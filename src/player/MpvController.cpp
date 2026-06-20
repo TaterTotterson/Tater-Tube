@@ -197,8 +197,6 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
         args << QStringLiteral("--shuffle");
     if (muteAudio)
         args << QStringLiteral("--no-audio");
-    else
-        appendAudioArgs(args);
     if (!httpHeaderFields.isEmpty()) {
         args << QString("--http-header-fields=%1").arg(httpHeaderFields);
     }
@@ -222,6 +220,9 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
     });
 
     m_headlessMode = detectHeadlessMode();
+    if (!muteAudio)
+        appendAudioArgs(args);
+
     if (m_headlessMode) {
         {
             QProcessEnvironment env = QProcessEnvironment::systemEnvironment();

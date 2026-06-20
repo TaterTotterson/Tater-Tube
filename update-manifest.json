@@ -1,11 +1,11 @@
 {
-  "version": "2026.06.20.6",
+  "version": "2026.06.20.7",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/240-MP-Emby-Jelly",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/240-MP-Emby-Jelly/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/releases/download/v2026.06.20.6/240-MP-v2026.06.20.6-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/archive/refs/tags/v2026.06.20.6.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/releases/download/v2026.06.20.7/240-MP-v2026.06.20.7-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/archive/refs/tags/v2026.06.20.7.tar.gz",
   "notes": [
-    "Routes Raspberry Pi composite playback audio to the analog Headphones ALSA device while preserving AAC stereo server transcoding."
+    "Fixes Raspberry Pi composite playback audio launch order so mpv receives the analog Headphones ALSA device automatically."
   ]
 }
