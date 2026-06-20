@@ -22,7 +22,7 @@ Build the default CRT/composite NTSC image:
 ./scripts/build-pi-image.sh
 ```
 
-Build the default CRT/composite NTSC image and enable SSH with a public key:
+Build the default CRT/composite NTSC image and add your SSH public key:
 
 ```bash
 PI_FIRST_USER_PUBKEY=~/.ssh/id_ed25519.pub \
@@ -53,7 +53,7 @@ The finished `.img.xz` lands in:
 .cache/pi-gen-arm64/deploy/
 ```
 
-Flash that image with Raspberry Pi Imager, Balena Etcher, or `dd`, then boot the Pi. 240-MP starts automatically as a dedicated `mp240` service user. The normal login user is only for SSH, debugging, and the `Exit to Terminal` flow.
+Flash that image with Raspberry Pi Imager, Balena Etcher, or `dd`, then boot the Pi. 240-MP starts automatically as a dedicated `mp240` service user. SSH is enabled by default for debugging and can be toggled from Settings. The normal login user is only for SSH, debugging, and the `Exit to Terminal` flow.
 
 The default login is `tater` / `pi`. Override `PI_FIRST_USER_NAME` and `PI_FIRST_USER_PASS` before building if you plan to share the image outside your own network.
 
@@ -70,7 +70,7 @@ Useful image build options:
 | `PI_FIRST_USER_NAME` | `tater` | Normal login user |
 | `PI_FIRST_USER_PASS` | `pi` | Password for the normal login user |
 | `PI_FIRST_USER_PUBKEY` | unset | SSH public key string or path to a `.pub` file; enables SSH automatically |
-| `PI_ENABLE_SSH` | `0` | Enable SSH when set to `1` |
+| `PI_ENABLE_SSH` | `1` | Enable SSH in the image; set to `0` to build with SSH off |
 | `PI_PUBKEY_ONLY_SSH` | `0` | Disable SSH password auth when set to `1` and `PI_FIRST_USER_PUBKEY` is set |
 | `PI_ENABLE_IR` | `1` | Enable GPIO IR receiver support in the image |
 | `PI_IR_GPIO_PIN` | `17` | GPIO pin used by the IR receiver data line |

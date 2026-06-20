@@ -269,16 +269,13 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
         if (m_qtDrmFd < 0) {
             qWarning("[MpvController] Could not find Qt DRM fd");
         } else {
+            m_qtDrmMasterDropped = true;
+            qDebug("[MpvController] DRM master dropped (fd %d)", m_qtDrmFd);
+
             // Save the current CRTC state so we can restore it exactly after
             // mpv exits. mpv's atomic cleanup disables the CRTC (CRTC_ACTIVE=0);
             // without this restore, Qt EGLFS gets EINVAL on its next page flip.
             saveDrmCrtcState(m_qtDrmFd);
-            if (::ioctl(m_qtDrmFd, DRM_IOCTL_DROP_MASTER, 0) < 0) {
-                qWarning("[MpvController] drmDropMaster failed: %s", strerror(errno));
-            } else {
-                m_qtDrmMasterDropped = true;
-                qDebug("[MpvController] DRM master dropped (fd %d)", m_qtDrmFd);
-            }
         }
 #endif
 
@@ -502,6 +499,15 @@ MpvController::VideoProfile MpvController::detectVideoProfile() const {
     return VideoProfile::Generic;
 }
 
+bool MpvController::hasCompositeDrmConnector() const {
+#ifdef Q_OS_LINUX
+    return QFile::exists(QStringLiteral("/dev/dri/card1")) &&
+           QFile::exists(QStringLiteral("/sys/class/drm/card1-Composite-1"));
+#else
+    return false;
+#endif
+}
+
 void MpvController::appendVideoArgs(QStringList &args) const {
     // App-level "mpv_video_args" override replaces the auto-detected vo/hwdec
     // flags verbatim. Read here (not cached) so edits to config.json take effect
@@ -525,7 +531,12 @@ void MpvController::appendVideoArgs(QStringList &args) const {
             // jitters into visible 24p judder. The copy + zimg downscale costs more
             // CPU (~50-70% across 4 cores) but the Pi4 has the headroom, and crop
             // (--panscan) works because frames go through the normal scaler.
-            args << "--vo=drm" << "--hwdec=v4l2m2m-copy";
+            args << "--vo=drm";
+            if (hasCompositeDrmConnector()) {
+                args << "--drm-device=/dev/dri/card1"
+                     << "--drm-connector=Composite-1";
+            }
+            args << "--hwdec=v4l2m2m-copy";
         } else if (m_videoProfile == VideoProfile::Pi3) {
             // Pi 3B/3B+: too weak for the copy + software-scale path above (it pegs
             // all four cores and gets choppy). Zero-copy v4l2m2m hands decoded frames
@@ -603,8 +614,9 @@ int MpvController::findQtDrmFd() const {
 #ifdef Q_OS_LINUX
     // Scan the process's open file descriptors for Qt's DRM primary card
     // device. DRM primary nodes have major=226, minor 0-63 (card0, card1…).
-    // We try DRM_IOCTL_DROP_MASTER on each candidate — it succeeds only on
-    // the fd that currently holds DRM master, which tells us it's Qt's fd.
+    // We try DRM_IOCTL_DROP_MASTER on each candidate; it succeeds only on
+    // the fd that currently holds DRM master. The returned fd has already
+    // dropped master and needs DRM_IOCTL_SET_MASTER during restore.
     QDir fdDir("/proc/self/fd");
     const QStringList entries = fdDir.entryList(QDir::Files | QDir::System);
     for (const QString &entry : entries) {

@@ -30,6 +30,7 @@ install -m 0755 "$SOURCE_DIR/scripts/lib/pi-setup.sh" "${ROOTFS_DIR}/tmp/240mp-p
 {
     printf 'PI240_SERVICE_USER=%q\n' "${PI240_SERVICE_USER:-mp240}"
     printf 'PI240_SERVICE_HOME=%q\n' "${PI240_SERVICE_HOME:-/var/lib/240mp}"
+    printf 'PI240_IMAGE_PROFILE=%q\n' "$PROFILE"
     printf 'PI240_ENABLE_IR=%q\n' "$ENABLE_IR"
     printf 'PI240_IR_GPIO_PIN=%q\n' "$IR_GPIO_PIN"
     printf 'PI240_IR_PROTOCOL=%q\n' "${PI240_IR_PROTOCOL:-nec}"

@@ -9,6 +9,7 @@ libxkbcommon-dev
 libsdl2-2.0-0
 libsdl2-dev
 mpv
+openssh-server
 plymouth
 plymouth-themes
 pkg-config

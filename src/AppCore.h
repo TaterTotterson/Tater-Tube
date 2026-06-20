@@ -49,6 +49,8 @@ public:
     Q_INVOKABLE QVariantMap getUpdateInfo() const;
     Q_INVOKABLE void checkForUpdates();
     Q_INVOKABLE void installUpdate();
+    Q_INVOKABLE QVariantMap getSshInfo() const;
+    Q_INVOKABLE QVariantMap setSshEnabled(bool enabled);
 
     // Registers a module backend: stores it for action routing, exposes it to QML under
     // contextProperty, and connects its optional signals/slots by introspection (only

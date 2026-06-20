@@ -20,6 +20,7 @@ namespace {
 constexpr const char *kDefaultUpdateManifestUrl =
     "https://raw.githubusercontent.com/TaterTotterson/240-MP-Emby-Jelly/main/update-manifest.json";
 constexpr const char *kPiUpdateHelper = "/usr/local/sbin/240mp-update";
+constexpr const char *kSshControlHelper = "/usr/local/sbin/240mp-ssh-control";
 
 int compareVersions(const QString &left, const QString &right)
 {
@@ -35,6 +36,104 @@ int compareVersions(const QString &left, const QString &right)
     }
 
     return QString::compare(left, right, Qt::CaseInsensitive);
+}
+
+bool truthyValue(const QString &value)
+{
+    const QString normalized = value.trimmed().toLower();
+    return normalized == "1" || normalized == "true" || normalized == "yes" ||
+           normalized == "on";
+}
+
+QVariantMap parseSshControlOutput(const QString &output)
+{
+    QVariantMap result{
+        {"available", false},
+        {"enabled", false},
+        {"active", false}
+    };
+
+    const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+    for (const QString &line : lines) {
+        const int eq = line.indexOf('=');
+        if (eq <= 0)
+            continue;
+
+        const QString key = line.left(eq).trimmed();
+        const QString value = line.mid(eq + 1).trimmed();
+        if (key == "available" || key == "enabled" || key == "active")
+            result[key] = truthyValue(value);
+    }
+
+    return result;
+}
+
+QString sshControlMessage(const QVariantMap &info)
+{
+    if (!info.value("available").toBool())
+        return QStringLiteral("SSH SERVICE IS NOT AVAILABLE.");
+    if (info.value("enabled").toBool() && info.value("active").toBool())
+        return QStringLiteral("SSH IS ON.");
+    if (info.value("enabled").toBool())
+        return QStringLiteral("SSH IS ENABLED BUT NOT RUNNING.");
+    return QStringLiteral("SSH IS OFF.");
+}
+
+QVariantMap runSshControl(const QString &action)
+{
+    QVariantMap result{
+        {"ok", false},
+        {"available", false},
+        {"enabled", false},
+        {"active", false},
+        {"message", "SSH CONTROL IS NOT AVAILABLE ON THIS SYSTEM."}
+    };
+
+#ifndef Q_OS_LINUX
+    Q_UNUSED(action);
+    return result;
+#else
+    const QFileInfo helperInfo(QString::fromUtf8(kSshControlHelper));
+    if (!helperInfo.exists() || !helperInfo.isExecutable())
+        return result;
+
+    const QFileInfo sudoInfo("/usr/bin/sudo");
+    const QString sudoPath = sudoInfo.exists() ? QStringLiteral("/usr/bin/sudo")
+                                               : QStringLiteral("sudo");
+    const QStringList args{
+        QStringLiteral("-n"),
+        QString::fromUtf8(kSshControlHelper),
+        action
+    };
+
+    QProcess process;
+    process.start(sudoPath, args);
+    if (!process.waitForStarted(1000)) {
+        result["message"] = "COULD NOT START SSH CONTROL HELPER.";
+        return result;
+    }
+
+    if (!process.waitForFinished(10000)) {
+        process.kill();
+        process.waitForFinished(1000);
+        result["message"] = "SSH CONTROL HELPER TIMED OUT.";
+        return result;
+    }
+
+    const QString output = QString::fromUtf8(process.readAllStandardOutput());
+    const QString errorOutput = QString::fromUtf8(process.readAllStandardError()).trimmed();
+    const QVariantMap parsedStatus = parseSshControlOutput(output);
+    for (auto it = parsedStatus.constBegin(); it != parsedStatus.constEnd(); ++it)
+        result.insert(it.key(), it.value());
+
+    const bool ok = process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+    result["ok"] = ok;
+    result["message"] = ok ? sshControlMessage(result)
+                           : (errorOutput.isEmpty()
+                                  ? QStringLiteral("SSH CONTROL HELPER FAILED.")
+                                  : errorOutput.toUpper());
+    return result;
+#endif
 }
 }
 
@@ -419,6 +518,14 @@ void AppCore::installUpdate() {
         ? "INSTALLING UPDATE. 240-MP WILL RESTART."
         : "COULD NOT START THE UPDATE HELPER.";
     emit updateInstallFinished(result);
+}
+
+QVariantMap AppCore::getSshInfo() const {
+    return runSshControl(QStringLiteral("status"));
+}
+
+QVariantMap AppCore::setSshEnabled(bool enabled) {
+    return runSshControl(enabled ? QStringLiteral("enable") : QStringLiteral("disable"));
 }
 
 QVariant AppCore::get_installed_modules() {

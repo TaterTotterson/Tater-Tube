@@ -78,6 +78,7 @@ private:
     void doHeadlessRestore(int pos, int dur, bool naturalEof, bool playbackError);
     bool detectHeadlessMode() const;
     VideoProfile detectVideoProfile() const;
+    bool hasCompositeDrmConnector() const;
     // Appends the profile-specific --vo/--gpu-context/--hwdec flags (honouring the
     // app-level "mpv_video_args" override) to a forming mpv argument list.
     void appendVideoArgs(QStringList &args) const;

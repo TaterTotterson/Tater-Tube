@@ -24,6 +24,7 @@ FocusScope {
     property string updateMessage: ""
     property string updateDetail: ""
     property var updateOptions: []
+    property var sshInfo: ({})
 
     // Quit overlay choices. Under the autostart service (headless RPi) the quit menu has an
     // "Exit to Terminal" option that drops to a tty1 login without powering off; that
@@ -74,7 +75,15 @@ FocusScope {
         }
 
         // SYSTEM section
+        var ssh = settingsRoot.refreshSshInfo()
         items.push({ type: "section", label: "System:" })
+        items.push({
+            type: "ssh_toggle",
+            label: "SSH Access",
+            value: settingsRoot.sshRowValue(ssh),
+            available: !!ssh.available,
+            enabled: !!ssh.enabled
+        })
         items.push({ type: "action", action: "check_updates", label: "Check For Updates", value: root.appVersion })
         items.push({ type: "quit", label: "Quit 240-MP" })
 
@@ -92,6 +101,38 @@ FocusScope {
             }
         }
         settingsList.positionViewAtIndex(settingsList.currentIndex, ListView.Contain)
+    }
+
+    function sshRowValue(info) {
+        if (!info || !info.available) return "N/A"
+        return info.enabled ? "On" : "Off"
+    }
+
+    function refreshSshInfo() {
+        sshInfo = appCore.getSshInfo()
+        return sshInfo
+    }
+
+    function replaceSettingsRow(rowIndex, values) {
+        var updated = settingsItems.slice()
+        updated[rowIndex] = Object.assign({}, updated[rowIndex], values)
+        var savedIndex = settingsList.currentIndex
+        settingsItems = updated
+        settingsList.currentIndex = savedIndex
+    }
+
+    function setSshEnabled(rowIndex, enabled) {
+        var row = settingsItems[rowIndex]
+        if (!row || !row.available) return
+
+        replaceSettingsRow(rowIndex, { value: "..." })
+        var result = appCore.setSshEnabled(enabled)
+        sshInfo = result
+        replaceSettingsRow(rowIndex, {
+            value: settingsRoot.sshRowValue(result),
+            available: !!result.available,
+            enabled: !!result.enabled
+        })
     }
 
     function firstSelectableAfter(idx) {
@@ -220,6 +261,8 @@ FocusScope {
                 settingsItems = updated
                 currentIndex = savedIndex
                 appCore.save_setting(row.moduleId, row.key, newVal)
+            } else if (row && row.type === "ssh_toggle") {
+                settingsRoot.setSshEnabled(currentIndex, false)
             }
         }
 
@@ -236,6 +279,8 @@ FocusScope {
                 settingsItems = updated
                 currentIndex = savedIndex
                 appCore.save_setting(row.moduleId, row.key, newVal)
+            } else if (row && row.type === "ssh_toggle") {
+                settingsRoot.setSshEnabled(currentIndex, true)
             }
         }
 
@@ -245,6 +290,8 @@ FocusScope {
                 settingsRoot.navigateTo("views/ModuleSettings.qml", { moduleId: row.moduleId }, { currentIndex: settingsList.currentIndex })
             } else if (row && row.type === "action" && row.action === "check_updates") {
                 settingsRoot.beginUpdateCheck()
+            } else if (row && row.type === "ssh_toggle") {
+                settingsRoot.setSshEnabled(currentIndex, !row.enabled)
             } else if (row && row.type === "quit") {
                 settingsRoot.quitChoiceIndex = 0
                 settingsRoot.quitOverlayVisible = true
@@ -305,7 +352,7 @@ FocusScope {
                     spacing: root.sw * 0.00625 //4
 
                     Text {
-                        visible: modelData.type === "list_single"
+                        visible: modelData.type === "list_single" || (modelData.type === "ssh_toggle" && modelData.available === true)
                         text: "\u25C4"
                         color: settingsList.currentIndex === index ? root.surfaceColor : root.tertiaryColor
                         font.family: root.globalFont
@@ -328,7 +375,7 @@ FocusScope {
                         font.pixelSize:root.sh * 0.05 //24
                     }
                     Text {
-                        visible: modelData.type === "submenu" || modelData.type === "list_single" || modelData.type === "action"
+                        visible: modelData.type === "submenu" || modelData.type === "list_single" || modelData.type === "action" || (modelData.type === "ssh_toggle" && modelData.available === true)
                         text: "\u25BA"
                         color: settingsList.currentIndex === index ? root.surfaceColor : root.tertiaryColor
                         font.family: root.globalFont

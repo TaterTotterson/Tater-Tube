@@ -15,6 +15,7 @@ PI240_RUNTIME_PACKAGES=(
     qml6-module-qtquick-effects
     libsdl2-2.0-0
     mpv
+    openssh-server
     plymouth
     plymouth-themes
     v4l-utils
@@ -103,7 +104,7 @@ pi240_boot_cmdline_path() {
     printf '%s' /boot/firmware/cmdline.txt
 }
 
-pi240_add_boot_cmdline_args() {
+pi240_append_boot_cmdline_args() {
     local cmdline_txt
     cmdline_txt="$(pi240_boot_cmdline_path)"
 
@@ -116,7 +117,19 @@ pi240_add_boot_cmdline_args() {
     fi
 
     local arg
-    for arg in \
+    for arg in "$@"; do
+        [ -n "$arg" ] || continue
+        case " $current " in
+            *" $arg "*) ;;
+            *) current="${current:+$current }$arg" ;;
+        esac
+    done
+
+    printf '%s\n' "$current" | pi240_root tee "$cmdline_txt" >/dev/null
+}
+
+pi240_add_boot_cmdline_args() {
+    pi240_append_boot_cmdline_args \
         quiet \
         splash \
         loglevel=3 \
@@ -126,14 +139,18 @@ pi240_add_boot_cmdline_args() {
         rd.systemd.show_status=false \
         udev.log_level=3 \
         plymouth.ignore-serial-consoles
-    do
-        case " $current " in
-            *" $arg "*) ;;
-            *) current="${current:+$current }$arg" ;;
-        esac
-    done
+}
 
-    printf '%s\n' "$current" | pi240_root tee "$cmdline_txt" >/dev/null
+pi240_force_composite_video() {
+    # The Pi composite KMS connector reports "unknown" unless it is force-enabled.
+    # mpv rejects that as disconnected, even though Qt can render through vc4drmfb.
+    pi240_append_boot_cmdline_args "video=Composite-1:720x480ie"
+}
+
+pi240_auto_force_composite_video() {
+    if compgen -G "/sys/class/drm/*-Composite-1" >/dev/null; then
+        pi240_force_composite_video
+    fi
 }
 
 pi240_enable_ir_overlay() {
@@ -296,6 +313,86 @@ SUDOERS
     if command -v visudo >/dev/null 2>&1; then
         pi240_root visudo -cf /etc/sudoers.d/240mp-update
     fi
+}
+
+pi240_install_ssh_control() {
+    local service_user="${1:-mp240}"
+    local helper="${2:-/usr/local/sbin/240mp-ssh-control}"
+    local default_enabled="${3:-}"
+
+    pi240_install_file_from_stdin "$helper" 0755 <<'HELPER'
+#!/usr/bin/env bash
+set -euo pipefail
+
+unit="ssh.service"
+action="${1:-status}"
+
+systemd_live() {
+    [ -d /run/systemd/system ]
+}
+
+emit_status() {
+    local available=0
+    local enabled=0
+    local active=0
+
+    if systemctl cat "$unit" >/dev/null 2>&1; then
+        available=1
+    fi
+    if systemctl is-enabled --quiet "$unit" >/dev/null 2>&1; then
+        enabled=1
+    fi
+    if systemctl is-active --quiet "$unit" >/dev/null 2>&1; then
+        active=1
+    fi
+
+    printf 'available=%s\n' "$available"
+    printf 'enabled=%s\n' "$enabled"
+    printf 'active=%s\n' "$active"
+}
+
+case "$action" in
+    status)
+        emit_status
+        ;;
+    enable)
+        systemctl unmask "$unit" >/dev/null 2>&1 || true
+        systemctl enable "$unit"
+        if systemd_live; then
+            systemctl start "$unit"
+        fi
+        emit_status
+        ;;
+    disable)
+        systemctl disable "$unit"
+        if systemd_live; then
+            systemctl stop "$unit"
+        fi
+        emit_status
+        ;;
+    *)
+        echo "usage: $0 [status|enable|disable]" >&2
+        exit 2
+        ;;
+esac
+HELPER
+
+    pi240_install_file_from_stdin /etc/sudoers.d/240mp-ssh-control 0440 <<SUDOERS
+${service_user} ALL=(root) NOPASSWD: ${helper}
+SUDOERS
+
+    if command -v visudo >/dev/null 2>&1; then
+        pi240_root visudo -cf /etc/sudoers.d/240mp-ssh-control
+    fi
+
+    case "$default_enabled" in
+        1|true|TRUE|yes|YES|on|ON)
+            pi240_root "$helper" enable || true
+            ;;
+        0|false|FALSE|no|NO|off|OFF)
+            pi240_root "$helper" disable || true
+            ;;
+    esac
 }
 
 pi240_install_ir_support() {

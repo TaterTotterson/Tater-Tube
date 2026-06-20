@@ -84,6 +84,8 @@ if [[ "${REPLY}" =~ ^[Yy]$ ]]; then
     SERVICE_USER="${SERVICE_USER:-pi}"
 
     pi240_install_autostart "${SERVICE_USER}" "${LAUNCHER}" "${SYSTEMD_SERVICE}"
+    pi240_install_ssh_control "${SERVICE_USER}" /usr/local/sbin/240mp-ssh-control
+    pi240_auto_force_composite_video
     pi240_install_boot_splash
     echo "Service installed and enabled."
     echo "Start now with: sudo systemctl start 240mp"

@@ -272,6 +272,8 @@ How you read logs depends on whether you installed the autostart service:
     ```
     Ready-to-flash images also leave `tty2` available as a recovery console; press `Ctrl+Alt+F2`, log in, and inspect `journalctl -u 240mp -b`.
 
+Ready-to-flash images enable SSH by default for debugging. The Settings screen includes an `SSH Access` row that toggles `ssh.service` through `/usr/local/sbin/240mp-ssh-control`; set `PI_ENABLE_SSH=0` when building if you want SSH off on first boot.
+
 ### mpv playback logs
 
 During playback the app hands off to mpv as a subprocess (see [ARCHITECTURE.md → Playback Hand-off](ARCHITECTURE.md#playback-hand-off-mpvcontroller)). `MpvController` writes mpv's own output to a log file in the temp dir alongside its IPC socket (`/tmp/240mp-mpv.sock`) — useful when a video won't play or transcoding misbehaves.

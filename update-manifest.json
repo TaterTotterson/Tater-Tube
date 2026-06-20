@@ -1,11 +1,11 @@
 {
-  "version": "2026.06.20.4",
+  "version": "2026.06.20.5",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/240-MP-Emby-Jelly",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/240-MP-Emby-Jelly/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/releases/download/v2026.06.20.4/240-MP-v2026.06.20.4-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/archive/refs/tags/v2026.06.20.4.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/releases/download/v2026.06.20.5/240-MP-v2026.06.20.5-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/archive/refs/tags/v2026.06.20.5.tar.gz",
   "notes": [
-    "Raspberry Pi appliance updates download the prebuilt Linux arm64 release archive, install /opt/240mp, and restart the 240-MP service."
+    "Fixes Raspberry Pi composite playback handoff/restore, adds explicit mpv DRM connector selection, and keeps SSH controllable from Settings."
   ]
 }

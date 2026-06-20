@@ -55,6 +55,7 @@ Watch on YouTube: https://youtu.be/r-gylGDoELY
 ### Global
 - Color schemes, including the Off Air CRT/static theme
 - Keyboard, USB remote, and controller input support
+- Settings toggle for SSH access on ready-to-flash Pi images
 - Media Keys during video playback (volume +/-, mute, play/pause, stop, seek, next chapter, previous chapter)
 
 ## Install 
