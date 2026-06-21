@@ -2,7 +2,8 @@ local assdraw = require 'mp.assdraw'
 
 local overlay = mp.create_osd_overlay("ass-events")
 local hide_timer = nil
-local DISPLAY_SECONDS = 2.8
+local DISPLAY_SECONDS = 7.0
+local latest_label = ""
 
 local function ass_escape(text)
     return tostring(text):gsub("\\", "\\\\"):gsub("{", "\\{"):gsub("}", "\\}")
@@ -17,11 +18,11 @@ local function hide()
 end
 
 local function draw_label(label)
-    if not label or label == "" then return end
+    if not label or label == "" then return false end
     label = ass_escape(label)
 
     local ww, wh = mp.get_osd_size()
-    if ww == 0 or wh == 0 then return end
+    if ww == 0 or wh == 0 then return false end
 
     local margin_x = math.floor(ww * 0.08)
     local margin_y = math.floor(wh * 0.11)
@@ -57,14 +58,29 @@ local function draw_label(label)
 
     if hide_timer then hide_timer:kill() end
     hide_timer = mp.add_timeout(DISPLAY_SECONDS, hide)
+    return true
 end
 
-mp.register_script_message("240mp-ota-channel", draw_label)
+local function show_label(label)
+    if not label or label == "" then return end
+    latest_label = label
+
+    draw_label(label)
+    for _, delay in ipairs({0.2, 0.7, 1.4}) do
+        mp.add_timeout(delay, function()
+            if latest_label == label then
+                draw_label(label)
+            end
+        end)
+    end
+end
+
+mp.register_script_message("240mp-ota-channel", show_label)
 
 mp.register_event("file-loaded", function()
     local title = mp.get_property("media-title", "")
     if title ~= "" then
-        draw_label(title)
+        show_label(title)
     end
 end)
 

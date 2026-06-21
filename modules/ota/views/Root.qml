@@ -483,12 +483,6 @@ FocusScope {
             }
         }
 
-        Text {
-            text: "IP OR HOSTNAME  ENTER:SAVE  " + root.hints.back + ":BACK"
-            color: root.tertiaryColor
-            font.family: root.globalFont
-            font.pixelSize: root.sh * 0.0333333
-        }
     }
 
     Text {
@@ -504,15 +498,4 @@ FocusScope {
         visible: !otaRoot.noSignalVisible && !otaRoot.hdhomerunSetupVisible && (otaRoot.tuningStaticVisible || !hasStartedPlayback)
     }
 
-    Text {
-        text: root.hints.back + ":BACK  CH +/-:UP/DOWN  LAST:LEFT  OK:TUNE"
-        color: root.tertiaryColor
-        font.family: root.globalFont
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.bottomMargin: root.sh * 0.1041667
-        anchors.leftMargin: root.sw * 0.125
-        font.pixelSize: root.sh * 0.0333333
-        visible: !otaRoot.noSignalVisible && !otaRoot.hdhomerunSetupVisible && (otaRoot.tuningStaticVisible || !hasStartedPlayback)
-    }
 }

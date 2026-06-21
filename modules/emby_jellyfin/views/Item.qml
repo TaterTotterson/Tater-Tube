@@ -456,19 +456,6 @@ FocusScope {
         }
     }
 
-    // Footer
-    Text {
-        id: footer
-        text: root.hints.back + ":BACK " + root.hints.navigate + ":NAVIGATE " + root.hints.change + ":CHANGE " + root.hints.select + ":SELECT"
-        color: root.tertiaryColor
-        font.family: root.globalFont
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.bottomMargin: root.sh * 0.1041667 //50
-        anchors.leftMargin: root.sw * 0.125 //80
-        font.pixelSize: root.sh * 0.0333333 //16
-    }
-
     // Launch overlay — covers the detail screen while Emby/Jellyfin prepares the stream
     // so a slow server doesn't make the app look frozen after pressing PLAY.
     Rectangle {
@@ -485,14 +472,5 @@ FocusScope {
             font.pixelSize: root.sh * 0.05 //24
         }
 
-        Text {
-            text: root.hints.back + ":CANCEL"
-            color: root.tertiaryColor
-            font.family: root.globalFont
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: root.sh * 0.1041667 //50
-            font.pixelSize: root.sh * 0.0333333 //16
-        }
     }
 }

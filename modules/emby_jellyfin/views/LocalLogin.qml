@@ -142,17 +142,6 @@ FocusScope {
         font.pixelSize: root.sh * 0.0333333
     }
 
-    Text {
-        text: root.hints.back + ":BACK " + root.hints.navigate + ":FIELDS ENTER:SIGN IN"
-        color: root.tertiaryColor
-        font.family: root.globalFont
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.bottomMargin: root.sh * 0.1041667
-        anchors.leftMargin: root.sw * 0.125
-        font.pixelSize: root.sh * 0.0333333
-    }
-
     component LoginField: Item {
         property alias text: fieldInput.text
         property string label: ""
