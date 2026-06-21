@@ -23,10 +23,12 @@ FocusScope {
     property bool leaving: false
     property bool hasStartedPlayback: false
     property bool tuningStaticVisible: true
+    property bool noSignalVisible: false
     property bool stoppingForTune: false
     property bool streamRequestActive: false
     property int lineupRequestSerial: 0
     property int tuneDelayMs: 1200
+    property int previousIndex: -1
 
     focus: true
 
@@ -85,6 +87,7 @@ FocusScope {
         if (!channel || !channel.id) return
 
         tuningStaticVisible = true
+        noSignalVisible = false
         hasStartedPlayback = false
         streamRequestActive = false
         statusText = channelLabel(channel)
@@ -109,7 +112,8 @@ FocusScope {
         if (!streamUrl) {
             statusText = "HDHOMERUN CHANNEL HAS NO STREAM URL"
             streamRequestActive = false
-            tuningStaticVisible = true
+            tuningStaticVisible = false
+            noSignalVisible = true
             return
         }
         appCore.save_setting(moduleId, "last_hdhomerun_channel_id", channel.id)
@@ -124,6 +128,7 @@ FocusScope {
         statusText = label
         hasStartedPlayback = true
         tuningStaticVisible = false
+        noSignalVisible = false
         streamRequestActive = false
         mpvController.loadAndPlay(url, 0.0, 0, -1, [], false, -1, 0.0,
                                   httpHeaderFields || "", false, "ota", false, label)
@@ -134,6 +139,8 @@ FocusScope {
         if (index < 0) index = channels.length - 1
         if (index >= channels.length) index = 0
 
+        if (currentIndex >= 0 && currentIndex !== index)
+            previousIndex = currentIndex
         currentIndex = index
         var channel = channels[currentIndex]
         if (!channel || !channel.id) return
@@ -157,6 +164,12 @@ FocusScope {
             requestSelectedStream()
     }
 
+    function tuneLastChannel() {
+        if (channels.length === 0) return
+        if (previousIndex < 0 || previousIndex >= channels.length) return
+        tuneIndex(previousIndex, false)
+    }
+
     function showHdhomerunSetup(message) {
         tuneTimer.stop()
         channels = []
@@ -165,6 +178,7 @@ FocusScope {
         streamRequestActive = false
         hasStartedPlayback = false
         tuningStaticVisible = true
+        noSignalVisible = false
         hdhomerunSetupVisible = true
         hdhomerunInputText = hdhomerunHost !== "" ? hdhomerunHost : "hdhomerun.local"
         hdhomerunHostField.text = hdhomerunInputText
@@ -199,6 +213,7 @@ FocusScope {
         streamRequestActive = false
         hasStartedPlayback = false
         tuningStaticVisible = true
+        noSignalVisible = false
         hdhomerunSetupVisible = false
         statusText = "LOADING HDHOMERUN CHANNELS..."
 
@@ -300,7 +315,7 @@ FocusScope {
             mpvController.sendKey("SPACE")
             event.accepted = true
         } else if (event.key === Qt.Key_Left) {
-            mpvController.sendKey("LEFT")
+            tuneLastChannel()
             event.accepted = true
         } else if (event.key === Qt.Key_Right) {
             mpvController.sendKey("RIGHT")
@@ -357,11 +372,17 @@ FocusScope {
             }
             statusText = "OTA PLAYBACK FAILED"
             streamRequestActive = false
-            tuningStaticVisible = true
+            tuningStaticVisible = false
+            noSignalVisible = true
         }
         function onScriptMessageReceived(message, arg) {
             if (message === "240mp-ota-tune-now") {
                 tuneNow()
+                return
+            }
+
+            if (message === "240mp-ota-last-channel") {
+                tuneLastChannel()
                 return
             }
 
@@ -396,6 +417,15 @@ FocusScope {
         color: otaRoot.tuningStaticVisible ? "transparent" : "black"
     }
 
+    NoSignalScreen {
+        anchors.fill: parent
+        visible: otaRoot.noSignalVisible
+        inputLabel: "AIR"
+        message: "NO SIGNAL"
+        detail: "WEAK SIGNAL"
+        z: 4
+    }
+
     AppBar {
         iconSource: otaRoot.moduleIcon
         title: otaRoot.moduleName
@@ -404,7 +434,7 @@ FocusScope {
         anchors.left: parent.left
         anchors.topMargin: root.sh * 0.125
         anchors.leftMargin: root.sw * 0.125
-        visible: otaRoot.tuningStaticVisible || !hasStartedPlayback
+        visible: !otaRoot.noSignalVisible && (otaRoot.tuningStaticVisible || !hasStartedPlayback)
     }
 
     Column {
@@ -471,11 +501,11 @@ FocusScope {
         width: root.sw * 0.8
         wrapMode: Text.WordWrap
         font.pixelSize: root.sh * 0.05
-        visible: !otaRoot.hdhomerunSetupVisible && (otaRoot.tuningStaticVisible || !hasStartedPlayback)
+        visible: !otaRoot.noSignalVisible && !otaRoot.hdhomerunSetupVisible && (otaRoot.tuningStaticVisible || !hasStartedPlayback)
     }
 
     Text {
-        text: root.hints.back + ":BACK  CH +/-:UP/DOWN  OK:TUNE"
+        text: root.hints.back + ":BACK  CH +/-:UP/DOWN  LAST:LEFT  OK:TUNE"
         color: root.tertiaryColor
         font.family: root.globalFont
         anchors.bottom: parent.bottom
@@ -483,6 +513,6 @@ FocusScope {
         anchors.bottomMargin: root.sh * 0.1041667
         anchors.leftMargin: root.sw * 0.125
         font.pixelSize: root.sh * 0.0333333
-        visible: !otaRoot.hdhomerunSetupVisible && (otaRoot.tuningStaticVisible || !hasStartedPlayback)
+        visible: !otaRoot.noSignalVisible && !otaRoot.hdhomerunSetupVisible && (otaRoot.tuningStaticVisible || !hasStartedPlayback)
     }
 }

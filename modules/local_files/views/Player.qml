@@ -12,6 +12,7 @@ FocusScope {
     property string itemTitle:   navParams.title    || ""
 
     property bool   overlayVisible:      false
+    property bool   noSignalVisible:     false
     property int    savedPositionMs:     0
     property int    savedPlaylistPos:    -1
     property int    choiceIndex:         0
@@ -34,7 +35,13 @@ FocusScope {
     focus: true
 
     Keys.onPressed: function(event) {
-        if (overlayVisible) {
+        if (noSignalVisible) {
+            if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back ||
+                event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                goBack()
+                event.accepted = true
+            }
+        } else if (overlayVisible) {
             if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
                 goBack()
                 event.accepted = true
@@ -50,7 +57,8 @@ FocusScope {
                 if (choiceIndex === 0 && startPlPos >= 0)
                     resumedFromPlaylistPos = startPlPos
                 overlayVisible = false
-                mpvController.loadAndPlay(filePath, startMs / 1000.0, 0, -1, [], loopOn, startPlPos)
+                mpvController.loadAndPlay(filePath, startMs / 1000.0, 0, -1, [], loopOn, startPlPos,
+                                          0.0, "", false, "", false, itemTitle)
                 event.accepted = true
             }
         } else {
@@ -125,6 +133,10 @@ FocusScope {
             }
             goBack()
         }
+
+        function onPlaybackFailed() {
+            noSignalVisible = true
+        }
     }
 
     Component.onCompleted: {
@@ -136,12 +148,12 @@ FocusScope {
         // Shuffle wins: a shuffled playlist starts fresh & random; resume position
         // (a sequential item index) is meaningless once order is randomized.
         if (shuffleOn && isPlaylist(filePath)) {
-            mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1, 0.0, "", false, "", true)
+            mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1, 0.0, "", false, "", true, itemTitle)
             return
         }
 
         if (resumeSetting === "no") {
-            mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1)
+            mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1, 0.0, "", false, "", false, itemTitle)
             return
         }
 
@@ -153,14 +165,16 @@ FocusScope {
             if (savedPos > 0 && savedPl >= 0)
                 resumedFromPlaylistPos = savedPl
             mpvController.loadAndPlay(filePath, savedPos > 0 ? savedPos / 1000.0 : 0.0,
-                                      0, -1, [], loopOn, savedPos > 0 ? savedPl : -1)
+                                      0, -1, [], loopOn, savedPos > 0 ? savedPl : -1,
+                                      0.0, "", false, "", false, itemTitle)
         } else {
             if (savedPos > 0) {
                 savedPositionMs  = savedPos
                 savedPlaylistPos = savedPl
                 overlayVisible   = true
             } else {
-                mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1)
+                mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1,
+                                          0.0, "", false, "", false, itemTitle)
             }
         }
     }
@@ -168,6 +182,15 @@ FocusScope {
     Rectangle {
         anchors.fill: parent
         color: "black"
+    }
+
+    NoSignalScreen {
+        anchors.fill: parent
+        visible: noSignalVisible
+        inputLabel: "VIDEO 1"
+        message: "NO SIGNAL"
+        detail: "FILE NOT PLAYABLE"
+        z: 4
     }
 
     Rectangle {

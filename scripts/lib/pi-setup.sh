@@ -370,7 +370,7 @@ PLYMOUTH_CONF
     pi240_root systemctl mask plymouth-quit.service plymouth-quit-wait.service || true
 
     if [ -e /run/240mp-updating ]; then
-        pi240_blank_update_console || true
+        pi240_show_update_splash || true
     fi
 }
 
@@ -378,6 +378,11 @@ pi240_show_update_splash() {
     if ! command -v plymouth >/dev/null 2>&1; then
         return 0
     fi
+
+    # Hide whatever agetty or the kernel last left on tty1 before Plymouth
+    # takes over. On composite output the handoff can otherwise expose the
+    # login console behind the update message for a moment.
+    pi240_blank_update_console || true
 
     if ! plymouth --ping >/dev/null 2>&1; then
         if command -v plymouthd >/dev/null 2>&1; then
@@ -400,7 +405,15 @@ pi240_blank_update_console() {
 
     # Clear stale login text from the underlying VT before the EGL app releases
     # the display. Plymouth may not be able to draw until KMS is free.
-    printf '\033c\033[?25l\033[2J\033[H' | pi240_root tee "$tty" >/dev/null 2>&1 || true
+    printf '\033c\033[?25l\033[0m\033[40m\033[37m\033[2J\033[3J\033[H' | pi240_root tee "$tty" >/dev/null 2>&1 || true
+
+    if command -v setterm >/dev/null 2>&1; then
+        if pi240_is_root; then
+            TERM=linux setterm --cursor off --clear all > "$tty" 2>/dev/null || true
+        else
+            sudo sh -c "TERM=linux setterm --cursor off --clear all > '$tty'" 2>/dev/null || true
+        fi
+    fi
 }
 
 pi240_install_launcher() {

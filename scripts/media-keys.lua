@@ -15,6 +15,8 @@ local VOLUME_STEP    = 5     -- percentage points per Volume +/- press
 local SEEK_FORWARD   = 30    -- Fast Forward jump, seconds
 local SEEK_BACK      = 10    -- Rewind jump, seconds
 local BAR_TIMEOUT    = 1.5   -- seconds the volume bar stays on screen
+local INPUT_LABEL    = (mp.get_opt("vcr-input") or ""):upper()
+local IS_OTA         = INPUT_LABEL == "AIR"
 
 local C_WHITE   = "&HFFFFFF&"
 local A_OPAQUE  = "&H00&"
@@ -115,7 +117,10 @@ end
 
 -- Run a seek/chapter command, then open the nav menu (mpv-osc.lua) so the new
 -- position is shown.
-local function seek_with_menu(command)
+local function seek_with_menu(command, label)
+    if label and label ~= "" then
+        mp.commandv("script-message", "240mp-vcr-status", label)
+    end
     mp.command(command)
     mp.commandv("script-message", "240mp-osd-menu-show")
 end
@@ -127,8 +132,21 @@ mp.add_forced_key_binding("MUTE",        "mk-mute",     function() mp.command("n
 mp.add_forced_key_binding("PLAYPAUSE", "mk-playpause", function() mp.command("cycle pause") end)
 mp.add_forced_key_binding("STOP",      "mk-stop",      function() mp.command("quit") end)
 
-mp.add_forced_key_binding("FORWARD", "mk-forward", function() seek_with_menu("no-osd seek " .. SEEK_FORWARD) end)
-mp.add_forced_key_binding("REWIND",  "mk-rewind",  function() seek_with_menu("no-osd seek -" .. SEEK_BACK) end)
+mp.add_forced_key_binding("FORWARD", "mk-forward", function() seek_with_menu("no-osd seek " .. SEEK_FORWARD, "FF") end)
+mp.add_forced_key_binding("REWIND",  "mk-rewind",  function() seek_with_menu("no-osd seek -" .. SEEK_BACK, "REW") end)
 
-mp.add_forced_key_binding("NEXT", "mk-next", function() seek_with_menu("no-osd add chapter 1") end)
-mp.add_forced_key_binding("PREV", "mk-prev", function() seek_with_menu("no-osd add chapter -1") end)
+mp.add_forced_key_binding("NEXT", "mk-next", function()
+    if IS_OTA then
+        mp.commandv("script-message", "240mp-ota-channel-step", "1")
+    else
+        seek_with_menu("no-osd add chapter 1", "NEXT")
+    end
+end)
+
+mp.add_forced_key_binding("PREV", "mk-prev", function()
+    if IS_OTA then
+        mp.commandv("script-message", "240mp-ota-last-channel")
+    else
+        seek_with_menu("no-osd add chapter -1", "PREV")
+    end
+end)

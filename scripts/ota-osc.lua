@@ -30,11 +30,13 @@ local function draw_label(label)
     local fs = math.max(18, math.floor(wh * 0.065))
     local box_w = math.min(math.floor(ww * 0.72), math.floor(#label * fs * 0.56 + pad_x * 2))
     local box_h = math.floor(fs * 1.35 + pad_y * 2)
+    local box_x = ww - margin_x - box_w
+    local text_x = ww - margin_x - pad_x
 
     local ass = assdraw.ass_new()
 
     ass:new_event()
-    ass:pos(margin_x, margin_y)
+    ass:pos(box_x, margin_y)
     ass:append("{\\bord0\\shad0\\1c&H000000&\\1a&H55&}")
     ass:draw_start()
     ass:rect_cw(0, 0, box_w, box_h)
@@ -42,8 +44,8 @@ local function draw_label(label)
 
     ass:new_event()
     ass:append(string.format(
-        "{\\an4\\pos(%d,%d)\\fnVCR OSD Mono\\fs%d\\1c&HFFFFFF&\\1a&H00&\\bord0\\shad0}%s",
-        margin_x + pad_x,
+        "{\\an6\\pos(%d,%d)\\fnVCR OSD Mono\\fs%d\\1c&HFFFFFF&\\1a&H00&\\bord0\\shad0}%s",
+        text_x,
         margin_y + math.floor(box_h / 2),
         fs,
         label))
@@ -74,8 +76,14 @@ local function tune_now()
     mp.commandv("script-message", "240mp-ota-tune-now")
 end
 
+local function tune_last()
+    mp.commandv("script-message", "240mp-ota-last-channel")
+end
+
 mp.add_forced_key_binding("UP", "ota-channel-up", function() tune_relative(1) end)
 mp.add_forced_key_binding("DOWN", "ota-channel-down", function() tune_relative(-1) end)
+mp.add_forced_key_binding("LEFT", "ota-last-channel", tune_last)
+mp.add_forced_key_binding("PREV", "ota-last-channel-prev", tune_last)
 mp.add_forced_key_binding("ENTER", "ota-tune-enter", tune_now)
 mp.add_forced_key_binding("KP_ENTER", "ota-tune-kp-enter", tune_now)
 mp.add_key_binding("ESC", "ota-esc", function() mp.command("quit") end)

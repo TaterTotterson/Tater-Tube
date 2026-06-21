@@ -166,8 +166,8 @@ local function draw_menu()
     local time_pos = math.min(math.max(0, (mp.get_property_number("time-pos", 0) or 0) + transcode_offset), total)
     local percent  = (total > 0) and math.min(100, math.max(0, time_pos / total * 100)) or 0
 
-    draw_text(ass, lm, row1_y, 4, format_time(time_pos), fs, C_WHITE, A_OPAQUE)
-    draw_text(ass, rm, row1_y, 6, format_time(total),    fs, C_WHITE, A_OPAQUE)
+    draw_text(ass, lm, row1_y, 4, "TCR " .. format_time(time_pos), fs, C_WHITE, A_OPAQUE)
+    draw_text(ass, rm, row1_y, 6, "END " .. format_time(total),    fs, C_WHITE, A_OPAQUE)
 
     -- ── Row 2: Seek bar ───────────────────────────────────────────
     local pad   = 2

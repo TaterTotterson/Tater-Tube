@@ -1,13 +1,15 @@
 {
-  "version": "2026.06.20.24",
+  "version": "2026.06.20.25",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/240-MP-Emby-Jelly",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/240-MP-Emby-Jelly/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/releases/download/v2026.06.20.24/240-MP-v2026.06.20.24-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/archive/refs/tags/v2026.06.20.24.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/releases/download/v2026.06.20.25/240-MP-v2026.06.20.25-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/archive/refs/tags/v2026.06.20.25.tar.gz",
   "notes": [
-    "Makes Over The Air HDHomeRun-only and removes the Emby/Jellyfin OTA source switch.",
-    "Restores the update handoff to a blank quiet screen instead of trying to draw the update splash.",
-    "Keeps the HDHomeRun address setup and channel tuning flow."
+    "Adds a blinking VCR-style clock to the main menu with manual clock controls in Settings.",
+    "Adds retro playback OSD flashes for input labels, play/pause, FF/REW, channel labels, and no-signal screens.",
+    "Adds a simple sleep timer and OTA last-channel recall.",
+    "Removes the packaged-app Quit option and menu control hints for a cleaner VCR front screen.",
+    "Shows the firmware update splash again while keeping tty1 blank underneath it."
   ]
 }

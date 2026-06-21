@@ -181,6 +181,10 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
     if (QFile::exists(mediaKeysScript))
         args << QString("--script=%1").arg(mediaKeysScript);
 
+    const QString vcrOsdScript = m_appRoot + "/scripts/vcr-osd.lua";
+    if (QFile::exists(vcrOsdScript))
+        args << QString("--script=%1").arg(vcrOsdScript);
+
     if (playlistStart >= 0)
         args << QString("--playlist-start=%1").arg(playlistStart);
     if (!displayTitle.isEmpty())
@@ -197,8 +201,12 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
         args << QStringLiteral("--sid=no");
     // else: external sub(s) loaded, subTrack==0 → mpv auto-selects first loaded sub
 
+    QStringList scriptOpts;
     if (transcodeOffsetSec > 0.5f)
-        args << QString("--script-opts=transcode-offset=%1").arg(double(transcodeOffsetSec), 0, 'f', 3);
+        scriptOpts << QString("transcode-offset=%1").arg(double(transcodeOffsetSec), 0, 'f', 3);
+    scriptOpts << QString("vcr-input=%1").arg(oscMode == "ota" ? QStringLiteral("AIR")
+                                                                : QStringLiteral("VIDEO 1"));
+    args << QString("--script-opts=%1").arg(scriptOpts.join(","));
 
     if (loop)
         args << QStringLiteral("--loop-playlist=inf");

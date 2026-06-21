@@ -86,6 +86,15 @@ Window {
         "White": "#FFFFFF"
     })
     property string offAirHighlightColor: "Orange"
+    property int vcrClockBaseMinutes: 0
+    property double vcrClockSetAtMs: 0
+    property int vcrClockTick: 0
+    property bool vcrClockColonVisible: true
+    property string vcrClockText: formatVcrClock()
+    property string sleepTimerMode: "Off"
+    property double sleepTimerEndMs: 0
+    property int sleepTimerRemainingSeconds: -1
+    property bool sleepTimerWarningVisible: sleepTimerRemainingSeconds > 0 && sleepTimerRemainingSeconds <= 60
     property string primaryColor:   (allThemes[currentTheme] || allThemes["Off Air"]).primary
     property string secondaryColor: (allThemes[currentTheme] || allThemes["Off Air"]).secondary
     property string tertiaryColor:  (allThemes[currentTheme] || allThemes["Off Air"]).tertiary
@@ -103,7 +112,104 @@ Window {
         function onAppSettingChanged(key, value) {
             if (key === "color_scheme") root.currentTheme = value
             if (key === "off_air_highlight_color") root.offAirHighlightColor = value
+            if (key === "vcr_clock_minutes" || key === "vcr_clock_set_at_ms")
+                root.loadVcrClock(appCore.get_settings())
+            if (key === "sleep_timer_mode" || key === "sleep_timer_end_ms")
+                root.loadSleepTimer(appCore.get_settings())
         }
+    }
+
+    function clampInt(value, minValue, maxValue, fallback) {
+        var parsed = parseInt(value)
+        if (isNaN(parsed)) return fallback
+        return Math.max(minValue, Math.min(maxValue, parsed))
+    }
+
+    function loadVcrClock(cfg) {
+        var app = (cfg && cfg.app) ? cfg.app : {}
+        var minutes = Number(app.vcr_clock_minutes)
+        var setAt = Number(app.vcr_clock_set_at_ms)
+        if (isNaN(minutes)) minutes = 0
+        if (isNaN(setAt) || setAt <= 0) setAt = Date.now()
+        vcrClockBaseMinutes = ((Math.floor(minutes) % 1440) + 1440) % 1440
+        vcrClockSetAtMs = setAt
+        vcrClockTick++
+    }
+
+    function vcrClockMinutesNow() {
+        var elapsedMinutes = Math.max(0, Math.floor((Date.now() - vcrClockSetAtMs) / 60000))
+        return (vcrClockBaseMinutes + elapsedMinutes) % 1440
+    }
+
+    function vcrClockParts() {
+        var minutes = vcrClockMinutesNow()
+        var hour24 = Math.floor(minutes / 60)
+        var minute = minutes % 60
+        var period = hour24 >= 12 ? "PM" : "AM"
+        var hour12 = hour24 % 12
+        if (hour12 === 0) hour12 = 12
+        return { hour: hour12, minute: minute, period: period }
+    }
+
+    function formatVcrClock() {
+        vcrClockTick
+        var parts = vcrClockParts()
+        var minute = parts.minute < 10 ? "0" + parts.minute : "" + parts.minute
+        var colon = vcrClockColonVisible ? ":" : " "
+        return parts.hour + colon + minute + " " + parts.period
+    }
+
+    function setVcrClock(hour12, minute, period) {
+        var hour = clampInt(hour12, 1, 12, 12)
+        var min = clampInt(minute, 0, 59, 0)
+        var p = (period === "PM") ? "PM" : "AM"
+        var hour24 = hour % 12
+        if (p === "PM") hour24 += 12
+        var minutes = hour24 * 60 + min
+        var setAt = Date.now()
+        vcrClockBaseMinutes = minutes
+        vcrClockSetAtMs = setAt
+        vcrClockTick++
+        appCore.save_setting("", "vcr_clock_minutes", minutes)
+        appCore.save_setting("", "vcr_clock_set_at_ms", setAt)
+    }
+
+    function sleepTimerMinutes(mode) {
+        if (mode === "30 Min") return 30
+        if (mode === "60 Min") return 60
+        if (mode === "90 Min") return 90
+        return 0
+    }
+
+    function loadSleepTimer(cfg) {
+        var app = (cfg && cfg.app) ? cfg.app : {}
+        sleepTimerMode = app.sleep_timer_mode || "Off"
+        sleepTimerEndMs = Number(app.sleep_timer_end_ms || 0)
+        if (sleepTimerMinutes(sleepTimerMode) <= 0)
+            sleepTimerRemainingSeconds = -1
+        checkSleepTimer()
+    }
+
+    function setSleepTimerMode(mode) {
+        var minutes = sleepTimerMinutes(mode)
+        sleepTimerMode = minutes > 0 ? mode : "Off"
+        sleepTimerEndMs = minutes > 0 ? Date.now() + minutes * 60000 : 0
+        appCore.save_setting("", "sleep_timer_mode", sleepTimerMode)
+        appCore.save_setting("", "sleep_timer_end_ms", sleepTimerEndMs)
+        checkSleepTimer()
+    }
+
+    function checkSleepTimer() {
+        var minutes = sleepTimerMinutes(sleepTimerMode)
+        if (minutes <= 0 || sleepTimerEndMs <= 0) {
+            sleepTimerRemainingSeconds = -1
+            return
+        }
+
+        var remaining = Math.ceil((sleepTimerEndMs - Date.now()) / 1000)
+        sleepTimerRemainingSeconds = remaining
+        if (remaining <= 0)
+            Qt.quit()
     }
 
     Component.onCompleted: {
@@ -129,6 +235,8 @@ Window {
             savedOffAirHighlight = "Orange"
         }
         root.offAirHighlightColor = savedOffAirHighlight
+        loadVcrClock(cfg)
+        loadSleepTimer(cfg)
 
         // Break declarative bindings on macOS so the C++ NSWindow override
         // in forceWindowFullScreen() isn't immediately re-fought by QML.
@@ -144,6 +252,17 @@ Window {
         id: font; source: "assets/fonts/VCR_OSD_MONO_1.001.ttf"
     }
     property string globalFont: font.name;
+
+    Timer {
+        interval: 500
+        repeat: true
+        running: true
+        onTriggered: {
+            root.vcrClockColonVisible = !root.vcrClockColonVisible
+            root.vcrClockTick++
+            root.checkSleepTimer()
+        }
+    }
 
     // --- INPUT / APP INFO MIRRORS ---
     // Views must bind these via `root.*`, never the appCore/inputManager
@@ -198,6 +317,42 @@ Window {
                 moduleLoader.setSource(prev.source, { "navParams": prev.params, "navListState": prev.listState || {} })
             }
 
+        }
+    }
+
+    Rectangle {
+        visible: root.sleepTimerWarningVisible
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: root.sh * 0.10
+        anchors.rightMargin: root.sw * 0.10
+        width: root.sw * 0.25
+        height: root.sh * 0.12
+        color: "black"
+        border.color: root.primaryColor
+        border.width: 2
+
+        Column {
+            anchors.centerIn: parent
+            spacing: root.sh * 0.01
+
+            Text {
+                text: "SLEEP"
+                color: root.primaryColor
+                font.family: root.globalFont
+                horizontalAlignment: Text.AlignHCenter
+                anchors.horizontalCenter: parent.horizontalCenter
+                font.pixelSize: root.sh * 0.0333333
+            }
+
+            Text {
+                text: Math.max(0, root.sleepTimerRemainingSeconds)
+                color: root.accentColor
+                font.family: root.globalFont
+                horizontalAlignment: Text.AlignHCenter
+                anchors.horizontalCenter: parent.horizontalCenter
+                font.pixelSize: root.sh * 0.05
+            }
         }
     }
 }

@@ -32,6 +32,7 @@ FocusScope {
     property bool stoppedReported:    false
     property bool playbackStarted:    false
     property bool overlayVisible:     false
+    property bool noSignalVisible:    false
     property int  choiceIndex:        0
     property string resumeSetting:    "ask"
     property bool pendingRetryTranscode: false
@@ -49,7 +50,13 @@ FocusScope {
     focus: true
 
     Keys.onPressed: function(event) {
-        if (overlayVisible) {
+        if (noSignalVisible) {
+            if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back ||
+                event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                goBack()
+                event.accepted = true
+            }
+        } else if (overlayVisible) {
             if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
                 goBack()
                 event.accepted = true
@@ -197,15 +204,18 @@ FocusScope {
     }
 
     function doStartPlayback(offsetMs) {
+        noSignalVisible = false
         if (isTranscoding) {
             // Transcode covers the full timeline (requested at offset 0), so seek mpv
             // to the resume point. This keeps everything before offsetMs seekable, so
             // the user can rewind past the resume point.
-            mpvController.loadAndPlay(streamUrl, offsetMs / 1000.0, 0, -1, [], false, -1, 0.0, httpHeaderFields)
+            mpvController.loadAndPlay(streamUrl, offsetMs / 1000.0, 0, -1, [], false, -1, 0.0,
+                                      httpHeaderFields, false, "", false, itemTitle)
         } else {
             var sub = buildSubArgs()
             mpvController.loadAndPlay(streamUrl, offsetMs / 1000.0,
-                                       audioIdx + 1, sub.track, sub.urls, false, -1, 0.0, httpHeaderFields)
+                                       audioIdx + 1, sub.track, sub.urls, false, -1, 0.0,
+                                       httpHeaderFields, false, "", false, itemTitle)
         }
     }
 
@@ -254,7 +264,8 @@ FocusScope {
                 // Fallback transcode was requested at offset 0 (full timeline), so seek
                 // mpv to the resume point — keeps everything before it seekable.
                 var sub = buildSubArgs()
-                mpvController.loadAndPlay(url, viewOffset / 1000.0, audioIdx + 1, sub.track, sub.urls, false, -1, 0.0, httpHeaderFields)
+                mpvController.loadAndPlay(url, viewOffset / 1000.0, audioIdx + 1, sub.track, sub.urls, false, -1, 0.0,
+                                          httpHeaderFields, false, "", false, itemTitle)
                 return
             }
         }
@@ -375,7 +386,8 @@ FocusScope {
                                               selectedAudioId, selectedSubtitleId,
                                               0)
             } else {
-                goBack()
+                noSignalVisible = true
+                playbackStarted = false
             }
         }
     }
@@ -421,8 +433,17 @@ FocusScope {
             font.family: root.globalFont
             anchors.centerIn: parent
             font.pixelSize: root.sh * 0.05 //24
-            visible: streamUrl !== "" && !overlayVisible && !playbackStarted
+            visible: streamUrl !== "" && !overlayVisible && !noSignalVisible && !playbackStarted
         }
+    }
+
+    NoSignalScreen {
+        anchors.fill: parent
+        visible: noSignalVisible
+        inputLabel: "VIDEO 1"
+        message: "NO SIGNAL"
+        detail: "PLAYBACK FAILED"
+        z: 4
     }
 
     Rectangle {

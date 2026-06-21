@@ -16,8 +16,6 @@ FocusScope {
     // Flat model: mix of section headers and rows
     property var settingsItems: []
 
-    property bool quitOverlayVisible: false
-    property int quitChoiceIndex: 0
     property bool updateOverlayVisible: false
     property bool updateBusy: false
     property int updateChoiceIndex: 0
@@ -26,22 +24,22 @@ FocusScope {
     property var updateOptions: []
     property var sshInfo: ({})
 
-    // Quit overlay choices. Under the autostart service (headless RPi) the quit menu has an
-    // "Exit to Terminal" option that drops to a tty1 login without powering off; that
-    // option is not needed on macOS/Desktop or when run by hand, so it's yes/no for that case.
-    property bool autostartSession: false
-    property var quitOptions: settingsRoot.autostartSession
-        ? [{ label: "Power Off",        action: "quit"     },
-           { label: "Exit to Terminal", action: "terminal" },
-           { label: "Cancel",           action: "cancel"   }]
-        : [{ label: "Yes", action: "quit" },
-           { label: "No",  action: "cancel" }]
+    function hourOptions() {
+        var opts = []
+        for (var i = 1; i <= 12; i++) opts.push("" + i)
+        return opts
+    }
+
+    function minuteOptions() {
+        var opts = []
+        for (var i = 0; i < 60; i++) opts.push(i < 10 ? "0" + i : "" + i)
+        return opts
+    }
 
     function buildModel() {
         var cfg = appCore.get_settings()
         appSettings = cfg.app || {}
         installedModules = appCore.get_installed_modules()
-        autostartSession = appCore.isAutostartSession()
 
         var items = []
 
@@ -67,6 +65,38 @@ FocusScope {
                 moduleId: ""
             })
         }
+        items.push({
+            type: "list_single",
+            key: "sleep_timer_mode",
+            label: "Sleep Timer",
+            options: ["Off","30 Min","60 Min","90 Min"],
+            value: root.sleepTimerMode || "Off",
+            moduleId: ""
+        })
+
+        var clockParts = root.vcrClockParts()
+        items.push({ type: "section", label: "Clock:" })
+        items.push({
+            type: "clock_part",
+            part: "hour",
+            label: "Clock Hour",
+            options: hourOptions(),
+            value: "" + clockParts.hour
+        })
+        items.push({
+            type: "clock_part",
+            part: "minute",
+            label: "Clock Minute",
+            options: minuteOptions(),
+            value: clockParts.minute < 10 ? "0" + clockParts.minute : "" + clockParts.minute
+        })
+        items.push({
+            type: "clock_part",
+            part: "period",
+            label: "Clock AM/PM",
+            options: ["AM","PM"],
+            value: clockParts.period
+        })
 
         // MODULES section — only show modules with has_settings
         var hasModuleSettings = false
@@ -95,7 +125,6 @@ FocusScope {
             enabled: !!ssh.enabled
         })
         items.push({ type: "action", action: "check_updates", label: "Check For Updates", value: root.appVersion })
-        items.push({ type: "quit", label: "Quit 240-MP" })
 
         settingsItems = items
 
@@ -146,17 +175,36 @@ FocusScope {
     }
 
     function setListSingleValue(rowIndex, row, newVal) {
+        if (row.type === "clock_part") {
+            setClockPartValue(rowIndex, row, newVal)
+            return
+        }
+
         var updated = settingsItems.slice()
         updated[rowIndex] = Object.assign({}, row, { value: newVal })
         var savedIndex = rowIndex
         settingsItems = updated
         settingsList.currentIndex = savedIndex
-        appCore.save_setting(row.moduleId, row.key, newVal)
+        if (row.moduleId === "" && row.key === "sleep_timer_mode")
+            root.setSleepTimerMode(newVal)
+        else
+            appCore.save_setting(row.moduleId, row.key, newVal)
 
         if (row.moduleId === "" && row.key === "color_scheme") {
             buildModel()
             settingsList.currentIndex = 0
         }
+    }
+
+    function setClockPartValue(rowIndex, row, newVal) {
+        var parts = root.vcrClockParts()
+        var hour = row.part === "hour" ? parseInt(newVal) : parts.hour
+        var minute = row.part === "minute" ? parseInt(newVal) : parts.minute
+        var period = row.part === "period" ? newVal : parts.period
+        root.setVcrClock(hour, minute, period)
+        buildModel()
+        settingsList.currentIndex = rowIndex
+        settingsList.positionViewAtIndex(settingsList.currentIndex, ListView.Contain)
     }
 
     function firstSelectableAfter(idx) {
@@ -274,7 +322,7 @@ FocusScope {
 
         Keys.onLeftPressed: {
             var row = settingsItems[currentIndex]
-            if (row && row.type === "list_single") {
+            if (row && (row.type === "list_single" || row.type === "clock_part")) {
                 var opts = row.options
                 var idx = opts.indexOf(row.value)
                 var newIdx = (idx - 1 + opts.length) % opts.length
@@ -286,7 +334,7 @@ FocusScope {
 
         Keys.onRightPressed: {
             var row = settingsItems[currentIndex]
-            if (row && row.type === "list_single") {
+            if (row && (row.type === "list_single" || row.type === "clock_part")) {
                 var opts = row.options
                 var idx = opts.indexOf(row.value)
                 var newIdx = (idx + 1) % opts.length
@@ -304,9 +352,6 @@ FocusScope {
                 settingsRoot.beginUpdateCheck()
             } else if (row && row.type === "ssh_toggle") {
                 settingsRoot.setSshEnabled(currentIndex, !row.enabled)
-            } else if (row && row.type === "quit") {
-                settingsRoot.quitChoiceIndex = 0
-                settingsRoot.quitOverlayVisible = true
             }
         }
 
@@ -364,7 +409,7 @@ FocusScope {
                     spacing: root.sw * 0.00625 //4
 
                     Text {
-                        visible: modelData.type === "list_single" || (modelData.type === "ssh_toggle" && modelData.available === true)
+                        visible: modelData.type === "list_single" || modelData.type === "clock_part" || (modelData.type === "ssh_toggle" && modelData.available === true)
                         text: "\u25C4"
                         color: settingsList.currentIndex === index ? root.surfaceColor : root.tertiaryColor
                         font.family: root.globalFont
@@ -374,7 +419,7 @@ FocusScope {
                         font.pixelSize: root.sh * 0.0375 //18
                     }
                     Text {
-                        visible: modelData.type === "list_single" || modelData.value !== undefined
+                        visible: modelData.type === "list_single" || modelData.type === "clock_part" || modelData.value !== undefined
                         text: modelData.value || ""
                         color: settingsList.currentIndex === index ? root.surfaceColor : root.primaryColor
                         font.family: root.globalFont
@@ -387,7 +432,7 @@ FocusScope {
                         font.pixelSize:root.sh * 0.05 //24
                     }
                     Text {
-                        visible: modelData.type === "submenu" || modelData.type === "list_single" || modelData.type === "action" || (modelData.type === "ssh_toggle" && modelData.available === true)
+                        visible: modelData.type === "submenu" || modelData.type === "list_single" || modelData.type === "clock_part" || modelData.type === "action" || (modelData.type === "ssh_toggle" && modelData.available === true)
                         text: "\u25BA"
                         color: settingsList.currentIndex === index ? root.surfaceColor : root.tertiaryColor
                         font.family: root.globalFont
@@ -396,109 +441,6 @@ FocusScope {
                         bottomPadding: root.sh * 0.00625 //3
                         font.pixelSize: root.sh * 0.0375 //18
                     }
-                }
-            }
-        }
-    }
-
-    // --- FOOTER ---
-    Text {
-        id: footer
-        text: root.hints.back + ":BACK " + root.hints.navigate + ":NAVIGATE " + root.hints.change + ":CHANGE " + root.hints.select + ":SELECT"
-        color: root.tertiaryColor
-        font.family: root.globalFont
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.bottomMargin: root.sh * 0.1041667 //50
-        anchors.leftMargin: root.sw * 0.125 //80
-        font.pixelSize: root.sh * 0.0333333 //16
-    }
-
-    // --- QUIT CONFIRMATION OVERLAY ---
-    Rectangle {
-        anchors.fill: parent
-        color: root.staticBackgroundEnabled ? "transparent" : root.surfaceColor
-        visible: quitOverlayVisible
-        focus: quitOverlayVisible
-
-        StaticBackground {
-            anchors.fill: parent
-            visible: root.staticBackgroundEnabled
-            running: visible
-        }
-
-        Keys.onUpPressed:   { quitChoiceIndex = Math.max(0, quitChoiceIndex - 1) }
-        Keys.onDownPressed: { quitChoiceIndex = Math.min(quitOptions.length - 1, quitChoiceIndex + 1) }
-        Keys.onReturnPressed: {
-            var act = quitOptions[quitChoiceIndex].action
-            if (act === "quit")          Qt.quit()
-            else if (act === "terminal") Qt.exit(10)   // matches EXIT_STATUS check in 240mp-stop
-            else { quitOverlayVisible = false; settingsList.forceActiveFocus() }
-        }
-        Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
-                quitOverlayVisible = false
-                settingsList.forceActiveFocus()
-                event.accepted = true
-            }
-        }
-
-        Rectangle {
-            color: root.staticBackgroundEnabled ? "transparent" : root.surfaceColor
-            anchors.centerIn: parent
-            width: root.sw * 0.76875   //492
-            height: root.sh * 0.2833333 //136
-
-            Column {
-                id: quitDialogColumn
-                anchors.fill: parent
-                spacing: root.sh * 0.05 //24
-
-                Text {
-                    text: "REALLY QUIT?"
-                    color: root.secondaryColor
-                    font.family: root.globalFont
-                    font.pixelSize: root.sh * 0.0333333 //16
-                    anchors.horizontalCenter: parent.horizontalCenter
-                }
-
-                Column {
-                    Repeater {
-                        model: quitOptions
-                        delegate: Item {
-                            width: quitDialogColumn.width
-                            height: root.sh * 0.0583333 //28
-
-                            Rectangle {
-                                anchors.fill: quitOptionText
-                                color: root.accentColor
-                                visible: index === quitChoiceIndex
-                            }
-
-                            Text {
-                                id: quitOptionText
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: modelData.label
-                                color: index === quitChoiceIndex ? root.surfaceColor : root.primaryColor
-                                font.family: root.globalFont
-                                font.capitalization: Font.AllUppercase
-                                topPadding: root.sh * 0.0041667 //2
-                                leftPadding: root.sw * 0.009375 //6
-                                rightPadding: root.sw * 0.009375 //6
-                                bottomPadding: root.sh * 0.00625 //3
-                                font.pixelSize: root.sh * 0.05 //24
-                            }
-                        }
-                    }
-                }
-
-                Text {
-                    text: root.hints.back + ":BACK " + root.hints.navigate + ":NAVIGATE " + root.hints.select + ":SELECT"
-                    color: root.tertiaryColor
-                    font.family: root.globalFont
-                    font.pixelSize: root.sh * 0.0333333 //16
-                    anchors.horizontalCenter: parent.horizontalCenter
                 }
             }
         }
@@ -619,13 +561,6 @@ FocusScope {
                     }
                 }
 
-                Text {
-                    text: updateBusy ? "" : root.hints.back + ":BACK " + root.hints.navigate + ":NAVIGATE " + root.hints.select + ":SELECT"
-                    color: root.tertiaryColor
-                    font.family: root.globalFont
-                    font.pixelSize: root.sh * 0.0333333 //16
-                    anchors.horizontalCenter: parent.horizontalCenter
-                }
             }
         }
     }
