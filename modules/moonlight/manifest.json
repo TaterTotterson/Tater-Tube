@@ -1,0 +1,62 @@
+{
+  "id": "com.240mp.moonlight",
+  "name": "PC Link",
+  "order": 40,
+  "icon": "assets/images/logo.svg",
+  "entry_point_qml": "views/Root.qml",
+  "settings": [
+    {
+      "key": "enabled",
+      "label": "ENABLED",
+      "type": "toggle",
+      "default": "ON"
+    },
+    {
+      "key": "sunshine_host",
+      "label": "SUNSHINE HOST",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "resolution",
+      "label": "RESOLUTION",
+      "type": "list_single",
+      "options": ["640x480", "720x480", "768x576", "800x600"],
+      "default": "640x480"
+    },
+    {
+      "key": "fps",
+      "label": "FPS",
+      "type": "list_single",
+      "options": ["30", "50", "60"],
+      "default": "60"
+    },
+    {
+      "key": "bitrate",
+      "label": "BITRATE",
+      "type": "list_single",
+      "options": ["3000 Kbps", "5000 Kbps", "8000 Kbps", "12000 Kbps"],
+      "default": "5000 Kbps"
+    },
+    {
+      "key": "codec",
+      "label": "CODEC",
+      "type": "list_single",
+      "options": ["h264", "auto"],
+      "default": "h264"
+    },
+    {
+      "key": "renderer",
+      "label": "RENDERER",
+      "type": "list_single",
+      "options": ["Auto", "Pi", "SDL"],
+      "default": "Auto"
+    },
+    {
+      "key": "refresh_app_cache",
+      "label": "REFRESH PC APPS",
+      "type": "action",
+      "action_slot": "refresh_app_cache"
+    }
+  ]
+}

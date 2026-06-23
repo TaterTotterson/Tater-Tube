@@ -1,12 +1,14 @@
 {
-  "version": "2026.06.23.7",
-  "app_version": "1.0.2",
+  "version": "2026.06.23.8",
+  "app_version": "1.0.3",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/CRT-Station",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/CRT-Station/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/CRT-Station/releases/download/v1.0.2/240-MP-v1.0.2-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/CRT-Station/archive/refs/tags/v1.0.2.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/CRT-Station/releases/download/v1.0.3/240-MP-v1.0.3-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/CRT-Station/archive/refs/tags/v1.0.3.tar.gz",
   "notes": [
+    "Adds PC Link for Moonlight/Sunshine pairing, app listing, and CRT-friendly game streaming.",
+    "Adds PC Link settings for host, resolution, FPS, bitrate, codec, renderer, and app-list refresh.",
     "Adds Argon ONE V2 fan control with Auto, Off, and fixed percentage settings in System settings.",
     "Improves Emby/Jellyfin login diagnostics and normalizes server URLs entered from web UI paths.",
     "Adds a Raspberry Pi 3 compatibility playback path with safer mpv hardware decode and one-time software fallback.",

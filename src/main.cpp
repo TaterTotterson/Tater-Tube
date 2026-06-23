@@ -16,6 +16,7 @@
 #include "modules/emby_jellyfin/EmbyJellyfinBackend.h"
 #include "modules/retro/RetroBackend.h"
 #include "modules/youtube_playlist/YouTubePlaylistBackend.h"
+#include "modules/moonlight/MoonlightBackend.h"
 #include "player/MpvController.h"
 #include "input/InputManager.h"
 #include "api/ControlApiServer.h"
@@ -58,7 +59,7 @@ static QString resolveDataRoot() {
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     app.setApplicationName("CRT Station");
-    app.setApplicationVersion("1.0.2");
+    app.setApplicationVersion("1.0.3");
 
     // Hide cursor — CRT Station is keyboard-only so the cursor serves no purpose.
     // On Linux, only hide on headless EGLFS (not desktop X11/Wayland sessions).
@@ -88,6 +89,7 @@ int main(int argc, char *argv[]) {
     EmbyJellyfinBackend embyBackend(appRoot, dataRoot);
     RetroBackend        retroBackend(appRoot, dataRoot);
     YouTubePlaylistBackend youtubePlaylistBackend(appRoot, dataRoot);
+    MoonlightBackend    moonlightBackend(appRoot, dataRoot);
     MpvController       mpvController(appRoot, &appCore);
     InputManager        inputManager(dataRoot);
     ControlApiServer    controlApi(&mpvController, &embyBackend, &retroBackend);
@@ -108,6 +110,8 @@ int main(int argc, char *argv[]) {
     appCore.registerModule("com.240mp.retro",        "retroBackend",       &retroBackend, ctx);
     appCore.registerModule("com.240mp.youtube_playlist",
                            "youtubePlaylistBackend", &youtubePlaylistBackend, ctx);
+    appCore.registerModule("com.240mp.moonlight",
+                           "moonlightBackend", &moonlightBackend, ctx);
 
     ctx->setContextProperty("appCore",       &appCore);
     ctx->setContextProperty("mpvController", &mpvController);
@@ -133,6 +137,9 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(&inputManager, &InputManager::homeRequested,
                      &retroBackend, &RetroBackend::stop_game,
+                     Qt::QueuedConnection);
+    QObject::connect(&inputManager, &InputManager::homeRequested,
+                     &moonlightBackend, &MoonlightBackend::stop_stream,
                      Qt::QueuedConnection);
     QObject::connect(&inputManager, &InputManager::homeRequested,
                      rootObject, [rootObject]() {

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(240mp VERSION 1.0.2 LANGUAGES CXX)
+project(240mp VERSION 1.0.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -28,6 +28,7 @@ add_executable(240mp
     src/modules/emby_jellyfin/EmbyJellyfinBackend.cpp
     src/modules/retro/RetroBackend.cpp
     src/modules/youtube_playlist/YouTubePlaylistBackend.cpp
+    src/modules/moonlight/MoonlightBackend.cpp
     src/player/MpvController.cpp
     src/input/InputManager.cpp
     src/api/ControlApiServer.cpp

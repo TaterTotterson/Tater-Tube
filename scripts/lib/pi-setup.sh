@@ -88,6 +88,7 @@ pi240_install_runtime_dependencies() {
     pi240_root apt-get install -y "${PI240_RUNTIME_PACKAGES[@]}"
     pi240_install_latest_ytdlp
     pi240_install_retro_core_dependencies
+    pi240_install_moonlight_streaming
 }
 
 pi240_install_missing_runtime_dependencies() {
@@ -106,6 +107,7 @@ pi240_install_missing_runtime_dependencies() {
     if [ "${#missing[@]}" -eq 0 ]; then
         pi240_install_latest_ytdlp
         pi240_install_missing_retro_core_dependencies
+        pi240_install_moonlight_streaming
         return 0
     fi
 
@@ -113,6 +115,7 @@ pi240_install_missing_runtime_dependencies() {
     pi240_root env DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing[@]}"
     pi240_install_latest_ytdlp
     pi240_install_missing_retro_core_dependencies no-update
+    pi240_install_moonlight_streaming
 }
 
 pi240_install_latest_ytdlp() {
@@ -144,6 +147,39 @@ pi240_install_latest_ytdlp() {
         printf '[240mp-setup] Could not refresh yt-dlp from %s; keeping packaged copy\n' "$url" >&2
     fi
     rm -f "$tmp"
+}
+
+pi240_install_moonlight_streaming() {
+    if command -v moonlight >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if ! command -v apt-get >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if ! apt-cache show moonlight-embedded >/dev/null 2>&1; then
+        if ! command -v curl >/dev/null 2>&1; then
+            printf '[240mp-setup] Skipping Moonlight install; curl is unavailable.\n' >&2
+            return 0
+        fi
+
+        local setup_script
+        setup_script="$(mktemp)"
+        if curl -1sLf 'https://dl.cloudsmith.io/public/moonlight-game-streaming/moonlight-embedded/setup.deb.sh' -o "$setup_script"; then
+            pi240_root env distro=raspbian bash "$setup_script" || true
+        else
+            printf '[240mp-setup] Warning: could not download Moonlight package setup script.\n' >&2
+        fi
+        rm -f "$setup_script"
+    fi
+
+    if apt-cache show moonlight-embedded >/dev/null 2>&1; then
+        pi240_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
+        pi240_root env DEBIAN_FRONTEND=noninteractive apt-get install -y moonlight-embedded || true
+    else
+        printf '[240mp-setup] Moonlight Embedded package is unavailable; PC Link will show N/A until installed.\n' >&2
+    fi
 }
 
 pi240_install_retro_core_dependencies() {
