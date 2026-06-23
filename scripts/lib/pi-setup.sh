@@ -551,8 +551,20 @@ Theme=240mp
 ShowDelay=0
 PLYMOUTH_CONF
 
+    local plymouth_set_default=""
     if command -v plymouth-set-default-theme >/dev/null 2>&1; then
-        pi240_root plymouth-set-default-theme 240mp || true
+        plymouth_set_default="$(command -v plymouth-set-default-theme)"
+    elif [ -x /usr/sbin/plymouth-set-default-theme ]; then
+        plymouth_set_default="/usr/sbin/plymouth-set-default-theme"
+    fi
+
+    if [ -n "$plymouth_set_default" ]; then
+        pi240_root "$plymouth_set_default" 240mp || true
+        if command -v update-initramfs >/dev/null 2>&1; then
+            pi240_root update-initramfs -u -k all || true
+        elif [ -x /usr/sbin/update-initramfs ]; then
+            pi240_root /usr/sbin/update-initramfs -u -k all || true
+        fi
     fi
 
     # Keep the splash visible for the appliance instead of letting the default

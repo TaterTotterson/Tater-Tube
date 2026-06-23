@@ -1,11 +1,12 @@
 {
-  "version": "2026.06.23.3",
+  "version": "2026.06.23.4",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/240-MP-Emby-Jelly",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/240-MP-Emby-Jelly/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/releases/download/v2026.06.23.3/240-MP-v2026.06.23.3-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/archive/refs/tags/v2026.06.23.3.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/releases/download/v2026.06.23.4/240-MP-v2026.06.23.4-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/240-MP-Emby-Jelly/archive/refs/tags/v2026.06.23.4.tar.gz",
   "notes": [
+    "Fixes the CRT Station boot splash install path so updates and fresh images rebuild Plymouth initramfs with the custom theme.",
     "Changes Plex Video on Demand playback to use Plex transcoding instead of direct play, with 480p, 720p, and 1080p quality targets.",
     "Renames the app to CRT Station with refreshed boot and update polish.",
     "Adds Plex PIN login support as an alternate media provider for Video on Demand and Mixtapes.",
