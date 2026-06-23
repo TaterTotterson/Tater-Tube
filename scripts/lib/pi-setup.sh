@@ -32,18 +32,39 @@ PI240_RUNTIME_PACKAGES=(
 
 PI240_RETRO_CORE_PACKAGES=(
     libretro-nestopia
+    libretro-fceumm
     libretro-genesisplusgx
     libretro-gambatte
     libretro-mgba
 )
 
 PI240_OPTIONAL_RETRO_CORE_PACKAGES=(
+    libretro-atari800
+    libretro-beetle-pce-fast
+    libretro-beetle-supergrafx
+    libretro-beetle-vb
+    libretro-beetle-wswan
     libretro-snes9x
     libretro-beetle-psx
+    libretro-bluemsx
+    libretro-fbneo
+    libretro-freeintv
+    libretro-handy
+    libretro-mame2000
+    libretro-mame2003
+    libretro-mame2003-plus
+    libretro-o2em
+    libretro-picodrive
     libretro-pcsx-rearmed
+    libretro-prboom
+    libretro-prosystem
+    libretro-race
+    libretro-stella
+    libretro-tyrquake
+    libretro-vecx
 )
 
-PI240_PSX_CORE_URL="${PI240_PSX_CORE_URL:-https://buildbot.libretro.com/nightly/linux/aarch64/latest/pcsx_rearmed_libretro.so.zip}"
+PI240_RETRO_CORE_DOWNLOAD_BASE="${PI240_RETRO_CORE_DOWNLOAD_BASE:-https://buildbot.libretro.com/nightly/linux/aarch64/latest}"
 
 PI240_PSX_CORE_NAMES=(
     pcsx_rearmed_libretro.so
@@ -52,6 +73,39 @@ PI240_PSX_CORE_NAMES=(
     beetle_psx_hw_libretro.so
     beetle_psx_libretro.so
     swanstation_libretro.so
+)
+
+PI240_RETRO_CORE_DOWNLOADS=(
+    stella_libretro.so
+    stella2014_libretro.so
+    atari800_libretro.so
+    prosystem_libretro.so
+    handy_libretro.so
+    bluemsx_libretro.so
+    freeintv_libretro.so
+    o2em_libretro.so
+    vecx_libretro.so
+    fceumm_libretro.so
+    nestopia_libretro.so
+    gearsystem_libretro.so
+    genesis_plus_gx_libretro.so
+    picodrive_libretro.so
+    gambatte_libretro.so
+    mgba_libretro.so
+    pokemini_libretro.so
+    snes9x_libretro.so
+    mednafen_pce_fast_libretro.so
+    mednafen_supergrafx_libretro.so
+    mednafen_vb_libretro.so
+    mednafen_wswan_libretro.so
+    race_libretro.so
+    fbneo_libretro.so
+    mame2000_libretro.so
+    mame2003_libretro.so
+    mame2003_plus_libretro.so
+    pcsx_rearmed_libretro.so
+    prboom_libretro.so
+    tyrquake_libretro.so
 )
 
 pi240_is_root() {
@@ -191,7 +245,7 @@ pi240_install_retro_core_dependencies() {
             printf '[240mp-setup] Optional RetroArch core package unavailable: %s\n' "$pkg" >&2
         fi
     done
-    pi240_install_psx_core_fallback
+    pi240_install_retro_core_fallbacks
 }
 
 pi240_install_missing_retro_core_dependencies() {
@@ -222,7 +276,7 @@ pi240_install_missing_retro_core_dependencies() {
             printf '[240mp-setup] Optional RetroArch core package unavailable: %s\n' "$pkg" >&2
         fi
     done
-    pi240_install_psx_core_fallback
+    pi240_install_retro_core_fallbacks
 }
 
 pi240_retro_core_dirs() {
@@ -251,33 +305,38 @@ pi240_has_psx_core() {
     return 1
 }
 
-pi240_install_psx_core_fallback() {
-    pi240_has_psx_core && return 0
+pi240_install_retro_core_download() {
+    local core_name="$1"
+    local url="${PI240_RETRO_CORE_DOWNLOAD_BASE}/${core_name}.zip"
+
+    if [ "$core_name" = "pcsx_rearmed_libretro.so" ] && [ -n "${PI240_PSX_CORE_URL:-}" ]; then
+        url="$PI240_PSX_CORE_URL"
+    fi
 
     if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
-        printf '[240mp-setup] PSX core fallback needs curl and python3.\n' >&2
-        return 0
+        printf '[240mp-setup] RetroArch core fallback needs curl and python3.\n' >&2
+        return 1
     fi
 
     local tmp target
-    tmp="$(mktemp -d "${TMPDIR:-/tmp}/240mp-psx-core.XXXXXX")"
-    target="/usr/local/lib/libretro/pcsx_rearmed_libretro.so"
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/240mp-retro-core.XXXXXX")"
+    target="/usr/local/lib/libretro/${core_name}"
     trap 'rm -rf "$tmp"' RETURN
 
-    printf '[240mp-setup] Installing PSX RetroArch core from Libretro buildbot.\n' >&2
-    if ! curl -fsSL "$PI240_PSX_CORE_URL" -o "$tmp/pcsx_rearmed.zip"; then
-        printf '[240mp-setup] Warning: could not download PSX core: %s\n' "$PI240_PSX_CORE_URL" >&2
-        return 0
+    printf '[240mp-setup] Installing RetroArch core from Libretro buildbot: %s\n' "$core_name" >&2
+    if ! curl -fsSL "$url" -o "$tmp/core.zip"; then
+        printf '[240mp-setup] Warning: could not download RetroArch core: %s\n' "$url" >&2
+        return 1
     fi
 
-    if ! python3 - "$tmp/pcsx_rearmed.zip" "$tmp" <<'PY'
+    if ! python3 - "$tmp/core.zip" "$tmp" "$core_name" <<'PY'
 import pathlib
 import sys
 import zipfile
 
 zip_path = pathlib.Path(sys.argv[1])
 out_dir = pathlib.Path(sys.argv[2])
-member_name = "pcsx_rearmed_libretro.so"
+member_name = sys.argv[3]
 
 with zipfile.ZipFile(zip_path) as archive:
     for member in archive.namelist():
@@ -290,12 +349,25 @@ print(f"{member_name} not found in {zip_path}", file=sys.stderr)
 raise SystemExit(1)
 PY
     then
-        printf '[240mp-setup] Warning: downloaded PSX core archive was not usable.\n' >&2
-        return 0
+        printf '[240mp-setup] Warning: downloaded RetroArch core archive was not usable: %s\n' "$core_name" >&2
+        return 1
     fi
 
     pi240_root install -d -m 0755 /usr/local/lib/libretro
-    pi240_root install -m 0644 "$tmp/pcsx_rearmed_libretro.so" "$target"
+    pi240_root install -m 0644 "$tmp/$core_name" "$target"
+}
+
+pi240_install_retro_core_fallbacks() {
+    local core_name
+    for core_name in "${PI240_RETRO_CORE_DOWNLOADS[@]}"; do
+        pi240_has_retro_core "$core_name" && continue
+        pi240_install_retro_core_download "$core_name" || true
+    done
+}
+
+pi240_install_psx_core_fallback() {
+    pi240_has_psx_core && return 0
+    pi240_install_retro_core_download pcsx_rearmed_libretro.so || true
 }
 
 pi240_install_tty_rule() {

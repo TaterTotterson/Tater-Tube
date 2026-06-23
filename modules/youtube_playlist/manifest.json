@@ -12,12 +12,6 @@
       "default": "ON"
     },
     {
-      "key": "playlist_input",
-      "label": "PLAYLIST CODE",
-      "type": "text",
-      "default": ""
-    },
-    {
       "key": "playback_quality",
       "label": "QUALITY",
       "type": "list_single",
@@ -31,8 +25,23 @@
       "default": "ON"
     },
     {
+      "key": "remove_playlist_id",
+      "label": "PLAYLIST TO REMOVE",
+      "type": "list_single",
+      "options_source": "dynamic",
+      "options_slot": "load_playlist_remove_options",
+      "requires_auth": true
+    },
+    {
+      "key": "remove_playlist",
+      "label": "REMOVE PLAYLIST",
+      "type": "action",
+      "action_slot": "remove_selected_playlist",
+      "requires_auth": true
+    },
+    {
       "key": "refresh_playlist_cache",
-      "label": "REFRESH PLAYLIST",
+      "label": "REFRESH PLAYLISTS",
       "type": "action",
       "action_slot": "refresh_playlist_cache"
     }

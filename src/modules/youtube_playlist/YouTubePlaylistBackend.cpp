@@ -1,12 +1,14 @@
 #include "YouTubePlaylistBackend.h"
 
 #include <QDateTime>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSaveFile>
@@ -18,7 +20,7 @@
 
 namespace {
 constexpr const char *kModuleId = "com.240mp.youtube_playlist";
-constexpr const char *kPlaylistCacheFile = "public-access-cache.json";
+constexpr const char *kLegacyPlaylistCacheFile = "public-access-cache.json";
 constexpr int kPlaylistCacheVersion = 1;
 constexpr int kPlaylistLimit = 250;
 
@@ -51,6 +53,24 @@ QString cleanTitle(QString title, const QString &fallback)
     title = title.trimmed();
     title.replace(QRegularExpression("\\s+"), " ");
     return title.isEmpty() ? fallback : title;
+}
+
+QString fallbackPlaylistTitle(const QString &input, int index)
+{
+    const QString cleaned = input.trimmed();
+    if (!cleaned.isEmpty()) {
+        QString tail = cleaned;
+        const int slash = tail.lastIndexOf('/');
+        if (slash >= 0)
+            tail = tail.mid(slash + 1);
+        const int eq = tail.lastIndexOf('=');
+        if (eq >= 0)
+            tail = tail.mid(eq + 1);
+        tail.remove(QRegularExpression("[^A-Za-z0-9_-]"));
+        if (!tail.isEmpty())
+            return QStringLiteral("PLAYLIST %1").arg(tail.left(8).toUpper());
+    }
+    return QStringLiteral("PLAYLIST %1").arg(index + 1);
 }
 
 QString decodeJsonString(const QString &value)
@@ -136,6 +156,13 @@ YouTubePlaylistBackend::YouTubePlaylistBackend(const QString &appRoot,
 
 QVariantMap YouTubePlaylistBackend::moduleConfig() const
 {
+    const QJsonObject config = loadConfig();
+    return config.value(QStringLiteral("modules")).toObject()[QString::fromUtf8(kModuleId)]
+        .toObject().toVariantMap();
+}
+
+QJsonObject YouTubePlaylistBackend::loadConfig() const
+{
     QFile file(m_dataRoot + "/config.json");
     if (!file.open(QIODevice::ReadOnly))
         return {};
@@ -145,8 +172,26 @@ QVariantMap YouTubePlaylistBackend::moduleConfig() const
     if (error.error != QJsonParseError::NoError || !doc.isObject())
         return {};
 
-    return doc.object()["modules"].toObject()[QString::fromUtf8(kModuleId)]
-        .toObject().toVariantMap();
+    return doc.object();
+}
+
+bool YouTubePlaylistBackend::saveConfig(const QJsonObject &config) const
+{
+    QDir().mkpath(m_dataRoot);
+    QSaveFile file(m_dataRoot + "/config.json");
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning("[YouTubePlaylistBackend] could not write config: %s",
+                 qPrintable(file.errorString()));
+        return false;
+    }
+
+    file.write(QJsonDocument(config).toJson(QJsonDocument::Indented));
+    if (!file.commit()) {
+        qWarning("[YouTubePlaylistBackend] could not save config: %s",
+                 qPrintable(file.errorString()));
+        return false;
+    }
+    return true;
 }
 
 QString YouTubePlaylistBackend::setting(const QString &key, const QString &fallback) const
@@ -164,14 +209,16 @@ QString YouTubePlaylistBackend::ytDlpPath() const
     return QStandardPaths::findExecutable(QStringLiteral("youtube-dl"), executableSearchPaths());
 }
 
-QString YouTubePlaylistBackend::playlistCachePath() const
+QString YouTubePlaylistBackend::playlistCachePath(const QString &playlistUrl) const
 {
-    return QDir(m_dataRoot).absoluteFilePath(QString::fromUtf8(kPlaylistCacheFile));
+    const QByteArray hash = QCryptographicHash::hash(playlistUrl.toUtf8(), QCryptographicHash::Sha1).toHex();
+    return QDir(m_dataRoot).absoluteFilePath(QStringLiteral("public-access-cache-%1.json")
+                                             .arg(QString::fromLatin1(hash)));
 }
 
 QVariantMap YouTubePlaylistBackend::loadPlaylistCache(const QString &playlistUrl) const
 {
-    QFile file(playlistCachePath());
+    QFile file(playlistCachePath(playlistUrl));
     if (!file.open(QIODevice::ReadOnly))
         return {};
 
@@ -198,7 +245,7 @@ bool YouTubePlaylistBackend::savePlaylistCache(const QString &playlistUrl,
         return false;
 
     QDir().mkpath(m_dataRoot);
-    QSaveFile file(playlistCachePath());
+    QSaveFile file(playlistCachePath(playlistUrl));
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qWarning("[YouTubePlaylistBackend] could not write playlist cache: %s",
                  qPrintable(file.errorString()));
@@ -223,12 +270,23 @@ bool YouTubePlaylistBackend::savePlaylistCache(const QString &playlistUrl,
 
 void YouTubePlaylistBackend::clearPlaylistCache() const
 {
-    QFile::remove(playlistCachePath());
+    QFile::remove(QDir(m_dataRoot).absoluteFilePath(QString::fromUtf8(kLegacyPlaylistCacheFile)));
+    const QStringList names = QDir(m_dataRoot).entryList(
+        {QStringLiteral("public-access-cache-*.json")}, QDir::Files);
+    for (const QString &name : names)
+        QFile::remove(QDir(m_dataRoot).absoluteFilePath(name));
+}
+
+void YouTubePlaylistBackend::clearPlaylistCache(const QString &playlistUrl) const
+{
+    if (playlistUrl.isEmpty())
+        return;
+    QFile::remove(playlistCachePath(playlistUrl));
 }
 
 QString YouTubePlaylistBackend::get_auth_state()
 {
-    return normalize_playlist_input(get_saved_playlist_input()).isEmpty()
+    return get_saved_playlists().isEmpty()
         ? QStringLiteral("none")
         : QStringLiteral("authed");
 }
@@ -236,6 +294,70 @@ QString YouTubePlaylistBackend::get_auth_state()
 QString YouTubePlaylistBackend::get_saved_playlist_input() const
 {
     return setting(QStringLiteral("playlist_input"));
+}
+
+QVariantList YouTubePlaylistBackend::get_saved_playlists() const
+{
+    QVariantList result;
+    const QVariantMap cfg = moduleConfig();
+    const QVariantList saved = cfg.value(QStringLiteral("playlists")).toList();
+    QSet<QString> seen;
+
+    int index = 0;
+    for (const QVariant &value : saved) {
+        QVariantMap playlist = value.toMap();
+        const QString input = playlist.value(QStringLiteral("input")).toString().trimmed();
+        const QString url = normalize_playlist_input(
+            playlist.value(QStringLiteral("url")).toString().trimmed().isEmpty()
+                ? input
+                : playlist.value(QStringLiteral("url")).toString());
+        if (url.isEmpty() || seen.contains(url))
+            continue;
+
+        playlist[QStringLiteral("input")] = input.isEmpty() ? url : input;
+        playlist[QStringLiteral("url")] = url;
+        playlist[QStringLiteral("title")] = cleanTitle(
+            playlist.value(QStringLiteral("title")).toString(),
+            fallbackPlaylistTitle(input.isEmpty() ? url : input, index));
+        playlist[QStringLiteral("id")] = playlist.value(QStringLiteral("id")).toString().isEmpty()
+            ? QString::fromLatin1(QCryptographicHash::hash(url.toUtf8(), QCryptographicHash::Sha1).toHex())
+            : playlist.value(QStringLiteral("id")).toString();
+        result.append(playlist);
+        seen.insert(url);
+        ++index;
+    }
+
+    const QString legacyInput = get_saved_playlist_input();
+    const QString legacyUrl = normalize_playlist_input(legacyInput);
+    if (!legacyUrl.isEmpty() && !seen.contains(legacyUrl)) {
+        QVariantMap legacy;
+        legacy[QStringLiteral("id")] = QString::fromLatin1(
+            QCryptographicHash::hash(legacyUrl.toUtf8(), QCryptographicHash::Sha1).toHex());
+        legacy[QStringLiteral("input")] = legacyInput;
+        legacy[QStringLiteral("url")] = legacyUrl;
+        legacy[QStringLiteral("title")] = fallbackPlaylistTitle(legacyInput, result.size());
+        legacy[QStringLiteral("legacy")] = true;
+        result.append(legacy);
+    }
+
+    return result;
+}
+
+QVariantList YouTubePlaylistBackend::playlistRemovalOptions() const
+{
+    QVariantList options;
+    const QVariantList saved = get_saved_playlists();
+    for (const QVariant &value : saved) {
+        const QVariantMap playlist = value.toMap();
+        const QString id = playlist.value(QStringLiteral("id")).toString();
+        if (id.isEmpty())
+            continue;
+        options.append(QVariantMap{
+            {QStringLiteral("id"), id},
+            {QStringLiteral("label"), playlist.value(QStringLiteral("title")).toString()}
+        });
+    }
+    return options;
 }
 
 QString YouTubePlaylistBackend::normalize_playlist_input(const QString &input) const
@@ -280,6 +402,90 @@ QString YouTubePlaylistBackend::ytdl_format_for_quality(const QString &quality) 
     return QStringLiteral("best[height<=360][ext=mp4]/bestvideo[height<=360][vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[height<=360]/best");
 }
 
+QVariantMap YouTubePlaylistBackend::inspectPlaylist(const QString &playlistUrl, int limit,
+                                                    QString *errorOut) const
+{
+    QVariantMap result;
+    const QString bin = ytDlpPath();
+    if (bin.isEmpty()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("YT-DLP IS NOT INSTALLED");
+        return result;
+    }
+
+    QStringList args{
+        QStringLiteral("--flat-playlist"),
+        QStringLiteral("--dump-single-json"),
+        QStringLiteral("--no-warnings"),
+        QStringLiteral("--playlist-end"),
+        QString::number(limit),
+        playlistUrl
+    };
+
+    QProcess process;
+    process.setProcessChannelMode(QProcess::SeparateChannels);
+    process.start(bin, args);
+    if (!process.waitForStarted(2000)) {
+        if (errorOut)
+            *errorOut = QStringLiteral("COULD NOT START YT-DLP");
+        return result;
+    }
+
+    if (!process.waitForFinished(90000)) {
+        process.kill();
+        process.waitForFinished(1000);
+        if (errorOut)
+            *errorOut = QStringLiteral("YOUTUBE PLAYLIST TIMED OUT");
+        return result;
+    }
+
+    const QByteArray stdoutData = process.readAllStandardOutput();
+    const QString stderrText = QString::fromUtf8(process.readAllStandardError()).trimmed();
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        if (errorOut)
+            *errorOut = stderrText.isEmpty()
+                ? QStringLiteral("YOUTUBE PLAYLIST FAILED")
+                : stderrText.toUpper().left(160);
+        return result;
+    }
+
+    QJsonParseError error;
+    const QJsonDocument doc = QJsonDocument::fromJson(stdoutData, &error);
+    if (error.error != QJsonParseError::NoError || !doc.isObject()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("YOUTUBE PLAYLIST DATA IS INVALID");
+        return result;
+    }
+
+    result = doc.object().toVariantMap();
+    return result;
+}
+
+QVariantMap YouTubePlaylistBackend::resolve_playlist_info(const QString &input) const
+{
+    QVariantMap result;
+    const QString playlistUrl = normalize_playlist_input(input);
+    if (playlistUrl.isEmpty()) {
+        result[QStringLiteral("ok")] = false;
+        result[QStringLiteral("message")] = QStringLiteral("ENTER PLAYLIST CODE");
+        return result;
+    }
+
+    QString error;
+    const QVariantMap info = inspectPlaylist(playlistUrl, 1, &error);
+    const QString title = cleanTitle(info.value(QStringLiteral("title")).toString(),
+                                     fallbackPlaylistTitle(input, 0));
+
+    result[QStringLiteral("ok")] = error.isEmpty();
+    result[QStringLiteral("input")] = input.trimmed();
+    result[QStringLiteral("url")] = playlistUrl;
+    result[QStringLiteral("title")] = title;
+    result[QStringLiteral("id")] = QString::fromLatin1(
+        QCryptographicHash::hash(playlistUrl.toUtf8(), QCryptographicHash::Sha1).toHex());
+    result[QStringLiteral("message")] = error;
+    return result;
+}
+
 void YouTubePlaylistBackend::load_playlist(const QString &input)
 {
     fetchPlaylist(input, false);
@@ -287,7 +493,75 @@ void YouTubePlaylistBackend::load_playlist(const QString &input)
 
 void YouTubePlaylistBackend::refresh_playlist_cache()
 {
-    fetchPlaylist(get_saved_playlist_input(), true);
+    clearPlaylistCache();
+    emit authStateChanged();
+}
+
+void YouTubePlaylistBackend::refresh_playlist(const QString &input)
+{
+    fetchPlaylist(input, true);
+}
+
+void YouTubePlaylistBackend::load_playlist_remove_options()
+{
+    emit dynamicOptionsReady(QStringLiteral("remove_playlist_id"), playlistRemovalOptions());
+}
+
+void YouTubePlaylistBackend::remove_selected_playlist()
+{
+    const QVariantList saved = get_saved_playlists();
+    if (saved.isEmpty()) {
+        emit dynamicOptionsReady(QStringLiteral("remove_playlist_id"), QVariantList{});
+        emit authStateChanged();
+        return;
+    }
+
+    const QVariantMap cfg = moduleConfig();
+    QString selectedId = cfg.value(QStringLiteral("remove_playlist_id")).toString();
+    if (selectedId.isEmpty())
+        selectedId = saved.first().toMap().value(QStringLiteral("id")).toString();
+
+    QVariantList remaining;
+    QString removedUrl;
+    for (const QVariant &value : saved) {
+        const QVariantMap playlist = value.toMap();
+        if (playlist.value(QStringLiteral("id")).toString() == selectedId) {
+            removedUrl = playlist.value(QStringLiteral("url")).toString();
+            continue;
+        }
+
+        QVariantMap clean;
+        clean[QStringLiteral("id")] = playlist.value(QStringLiteral("id")).toString();
+        clean[QStringLiteral("input")] = playlist.value(QStringLiteral("input")).toString();
+        clean[QStringLiteral("url")] = playlist.value(QStringLiteral("url")).toString();
+        clean[QStringLiteral("title")] = playlist.value(QStringLiteral("title")).toString();
+        remaining.append(clean);
+    }
+
+    if (remaining.size() == saved.size())
+        return;
+
+    QJsonObject config = loadConfig();
+    QJsonObject modules = config.value(QStringLiteral("modules")).toObject();
+    QJsonObject module = modules.value(QString::fromUtf8(kModuleId)).toObject();
+    module[QStringLiteral("playlists")] = QJsonValue::fromVariant(remaining);
+    module.remove(QStringLiteral("playlist_input"));
+    if (remaining.isEmpty())
+        module.remove(QStringLiteral("remove_playlist_id"));
+    else
+        module[QStringLiteral("remove_playlist_id")] =
+            remaining.first().toMap().value(QStringLiteral("id")).toString();
+
+    modules[QString::fromUtf8(kModuleId)] = module;
+    config[QStringLiteral("modules")] = modules;
+    if (!saveConfig(config)) {
+        emit errorOccurred(QStringLiteral("COULD NOT REMOVE PLAYLIST"));
+        return;
+    }
+
+    clearPlaylistCache(removedUrl);
+    emit dynamicOptionsReady(QStringLiteral("remove_playlist_id"), playlistRemovalOptions());
+    emit authStateChanged();
 }
 
 void YouTubePlaylistBackend::fetchPlaylist(const QString &input, bool forceRefresh)
@@ -307,54 +581,17 @@ void YouTubePlaylistBackend::fetchPlaylist(const QString &input, bool forceRefre
         }
     }
 
-    const QString bin = ytDlpPath();
-    if (bin.isEmpty()) {
-        emit errorOccurred(QStringLiteral("YT-DLP IS NOT INSTALLED"));
+    if (forceRefresh)
+        clearPlaylistCache(playlistUrl);
+
+    QString error;
+    const QVariantMap rootMap = inspectPlaylist(playlistUrl, kPlaylistLimit, &error);
+    if (!error.isEmpty()) {
+        emit errorOccurred(error);
         return;
     }
 
-    QStringList args{
-        QStringLiteral("--flat-playlist"),
-        QStringLiteral("--dump-single-json"),
-        QStringLiteral("--no-warnings"),
-        QStringLiteral("--playlist-end"),
-        QString::number(kPlaylistLimit),
-        playlistUrl
-    };
-
-    QProcess process;
-    process.setProcessChannelMode(QProcess::SeparateChannels);
-    process.start(bin, args);
-    if (!process.waitForStarted(2000)) {
-        emit errorOccurred(QStringLiteral("COULD NOT START YT-DLP"));
-        return;
-    }
-
-    if (!process.waitForFinished(90000)) {
-        process.kill();
-        process.waitForFinished(1000);
-        emit errorOccurred(QStringLiteral("YOUTUBE PLAYLIST TIMED OUT"));
-        return;
-    }
-
-    const QByteArray stdoutData = process.readAllStandardOutput();
-    const QString stderrText = QString::fromUtf8(process.readAllStandardError()).trimmed();
-    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        emit errorOccurred(stderrText.isEmpty()
-            ? QStringLiteral("YOUTUBE PLAYLIST FAILED")
-            : stderrText.toUpper().left(160));
-        return;
-    }
-
-    QJsonParseError error;
-    const QJsonDocument doc = QJsonDocument::fromJson(stdoutData, &error);
-    if (error.error != QJsonParseError::NoError || !doc.isObject()) {
-        emit errorOccurred(QStringLiteral("YOUTUBE PLAYLIST DATA IS INVALID"));
-        return;
-    }
-
-    const QJsonObject root = doc.object();
-    const QJsonArray entries = root.value(QStringLiteral("entries")).toArray();
+    const QJsonArray entries = QJsonArray::fromVariantList(rootMap.value(QStringLiteral("entries")).toList());
     QVariantList items;
     int position = 0;
     for (const QJsonValue &value : entries) {
@@ -381,7 +618,7 @@ void YouTubePlaylistBackend::fetchPlaylist(const QString &input, bool forceRefre
         ++position;
     }
 
-    if (items.isEmpty() && root.value(QStringLiteral("playlist_count")).toInt() > 0)
+    if (items.isEmpty() && rootMap.value(QStringLiteral("playlist_count")).toInt() > 0)
         items = playlistItemsFromHtml(playlistUrl, kPlaylistLimit);
 
     if (items.isEmpty()) {
@@ -389,7 +626,7 @@ void YouTubePlaylistBackend::fetchPlaylist(const QString &input, bool forceRefre
         return;
     }
 
-    const QString title = cleanTitle(root.value(QStringLiteral("title")).toString(),
+    const QString title = cleanTitle(rootMap.value(QStringLiteral("title")).toString(),
                                      QStringLiteral("YOUTUBE PLAYLIST"));
     savePlaylistCache(playlistUrl, title, items);
     emit playlistLoaded(title, items);
@@ -400,8 +637,15 @@ void YouTubePlaylistBackend::onSettingChanged(const QString &moduleId,
                                               const QVariant &value)
 {
     Q_UNUSED(value)
-    if (moduleId == QLatin1String(kModuleId) && key == QLatin1String("playlist_input")) {
+    if (moduleId != QLatin1String(kModuleId))
+        return;
+
+    if (key == QLatin1String("playlist_input")) {
         clearPlaylistCache();
         emit authStateChanged();
+        emit dynamicOptionsReady(QStringLiteral("remove_playlist_id"), playlistRemovalOptions());
+    } else if (key == QLatin1String("playlists")) {
+        emit authStateChanged();
+        emit dynamicOptionsReady(QStringLiteral("remove_playlist_id"), playlistRemovalOptions());
     }
 }
