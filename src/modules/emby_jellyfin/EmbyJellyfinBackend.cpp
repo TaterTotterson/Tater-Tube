@@ -1068,7 +1068,7 @@ QVariantMap EmbyJellyfinBackend::parsePlexDetail(const QByteArray &body) const {
             detail = formatPlexItem(attrs);
             detail["partKey"] = QString{};
             detail["partId"] = QString{};
-            detail["forceTranscode"] = false;
+            detail["forceTranscode"] = true;
             detail["audioStreams"] = QVariantList{};
             detail["subtitleStreams"] = subtitleStreams;
             inTargetMedia = true;
@@ -1277,12 +1277,17 @@ void EmbyJellyfinBackend::plexLoadItemDetail(const QString &ratingKey) {
 
 void EmbyJellyfinBackend::plexBuildStreamUrl(const QString &ratingKey,
                                              const QString &partKey) {
-    Q_UNUSED(ratingKey);
     if (partKey.isEmpty()) {
         emit errorOccurred("PLEX STREAM FAILED: EMPTY PART KEY");
         return;
     }
-    emit streamUrlReady(plexAbsoluteUrl(partKey), {});
+    plexRequestTranscodeUrl(ratingKey, partKey, QUuid::createUuid().toString(QUuid::WithoutBraces),
+                            {}, {}, 0,
+                            [this](const QString &url, const QString &httpHeaderFields) {
+        emit streamUrlReady(url, httpHeaderFields);
+    }, [this](const QString &message) {
+        emit errorOccurred(message);
+    });
 }
 
 void EmbyJellyfinBackend::plexBuildAudioStreamUrl(const QString &ratingKey,
@@ -1292,6 +1297,118 @@ void EmbyJellyfinBackend::plexBuildAudioStreamUrl(const QString &ratingKey,
         return;
     }
     emit audioStreamUrlReady(ratingKey, plexAbsoluteUrl(partKey), {});
+}
+
+QString EmbyJellyfinBackend::plexTranscodeQuality() const {
+    const QString quality = videoQuality();
+    if (quality == QStringLiteral("1080p") ||
+        quality == QStringLiteral("720p") ||
+        quality == QStringLiteral("480p")) {
+        return quality;
+    }
+    return QStringLiteral("480p");
+}
+
+QString EmbyJellyfinBackend::plexHttpHeaderFields() const {
+    const QString token = plexToken();
+    return token.isEmpty() ? QString{} : QStringLiteral("X-Plex-Token: %1").arg(token);
+}
+
+void EmbyJellyfinBackend::plexRequestTranscodeUrl(
+        const QString &ratingKey,
+        const QString &partKey,
+        const QString &sessionId,
+        const QString &audioId,
+        const QString &subtitleId,
+        int offsetMs,
+        std::function<void(const QString &url, const QString &httpHeaderFields)> onReady,
+        std::function<void(const QString &message)> onError) {
+    Q_UNUSED(partKey);
+    if (ratingKey.isEmpty()) {
+        onError(QStringLiteral("PLEX TRANSCODE FAILED: EMPTY ITEM ID"));
+        return;
+    }
+
+    const QString effectiveSessionId = sessionId.isEmpty()
+        ? QUuid::createUuid().toString(QUuid::WithoutBraces)
+        : sessionId;
+    const PlaybackLimits limits = playbackLimitsFor(plexTranscodeQuality(), true);
+
+    QUrl url = plexApiUrl(QStringLiteral("/video/:/transcode/universal/start.m3u8"));
+    QUrlQuery q;
+    q.addQueryItem(QStringLiteral("hasMDE"), QStringLiteral("1"));
+    q.addQueryItem(QStringLiteral("path"), QStringLiteral("/library/metadata/") + ratingKey);
+    q.addQueryItem(QStringLiteral("mediaIndex"), QStringLiteral("0"));
+    q.addQueryItem(QStringLiteral("partIndex"), QStringLiteral("0"));
+    q.addQueryItem(QStringLiteral("protocol"), QStringLiteral("hls"));
+    q.addQueryItem(QStringLiteral("fastSeek"), QStringLiteral("1"));
+    q.addQueryItem(QStringLiteral("copyts"), QStringLiteral("1"));
+    q.addQueryItem(QStringLiteral("directPlay"), QStringLiteral("0"));
+    q.addQueryItem(QStringLiteral("directStream"), QStringLiteral("0"));
+    q.addQueryItem(QStringLiteral("maxVideoBitrate"),
+                   QString::number(qMax(1, limits.videoBitRate / 1000)));
+    q.addQueryItem(QStringLiteral("subtitleSize"), QStringLiteral("100"));
+    q.addQueryItem(QStringLiteral("audioBoost"), QStringLiteral("100"));
+    q.addQueryItem(QStringLiteral("session"), effectiveSessionId);
+    q.addQueryItem(QStringLiteral("X-Plex-Platform"), QStringLiteral("Chrome"));
+    q.addQueryItem(QStringLiteral("X-Plex-Client-Identifier"), plexClientId());
+    if (offsetMs > 0)
+        q.addQueryItem(QStringLiteral("offset"), QString::number(offsetMs / 1000));
+    if (!audioId.isEmpty())
+        q.addQueryItem(QStringLiteral("audioStreamID"), audioId);
+    if (!subtitleId.isEmpty() && subtitleId != QStringLiteral("0") &&
+        subtitleId != QStringLiteral("-1")) {
+        q.addQueryItem(QStringLiteral("subtitleStreamID"), subtitleId);
+        q.addQueryItem(QStringLiteral("subtitles"), QStringLiteral("burn"));
+    }
+    url.setQuery(q);
+
+    QNetworkRequest req = plexServerRequest(plexUrlWithToken(url));
+    req.setRawHeader("Accept", "application/x-mpegURL, application/vnd.apple.mpegurl, */*");
+    req.setRawHeader("X-Plex-Platform", "Chrome");
+
+    qInfo("[EmbyJellyfinBackend] Plex transcode requested at %s",
+          qPrintable(plexTranscodeQuality()));
+    auto *reply = m_nam->get(req);
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, onReady, onError]() {
+        reply->deleteLater();
+        const QByteArray bytes = reply->readAll();
+        if (reply->error() != QNetworkReply::NoError) {
+            QString message = QStringLiteral("PLEX TRANSCODE FAILED: ") + reply->errorString();
+            const QString body = abbreviatedNetworkBody(bytes);
+            if (!body.isEmpty())
+                message += QStringLiteral(" - ") + body;
+            onError(message);
+            return;
+        }
+
+        QString variantPath;
+        const QStringList lines = QString::fromUtf8(bytes).split(QLatin1Char('\n'));
+        for (const QString &line : lines) {
+            const QString trimmed = line.trimmed();
+            if (!trimmed.isEmpty() && !trimmed.startsWith(QLatin1Char('#'))) {
+                variantPath = trimmed;
+                break;
+            }
+        }
+
+        QString streamUrl;
+        if (!variantPath.isEmpty()) {
+            QUrl base = reply->url();
+            base.setQuery(QString{});
+            streamUrl = base.resolved(QUrl(variantPath)).toString();
+        } else {
+            streamUrl = reply->url().toString();
+        }
+
+        if (streamUrl.isEmpty()) {
+            onError(QStringLiteral("PLEX TRANSCODE FAILED: EMPTY STREAM URL"));
+            return;
+        }
+
+        onReady(streamUrl, plexHttpHeaderFields());
+    });
 }
 
 void EmbyJellyfinBackend::plexLoadNextEpisode(const QString &currentRatingKey) {
@@ -2316,7 +2433,15 @@ void EmbyJellyfinBackend::apiPrepareDetailPlayback(const QString &requestId,
         launch[QStringLiteral("series")] = detail.value(QStringLiteral("grandparentTitle"));
 
     if (mediaProvider() == kProviderPlex) {
-        emit apiLaunchStreamReady(requestId, launch, plexAbsoluteUrl(partKey), {});
+        const QString sessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString audioId = detail.value(QStringLiteral("selectedAudioId")).toString();
+        plexRequestTranscodeUrl(ratingKey, partKey, sessionId, audioId, {}, 0,
+                                [this, requestId, launch](const QString &url,
+                                                          const QString &httpHeaderFields) {
+            emit apiLaunchStreamReady(requestId, launch, url, httpHeaderFields);
+        }, [this, requestId](const QString &message) {
+            emit apiRequestFailed(requestId, message);
+        });
         return;
     }
 
@@ -2459,8 +2584,12 @@ void EmbyJellyfinBackend::build_stream_url(const QString &ratingKey,
                                            const QString &partKey,
                                            const QString &sessionId) {
     if (mediaProvider() == kProviderPlex) {
-        Q_UNUSED(sessionId)
-        plexBuildStreamUrl(ratingKey, partKey);
+        plexRequestTranscodeUrl(ratingKey, partKey, sessionId, {}, {}, 0,
+                                [this](const QString &url, const QString &httpHeaderFields) {
+            emit streamUrlReady(url, httpHeaderFields);
+        }, [this](const QString &message) {
+            emit errorOccurred(message);
+        });
         return;
     }
 
@@ -2497,11 +2626,12 @@ void EmbyJellyfinBackend::request_transcode(const QString &ratingKey,
                                             const QString &subtitleId,
                                             int offsetMs) {
     if (mediaProvider() == kProviderPlex) {
-        Q_UNUSED(sessionId)
-        Q_UNUSED(audioId)
-        Q_UNUSED(subtitleId)
-        Q_UNUSED(offsetMs)
-        plexBuildStreamUrl(ratingKey, partKey);
+        plexRequestTranscodeUrl(ratingKey, partKey, sessionId, audioId, subtitleId, offsetMs,
+                                [this](const QString &url, const QString &httpHeaderFields) {
+            emit streamUrlReady(url, httpHeaderFields);
+        }, [this](const QString &message) {
+            emit errorOccurred(message);
+        });
         return;
     }
 
@@ -2931,7 +3061,9 @@ void EmbyJellyfinBackend::getLibraries() {
 void EmbyJellyfinBackend::getVideoQualities() {
     if (mediaProvider() == kProviderPlex) {
         emit dynamicOptionsReady("video_quality", QVariantList{
-            QVariantMap{{"id","auto"}, {"label","DIRECT PLAY"}},
+            QVariantMap{{"id","480p"}, {"label","TRANSCODE 480P"}},
+            QVariantMap{{"id","720p"}, {"label","TRANSCODE 720P"}},
+            QVariantMap{{"id","1080p"}, {"label","TRANSCODE 1080P"}},
         });
         return;
     }

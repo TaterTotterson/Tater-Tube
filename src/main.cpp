@@ -58,7 +58,7 @@ static QString resolveDataRoot() {
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     app.setApplicationName("CRT Station");
-    app.setApplicationVersion("2026.06.23.2");
+    app.setApplicationVersion("2026.06.23.3");
 
     // Hide cursor — CRT Station is keyboard-only so the cursor serves no purpose.
     // On Linux, only hide on headless EGLFS (not desktop X11/Wayland sessions).

@@ -2,7 +2,7 @@
 
 Most users should use the ready-to-flash Raspberry Pi image for their CRT standard from the latest GitHub release.
 
-This fork is built around one production target: Raspberry Pi 4, composite video to a CRT, Argon IR remote support, and Emby/Jellyfin playback. There is no Plex support.
+This fork is built around one production target: Raspberry Pi 4, composite video to a CRT, Argon IR remote support, and Emby/Jellyfin or Plex playback.
 
 Use this page when you want to customize the image, change the app, or do local development.
 

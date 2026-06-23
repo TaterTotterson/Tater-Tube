@@ -186,6 +186,17 @@ private:
     void plexLoadItemDetail(const QString &ratingKey);
     void plexBuildStreamUrl(const QString &ratingKey, const QString &partKey);
     void plexBuildAudioStreamUrl(const QString &ratingKey, const QString &partKey);
+    void plexRequestTranscodeUrl(const QString &ratingKey,
+                                 const QString &partKey,
+                                 const QString &sessionId,
+                                 const QString &audioId,
+                                 const QString &subtitleId,
+                                 int offsetMs,
+                                 std::function<void(const QString &url,
+                                                    const QString &httpHeaderFields)> onReady,
+                                 std::function<void(const QString &message)> onError);
+    QString plexTranscodeQuality() const;
+    QString plexHttpHeaderFields() const;
     void plexLoadNextEpisode(const QString &currentRatingKey);
     void requestPlaybackInfo(const QString &ratingKey, const QString &partKey,
                              const QString &sessionId, const QString &audioId,

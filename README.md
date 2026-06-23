@@ -29,9 +29,7 @@ The easiest way to use it is to download the ready-to-flash NTSC or PAL `.img.xz
 - Autoplay next episode
 - Playlist and Collection support for Emby/Jellyfin
 - Audio and subtitle track selection
-- Auto direct play with AV1-to-H.264 fallback
-- Forced transcode quality options for Emby/Jellyfin
-- Direct-play Plex playback
+- H.264/AAC transcode playback with selectable 1080p, 720p, and 480p quality targets
 
 ### Mixtapes
 - Streams music from Emby/Jellyfin or Plex music libraries
