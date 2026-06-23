@@ -29,6 +29,12 @@
       "label": "AUTOPLAY NEXT",
       "type": "toggle",
       "default": "ON"
+    },
+    {
+      "key": "refresh_playlist_cache",
+      "label": "REFRESH PLAYLIST",
+      "type": "action",
+      "action_slot": "refresh_playlist_cache"
     }
   ]
 }
