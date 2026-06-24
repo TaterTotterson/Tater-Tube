@@ -76,7 +76,9 @@ The Pi image includes BlueZ and a Settings screen helper for Bluetooth controlle
 
 After pairing, the controller appears as a normal Linux input device. CRT Station uses SDL for menu navigation, and Game Center launches RetroArch so the same controller can be mapped or auto-detected there.
 
-Use Settings, then Map Controller, to record a global controller layout. The mapper writes CRT Station navigation bindings and RetroArch player-one RetroPad bindings. RetroArch cores share that global layout.
+CRT Station seeds a default controller layout from the first connected gamepad. Use Settings, then Map Controller, only when you want to override the default buttons. The mapper writes CRT Station navigation bindings and RetroArch player-one RetroPad bindings. RetroArch cores share that global layout.
+
+Paired and trusted Bluetooth controllers are retried automatically after boot and while the system is running. If a controller powers off, turn it back on normally; it should reconnect without forgetting and pairing again.
 
 ### Boot And Recovery
 
@@ -168,6 +170,8 @@ The host still controls the desktop or game resolution. For the cleanest CRT ima
 Controller support depends on the Sunshine host. Windows Sunshine requires ViGEmBus for virtual gamepads; install it from Sunshine's Troubleshooting tab and reboot if controllers do not work. Sunshine on macOS currently streams video/audio and keyboard-style input, but does not currently support gamepads.
 
 ## Update An Existing CRT Station Image
+
+Use Settings, System, then Check For Updates for normal appliance updates. The built-in updater switches to a CRT Station firmware screen, shows a VHS-style progress bar, writes detailed logs to `/var/log/240mp-update.log`, and refreshes the app, runtime packages, helpers, controller support, RetroArch cores, Moonlight, boot splash, IR, fan, SSH, Bluetooth, and composite setup without reflashing the SD card.
 
 From SSH:
 

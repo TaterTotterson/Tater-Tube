@@ -553,7 +553,7 @@ FocusScope {
         if ((result.status || "") === "started") {
             updateBusy = true
             updateMessage = result.message || "INSTALLING UPDATE. CRT STATION WILL RESTART."
-            updateDetail = "LEAVE POWER CONNECTED"
+            updateDetail = "SWITCHING TO UPDATE PROGRESS"
             updateOptions = []
         } else {
             updateBusy = false
@@ -806,7 +806,7 @@ FocusScope {
                 if (act === "install") {
                     updateBusy = true
                     updateMessage = "STARTING UPDATE..."
-                    updateDetail = "CURRENT " + root.appVersion
+                    updateDetail = "PREPARING UPDATE CONSOLE"
                     updateOptions = []
                     appCore.installUpdate()
                 } else {

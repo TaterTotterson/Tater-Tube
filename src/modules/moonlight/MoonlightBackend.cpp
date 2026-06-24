@@ -491,7 +491,7 @@ QStringList MoonlightBackend::streamArguments(const QString &appName, bool force
         args << QStringLiteral("-platform") << QStringLiteral("sdl");
 
     QString mappingFile = QDir(moonlightRoot()).absoluteFilePath(QStringLiteral("gamepad.map"));
-    if (!QFileInfo(mappingFile).exists() && forceSdl) {
+    if (!QFileInfo(mappingFile).exists()) {
         const QString bundledMapping = QDir(m_appRoot).absoluteFilePath(
             QStringLiteral("vendor/moonlight-sdl/share/moonlight/gamecontrollerdb.txt"));
         if (QFileInfo(bundledMapping).exists())

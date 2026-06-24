@@ -76,6 +76,9 @@ private:
     void loadDefaultMapping();
     void loadUserMapping();
     void noteActiveController(SDL_JoystickID which);
+    bool controllerMappingNeedsDefault() const;
+    void ensureDefaultControllerMapping(SDL_JoystickID which, SDL_GameController *controller);
+    void ensureDefaultJoystickMapping(SDL_JoystickID which);
     void handleButton(SDL_JoystickID which, Uint8 button, bool pressed);
     void handleAxis(SDL_JoystickID which, Uint8 axis, Sint16 value);
     void handleJoystickButton(SDL_JoystickID which, Uint8 button, bool pressed);

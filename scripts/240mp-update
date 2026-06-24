@@ -6,12 +6,149 @@ MANIFEST_URL="${1:-${MP240_UPDATE_MANIFEST_URL:-$DEFAULT_MANIFEST_URL}}"
 INSTALL_PREFIX="${MP240_INSTALL_PREFIX:-/opt/240mp}"
 SERVICE_NAME="${MP240_SERVICE_NAME:-240mp.service}"
 UPDATE_FLAG="${MP240_UPDATE_FLAG:-/run/240mp-updating}"
+LOG_FILE="${MP240_UPDATE_LOG:-/var/log/240mp-update.log}"
+FULL_UPDATE="${MP240_FULL_UPDATE:-1}"
 TMP_DIR=""
 SELF_COPY="${MP240_UPDATE_SELF_COPY_PATH:-}"
 SERVICE_STOPPED=0
+CURRENT_PERCENT=0
+CURRENT_STEP="STARTING UPDATE"
+ERROR_DETAIL=""
+
+truthy() {
+    case "${1:-}" in
+        1|true|TRUE|yes|YES|on|ON) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+update_ttys() {
+    local seen=""
+    local active_tty=""
+    local tty
+    local candidates=(/dev/tty1 /dev/tty0 /dev/tty12)
+
+    if [ -r /sys/class/tty/tty0/active ]; then
+        active_tty="$(cat /sys/class/tty/tty0/active 2>/dev/null || true)"
+        case "$active_tty" in
+            tty[0-9]*) candidates+=("/dev/$active_tty") ;;
+        esac
+    fi
+
+    for tty in "${candidates[@]}"; do
+        [ -e "$tty" ] || continue
+        case " $seen " in
+            *" $tty "*) continue ;;
+        esac
+        seen="${seen:+$seen }$tty"
+        printf '%s\n' "$tty"
+    done
+}
+
+write_update_ttys() {
+    [ "${MP240_UPDATE_TTY_UI:-1}" = "1" ] || return 0
+
+    local payload="$1"
+    local tty
+    while IFS= read -r tty; do
+        [ -n "$tty" ] || continue
+        printf '%s' "$payload" > "$tty" 2>/dev/null || true
+    done < <(update_ttys)
+}
+
+update_bar() {
+    local percent="$1"
+    local width=32
+    local filled empty
+
+    case "$percent" in
+        ''|*[!0-9]*) percent=0 ;;
+    esac
+    if [ "$percent" -lt 0 ]; then percent=0; fi
+    if [ "$percent" -gt 100 ]; then percent=100; fi
+
+    filled=$((percent * width / 100))
+    empty=$((width - filled))
+    printf '%*s' "$filled" '' | tr ' ' '#'
+    printf '%*s' "$empty" '' | tr ' ' '-'
+}
+
+update_screen() {
+    local percent="$1"
+    local title="$2"
+    local detail="${3:-}"
+    local bar payload
+
+    CURRENT_PERCENT="$percent"
+    CURRENT_STEP="$title"
+    bar="$(update_bar "$percent")"
+
+    printf -v payload '\033c\033[?25l\033[0m\033[40m\033[37m\033[2J\033[3J\033[H'
+    printf -v payload '%s\n\n              CRT STATION\n' "$payload"
+    printf -v payload '%s          ///// FIRMWARE UPDATE /////\n\n' "$payload"
+    printf -v payload '%s          [%s] %3s%%\n\n' "$payload" "$bar" "$percent"
+    printf -v payload '%s          %-38.38s\n' "$payload" "$title"
+    if [ -n "$detail" ]; then
+        printf -v payload '%s          %-38.38s\n' "$payload" "$detail"
+    fi
+    printf -v payload '%s\n          DO NOT POWER OFF\n' "$payload"
+    printf -v payload '%s          LOG: %s\n' "$payload" "$LOG_FILE"
+    write_update_ttys "$payload"
+}
+
+step() {
+    local percent="$1"
+    local title="$2"
+    local detail="${3:-}"
+    log "$title${detail:+ - $detail}"
+    update_screen "$percent" "$title" "$detail"
+}
+
+install_full_runtime_update() {
+    step 30 "APT METADATA" "CHECKING PACKAGES"
+    pi240_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq || return 1
+
+    step 34 "BASE RUNTIME" "QT MPV BLUETOOTH CORES"
+    pi240_root env DEBIAN_FRONTEND=noninteractive apt-get install -y "${PI240_RUNTIME_PACKAGES[@]}" || return 1
+
+    step 38 "PUBLIC ACCESS" "REFRESHING YT-DLP"
+    pi240_install_latest_ytdlp || true
+
+    step 41 "GAME CENTER" "RETROARCH CORES"
+    export PI240_INSTALL_ALL_RETRO_CORE_FALLBACKS="${PI240_INSTALL_ALL_RETRO_CORE_FALLBACKS:-1}"
+    pi240_install_retro_core_dependencies || true
+
+    step 45 "PC LINK" "MOONLIGHT RUNTIME"
+    pi240_install_moonlight_streaming || true
+}
+
+update_blank_console() {
+    local tty
+    while IFS= read -r tty; do
+        [ -n "$tty" ] || continue
+        printf '\033c\033[?25l\033[0m\033[40m\033[37m\033[2J\033[3J\033[H' > "$tty" 2>/dev/null || true
+    done < <(update_ttys)
+}
+
+on_error() {
+    local status="$1"
+    local line="$2"
+    local command="$3"
+
+    ERROR_DETAIL="EXIT ${status} AT LINE ${line}: ${command}"
+    log "Update failed: $ERROR_DETAIL"
+    update_screen "$CURRENT_PERCENT" "UPDATE FAILED" "$ERROR_DETAIL"
+}
 
 cleanup() {
     local status=$?
+    if [ "$status" -ne 0 ] && [ "${MP240_UPDATE_TRANSIENT:-0}" = "1" ]; then
+        if [ -z "$ERROR_DETAIL" ]; then
+            ERROR_DETAIL="EXIT ${status} DURING ${CURRENT_STEP}"
+            update_screen "$CURRENT_PERCENT" "UPDATE FAILED" "$ERROR_DETAIL"
+        fi
+        sleep "${MP240_UPDATE_ERROR_HOLD_SECONDS:-20}" || true
+    fi
     if [ -n "$TMP_DIR" ]; then
         rm -rf "$TMP_DIR"
     fi
@@ -31,6 +168,7 @@ cleanup() {
     fi
 }
 trap cleanup EXIT
+trap 'on_error "$?" "$LINENO" "$BASH_COMMAND"' ERR
 
 log() {
     printf '[240mp-update] %s\n' "$*"
@@ -70,6 +208,10 @@ run_in_transient_unit_if_needed() {
         --setenv=MP240_INSTALL_PREFIX="$INSTALL_PREFIX" \
         --setenv=MP240_SERVICE_NAME="$SERVICE_NAME" \
         --setenv=MP240_UPDATE_FLAG="$UPDATE_FLAG" \
+        --setenv=MP240_UPDATE_LOG="$LOG_FILE" \
+        --setenv=MP240_FULL_UPDATE="$FULL_UPDATE" \
+        --setenv=MP240_UPDATE_TTY_UI="${MP240_UPDATE_TTY_UI:-1}" \
+        --setenv=MP240_UPDATE_ERROR_HOLD_SECONDS="${MP240_UPDATE_ERROR_HOLD_SECONDS:-20}" \
         /usr/bin/env bash "$0" "$MANIFEST_URL"
     exit $?
 }
@@ -97,9 +239,24 @@ require_cmd systemctl
 run_in_transient_unit_if_needed
 run_from_stable_copy_if_needed
 
+install -d -m 0755 "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE") 2>&1
+log "CRT Station update log started: $(date -Is)"
+
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/240mp-update.XXXXXX")"
 
-log "Fetching manifest: $MANIFEST_URL"
+touch "$UPDATE_FLAG"
+systemctl stop 240mp-terminal.service >/dev/null 2>&1 || true
+update_blank_console || true
+step 3 "STARTING UPDATE" "STOPPING CRT STATION"
+
+SERVICE_STOPPED=1
+systemctl stop "$SERVICE_NAME" || true
+update_blank_console || true
+step 5 "VIDEO HOLD" "UPDATE CONSOLE ACTIVE"
+
+step 8 "FETCHING MANIFEST" "$MANIFEST_URL"
 curl -fsSL "$MANIFEST_URL" -o "$TMP_DIR/manifest.json"
 
 mapfile -t manifest_values < <(python3 - "$TMP_DIR/manifest.json" <<'PY'
@@ -127,9 +284,10 @@ if [ -z "$VERSION" ] || [ -z "$BINARY_ARCHIVE" ]; then
     exit 1
 fi
 
-log "Preparing version $VERSION from ${REPO_URL:-prebuilt archive}"
+step 15 "DOWNLOADING $VERSION" "${REPO_URL:-PREBUILT ARCHIVE}"
 curl -fsSL "$BINARY_ARCHIVE" -o "$TMP_DIR/update.tar.gz"
 
+step 22 "UNPACKING UPDATE" "VERIFYING PAYLOAD"
 mkdir -p "$TMP_DIR/install"
 tar -xzf "$TMP_DIR/update.tar.gz" -C "$TMP_DIR/install" --strip-components=3
 
@@ -142,28 +300,19 @@ fi
 # shellcheck source=/dev/null
 source "$SETUP_HELPER"
 
-log "Installing missing runtime dependencies"
-if ! pi240_install_missing_runtime_dependencies; then
-    log "Warning: could not install every missing runtime package; continuing with app update."
+if truthy "$FULL_UPDATE"; then
+    step 30 "INSTALLING RUNTIME" "FULL SYSTEM REFRESH"
+    if ! install_full_runtime_update; then
+        log "Warning: full runtime dependency refresh had errors; continuing with app update."
+    fi
+else
+    step 30 "INSTALLING RUNTIME" "MISSING PACKAGES ONLY"
+    if ! PI240_RUNTIME_REFRESH_MODE=missing pi240_install_missing_runtime_dependencies; then
+        log "Warning: could not install every missing runtime package; continuing with app update."
+    fi
 fi
 
-log "Installing update"
-touch "$UPDATE_FLAG"
-systemctl stop 240mp-terminal.service >/dev/null 2>&1 || true
-
-pi240_blank_update_console || true
-if [ "${MP240_ENABLE_BOOT_SPLASH:-1}" = "1" ]; then
-    pi240_show_update_splash || true
-fi
-
-SERVICE_STOPPED=1
-systemctl stop "$SERVICE_NAME" || true
-
-pi240_blank_update_console || true
-if [ "${MP240_ENABLE_BOOT_SPLASH:-1}" = "1" ]; then
-    pi240_show_update_splash || true
-fi
-
+step 48 "COPYING PROGRAM" "$INSTALL_PREFIX"
 install -d -m 0755 "$INSTALL_PREFIX"
 rm -rf "$INSTALL_PREFIX/bin" \
        "$INSTALL_PREFIX/share/240mp/views" \
@@ -180,39 +329,50 @@ if [ ! -f "$SETUP_HELPER" ]; then
     exit 1
 fi
 
-log "Refreshing Raspberry Pi service setup"
+step 58 "REFRESHING SERVICES" "SYSTEMD AND HELPERS"
 
 SERVICE_USER="$(systemctl show "$SERVICE_NAME" -p User --value 2>/dev/null || true)"
 SERVICE_USER="${SERVICE_USER:-mp240}"
 SERVICE_HOME="$(getent passwd "$SERVICE_USER" 2>/dev/null | cut -d: -f6 || true)"
 SERVICE_HOME="${SERVICE_HOME:-/var/lib/240mp}"
 
+step 62 "SERVICE USER" "$SERVICE_USER"
 pi240_create_service_user "$SERVICE_USER" "$SERVICE_HOME"
 pi240_install_tty_rule
 pi240_install_launcher "$INSTALL_PREFIX" /usr/local/bin/240mp
 pi240_install_autostart "$SERVICE_USER" /usr/local/bin/240mp "/etc/systemd/system/${SERVICE_NAME}" "$SERVICE_HOME"
+
+step 68 "INSTALLING HELPERS" "UPDATE SSH BLUETOOTH FAN"
 pi240_install_update_helper "$SERVICE_USER" /usr/local/sbin/240mp-update "$INSTALL_PREFIX/share/240mp/scripts/240mp-update"
 pi240_install_ssh_control "$SERVICE_USER" /usr/local/sbin/240mp-ssh-control
 pi240_install_bluetooth_control "$SERVICE_USER" /usr/local/sbin/240mp-bluetooth-control
 pi240_install_retro_mount_helper "$SERVICE_USER" /usr/local/sbin/240mp-retro-mount
 pi240_install_retro_core_control "$SERVICE_USER" /usr/local/sbin/240mp-retro-core-control
 pi240_install_argon_fan_control "$SERVICE_USER" /usr/local/sbin/240mp-argon-fan-control
+
+step 76 "INSTALLING PC LINK" "MOONLIGHT SDL"
 pi240_install_moonlight_sdl_bundle "$INSTALL_PREFIX"
 pi240_install_moonlight_control "$SERVICE_USER" /usr/local/sbin/240mp-moonlight-control
 pi240_enable_moonlight_composite_display_stack
+
+step 82 "VIDEO SETTINGS" "COMPOSITE OUTPUT"
 pi240_auto_force_composite_video
 if [ "${MP240_ENABLE_IR:-1}" = "1" ]; then
+    step 87 "REMOTE CONTROL" "ARGON IR"
     pi240_install_ir_support "${MP240_IR_PROTOCOL:-nec}" /etc/rc_keymaps/240mp.toml "${MP240_IR_GPIO_PIN:-23}"
     pi240_enable_ir_overlay "${MP240_IR_GPIO_PIN:-23}"
 fi
 if [ "${MP240_ENABLE_BOOT_SPLASH:-1}" = "1" ]; then
+    step 91 "BOOT SCREEN" "PLYMOUTH THEME"
     pi240_install_boot_splash
 fi
 
+step 96 "RESTARTING APP" "$VERSION"
 systemctl daemon-reload || true
 systemctl reset-failed "$SERVICE_NAME" || true
 systemctl start "$SERVICE_NAME"
 SERVICE_STOPPED=0
 rm -f "$UPDATE_FLAG"
 
+step 100 "UPDATE COMPLETE" "$VERSION"
 log "Updated CRT Station to $VERSION"

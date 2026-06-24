@@ -342,6 +342,7 @@ void InputManager::openController(int deviceIndex) {
     if (!shouldIgnoreJoystickName(name))
         m_rawJoystickNames.insert(id, name);
     qInfo("[input] controller added: %s", qPrintable(name));
+    ensureDefaultControllerMapping(id, gc);
     emit gamepadConnectedChanged();
 }
 
@@ -403,6 +404,7 @@ void InputManager::openJoystick(int deviceIndex) {
     m_joysticks.insert(id, joy);
     m_rawJoystickNames.insert(id, name);
     qInfo("[input] raw joystick added: %s", qPrintable(name));
+    ensureDefaultJoystickMapping(id);
     emit gamepadConnectedChanged();
 }
 
@@ -469,7 +471,7 @@ void InputManager::loadDefaultMapping() {
     m_joystickButtonMap[5]  = Action::Right;      // R1
     m_joystickButtonMap[8]  = Action::Back;       // select/share
     m_joystickButtonMap[9]  = Action::PlayPause;  // start/options
-    m_joystickButtonMap[10] = Action::Menu;       // guide/PS
+    // Raw guide/PS buttons are handled as Home in handleJoystickButton().
     m_joystickAxisMap[0] = { Action::Left, Action::Right };
     m_joystickAxisMap[1] = { Action::Up,   Action::Down  };
     m_joystickAxisMap[6] = { Action::Left, Action::Right };
@@ -1125,6 +1127,113 @@ bool InputManager::captureMappingInput(const QVariantMap &input,
     return true;
 }
 
+bool InputManager::controllerMappingNeedsDefault() const
+{
+    const QVariantMap existing = getControllerMapping();
+    return existing.value(QStringLiteral("bindings")).toMap().isEmpty();
+}
+
+void InputManager::ensureDefaultControllerMapping(SDL_JoystickID which,
+                                                  SDL_GameController *controller)
+{
+    if (!controller || !controllerMappingNeedsDefault())
+        return;
+
+    const auto withStep = [](QVariantMap input, const QString &step, const QString &title) {
+        if (input.isEmpty())
+            return input;
+        input[QStringLiteral("step")] = step;
+        input[QStringLiteral("title")] = title;
+        return input;
+    };
+
+    QVariantMap bindings;
+    const auto addButton = [&](const QString &step, const QString &title, SDL_GameControllerButton button) {
+        QVariantMap input = mappingInputForButton(controller, static_cast<Uint8>(button));
+        if (!input.isEmpty())
+            bindings[step] = withStep(input, step, title);
+    };
+    const auto addAxis = [&](const QString &step, const QString &title, SDL_GameControllerAxis axis, int direction) {
+        QVariantMap input = mappingInputForAxis(controller, static_cast<Uint8>(axis), direction);
+        if (!input.isEmpty())
+            bindings[step] = withStep(input, step, title);
+    };
+
+    addButton(QStringLiteral("up"),     QStringLiteral("UP"),             SDL_CONTROLLER_BUTTON_DPAD_UP);
+    addButton(QStringLiteral("down"),   QStringLiteral("DOWN"),           SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+    addButton(QStringLiteral("left"),   QStringLiteral("LEFT"),           SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+    addButton(QStringLiteral("right"),  QStringLiteral("RIGHT"),          SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+    addButton(QStringLiteral("b"),      QStringLiteral("A BUTTON"),       SDL_CONTROLLER_BUTTON_A);
+    addButton(QStringLiteral("a"),      QStringLiteral("B BUTTON"),       SDL_CONTROLLER_BUTTON_B);
+    addButton(QStringLiteral("y"),      QStringLiteral("X BUTTON"),       SDL_CONTROLLER_BUTTON_X);
+    addButton(QStringLiteral("x"),      QStringLiteral("Y BUTTON"),       SDL_CONTROLLER_BUTTON_Y);
+    addButton(QStringLiteral("select"), QStringLiteral("SELECT"),         SDL_CONTROLLER_BUTTON_BACK);
+    addButton(QStringLiteral("start"),  QStringLiteral("START"),          SDL_CONTROLLER_BUTTON_START);
+    addButton(QStringLiteral("l"),      QStringLiteral("LEFT BUMPER"),    SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+    addButton(QStringLiteral("r"),      QStringLiteral("RIGHT BUMPER"),   SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+    addAxis(QStringLiteral("l2"),       QStringLiteral("LEFT TRIGGER"),   SDL_CONTROLLER_AXIS_TRIGGERLEFT, +1);
+    addAxis(QStringLiteral("r2"),       QStringLiteral("RIGHT TRIGGER"),  SDL_CONTROLLER_AXIS_TRIGGERRIGHT, +1);
+    addButton(QStringLiteral("l3"),     QStringLiteral("LEFT STICK"),     SDL_CONTROLLER_BUTTON_LEFTSTICK);
+    addButton(QStringLiteral("r3"),     QStringLiteral("RIGHT STICK"),    SDL_CONTROLLER_BUTTON_RIGHTSTICK);
+
+    if (bindings.isEmpty())
+        return;
+
+    noteActiveController(which);
+    if (saveControllerMapping({{QStringLiteral("bindings"), bindings}}))
+        qInfo("[input] seeded default controller mapping from SDL controller");
+}
+
+void InputManager::ensureDefaultJoystickMapping(SDL_JoystickID which)
+{
+    if (!controllerMappingNeedsDefault())
+        return;
+
+    const auto withStep = [](QVariantMap input, const QString &step, const QString &title) {
+        if (input.isEmpty())
+            return input;
+        input[QStringLiteral("step")] = step;
+        input[QStringLiteral("title")] = title;
+        return input;
+    };
+
+    QVariantMap bindings;
+    const auto addButton = [&](const QString &step, const QString &title, Uint8 button) {
+        bindings[step] = withStep(mappingInputForJoystickButton(button), step, title);
+    };
+    const auto addAxis = [&](const QString &step, const QString &title, Uint8 axis, int direction) {
+        QVariantMap input = mappingInputForJoystickAxis(axis, direction);
+        if (!input.isEmpty())
+            bindings[step] = withStep(input, step, title);
+    };
+    const auto addHat = [&](const QString &step, const QString &title, Uint8 hatMask) {
+        QVariantMap input = mappingInputForJoystickHat(0, hatMask);
+        if (!input.isEmpty())
+            bindings[step] = withStep(input, step, title);
+    };
+
+    addHat(QStringLiteral("up"),        QStringLiteral("UP"),             SDL_HAT_UP);
+    addHat(QStringLiteral("down"),      QStringLiteral("DOWN"),           SDL_HAT_DOWN);
+    addHat(QStringLiteral("left"),      QStringLiteral("LEFT"),           SDL_HAT_LEFT);
+    addHat(QStringLiteral("right"),     QStringLiteral("RIGHT"),          SDL_HAT_RIGHT);
+    addButton(QStringLiteral("b"),      QStringLiteral("A BUTTON"),       0);
+    addButton(QStringLiteral("a"),      QStringLiteral("B BUTTON"),       1);
+    addButton(QStringLiteral("y"),      QStringLiteral("X BUTTON"),       2);
+    addButton(QStringLiteral("x"),      QStringLiteral("Y BUTTON"),       3);
+    addButton(QStringLiteral("l"),      QStringLiteral("LEFT BUMPER"),    4);
+    addButton(QStringLiteral("r"),      QStringLiteral("RIGHT BUMPER"),   5);
+    addAxis(QStringLiteral("l2"),       QStringLiteral("LEFT TRIGGER"),   2, +1);
+    addAxis(QStringLiteral("r2"),       QStringLiteral("RIGHT TRIGGER"),  5, +1);
+    addButton(QStringLiteral("select"), QStringLiteral("SELECT"),         8);
+    addButton(QStringLiteral("start"),  QStringLiteral("START"),          9);
+    addButton(QStringLiteral("l3"),     QStringLiteral("LEFT STICK"),     11);
+    addButton(QStringLiteral("r3"),     QStringLiteral("RIGHT STICK"),    12);
+
+    noteActiveController(which);
+    if (saveControllerMapping({{QStringLiteral("bindings"), bindings}}))
+        qInfo("[input] seeded default controller mapping from raw joystick fallback");
+}
+
 void InputManager::loadGameExitCombo(const QVariantMap &bindings)
 {
     m_gameExitComboTokenGroups.clear();
@@ -1224,6 +1333,15 @@ void InputManager::handleButton(SDL_JoystickID which, Uint8 button, bool pressed
         return;
     }
 
+    if (button == SDL_CONTROLLER_BUTTON_GUIDE) {
+        m_controllerInputSeen.insert(which);
+        noteActiveController(which);
+        setLastInputDevice(QStringLiteral("gamepad"));
+        if (pressed)
+            emit homeRequested();
+        return;
+    }
+
     const Action a = m_buttonMap.value(button, Action::None);
     if (a == Action::None)
         return;
@@ -1300,9 +1418,6 @@ void InputManager::handleJoystickButton(SDL_JoystickID which, Uint8 button, bool
     if (!m_rawJoystickNames.contains(which))
         return;
     updatePressedInputToken(QStringLiteral("joy_button_%1").arg(int(button)), pressed);
-    if (!m_controllerMappingActive && m_controllerInputSeen.contains(which))
-        return;
-
     if (m_controllerMappingActive) {
         if (!pressed)
             return;
@@ -1310,6 +1425,17 @@ void InputManager::handleJoystickButton(SDL_JoystickID which, Uint8 button, bool
         captureMappingInput(input, which, false);
         return;
     }
+
+    if (button == 10) {
+        noteActiveController(which);
+        setLastInputDevice(QStringLiteral("gamepad"));
+        if (pressed)
+            emit homeRequested();
+        return;
+    }
+
+    if (m_controllerInputSeen.contains(which))
+        return;
 
     const Action a = m_joystickButtonMap.value(button, Action::None);
     if (a == Action::None)

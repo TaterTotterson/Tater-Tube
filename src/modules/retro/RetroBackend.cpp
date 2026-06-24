@@ -879,7 +879,7 @@ QString RetroBackend::writeRetroarchConfig()
     out << "video_fullscreen = \"true\"\n";
     out << "pause_nonactive = \"false\"\n";
     out << "quit_press_twice = \"false\"\n";
-    out << "input_exit_emulator = \"nul\"\n";
+    out << "input_exit_emulator = \"escape\"\n";
     out << "input_exit_emulator_axis = \"nul\"\n";
     out << "input_exit_emulator_btn = \"nul\"\n";
     out << "input_driver = \"udev\"\n";

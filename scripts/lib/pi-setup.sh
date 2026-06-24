@@ -162,14 +162,19 @@ pi240_install_file_from_stdin() {
 }
 
 pi240_install_runtime_dependencies() {
-    pi240_root apt-get update -qq
-    pi240_root apt-get install -y "${PI240_RUNTIME_PACKAGES[@]}"
+    pi240_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    pi240_root env DEBIAN_FRONTEND=noninteractive apt-get install -y "${PI240_RUNTIME_PACKAGES[@]}"
     pi240_install_latest_ytdlp
     pi240_install_retro_core_dependencies
     pi240_install_moonlight_streaming
 }
 
 pi240_install_missing_runtime_dependencies() {
+    if [ "${PI240_RUNTIME_REFRESH_MODE:-full}" = "full" ]; then
+        pi240_install_runtime_dependencies
+        return
+    fi
+
     if ! command -v dpkg-query >/dev/null 2>&1 || ! command -v apt-get >/dev/null 2>&1; then
         return 0
     fi
@@ -1101,7 +1106,7 @@ BTN_TR = 311
 BTN_DPAD_UP = 544
 ABS_HAT0Y = 17
 ABS_HAT0X = 16
-STOP_KEYS = {KEY_HOME, KEY_HOMEPAGE, KEY_BACK, KEY_EXIT, KEY_CLOSE, BTN_MODE}
+STOP_KEYS = {KEY_ESC, KEY_HOME, KEY_HOMEPAGE, KEY_BACK, KEY_EXIT, KEY_CLOSE, BTN_MODE}
 
 unit = os.environ.get("MP240_MOONLIGHT_STOP_UNIT", "240mp-moonlight.service")
 event_struct = struct.Struct("llHHI")
@@ -1472,12 +1477,79 @@ EOF
     pi240_append_file "$file" "${option}=${value}"
 }
 
+pi240_set_bluetooth_main_option() {
+    local option="$1"
+    local value="$2"
+    local section="${3:-General}"
+    local file="/etc/bluetooth/main.conf"
+
+    pi240_root install -d -m 0755 /etc/bluetooth
+    if [ ! -f "$file" ]; then
+        pi240_install_file_from_stdin "$file" 0644 <<EOF
+[${section}]
+${option}=${value}
+EOF
+        return 0
+    fi
+
+    if grep -q -E "^#?${option}[[:space:]]*=" "$file"; then
+        pi240_root sed -i -E "s/^#?${option}[[:space:]]*=.*/${option}=${value}/" "$file"
+        return 0
+    fi
+
+    if ! grep -q -E "^\[${section}\]" "$file"; then
+        pi240_append_file "$file" "" "[${section}]"
+    fi
+    pi240_append_file "$file" "${option}=${value}"
+}
+
 pi240_configure_bluetooth_input() {
     # DualSense and some other controllers can pair/trust without BlueZ marking
     # them bonded. The default HID input policy then connects but refuses to
     # create /dev/input nodes, so SDL never sees the controller.
+    pi240_set_bluetooth_main_option AutoEnable true Policy
     pi240_set_bluetooth_input_option UserspaceHID true
     pi240_set_bluetooth_input_option ClassicBondedOnly false
+    pi240_set_bluetooth_input_option ReconnectAttempts 7
+    pi240_set_bluetooth_input_option ReconnectIntervals "1,2,4,8,16,32,64"
+}
+
+pi240_install_bluetooth_reconnect_service() {
+    local helper="${1:-/usr/local/sbin/240mp-bluetooth-control}"
+    local service="/etc/systemd/system/240mp-bluetooth-reconnect.service"
+    local timer="/etc/systemd/system/240mp-bluetooth-reconnect.timer"
+
+    pi240_install_file_from_stdin "$service" 0644 <<UNIT
+[Unit]
+Description=CRT Station Bluetooth controller reconnect
+After=bluetooth.service
+Wants=bluetooth.service
+
+[Service]
+Type=oneshot
+ExecStart=${helper} reconnect
+UNIT
+
+    pi240_install_file_from_stdin "$timer" 0644 <<'UNIT'
+[Unit]
+Description=Retry CRT Station Bluetooth controller reconnect
+
+[Timer]
+OnBootSec=12s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Unit=240mp-bluetooth-reconnect.service
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+    if [ -d /run/systemd/system ]; then
+        pi240_root systemctl daemon-reload || true
+        pi240_root systemctl enable --now 240mp-bluetooth-reconnect.timer >/dev/null 2>&1 || true
+    else
+        pi240_root systemctl enable 240mp-bluetooth-reconnect.timer >/dev/null 2>&1 || true
+    fi
 }
 
 pi240_install_bluetooth_control() {
@@ -1638,6 +1710,52 @@ power_on_controllers() {
     bluetoothctl power on >/dev/null 2>&1 || true
 }
 
+connect_device() {
+    local mac="$1"
+    local seconds="${BLUETOOTH_CONNECT_TIMEOUT:-8}"
+
+    case "$seconds" in
+        ''|*[!0-9]*) seconds=8 ;;
+    esac
+    if [ "$seconds" -lt 3 ]; then seconds=3; fi
+    if [ "$seconds" -gt 20 ]; then seconds=20; fi
+
+    bluetoothctl trust "$mac" >/dev/null 2>&1 || true
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$seconds" bluetoothctl connect "$mac" >/dev/null 2>&1 || true
+    else
+        bluetoothctl connect "$mac" >/dev/null 2>&1 || true
+    fi
+}
+
+reconnect_known_devices() {
+    local line
+    local rest
+    local mac
+    local paired
+    local trusted
+    local connected
+
+    bluetoothctl devices 2>/dev/null | while IFS= read -r line; do
+        case "$line" in
+            Device\ *)
+                rest="${line#Device }"
+                mac="${rest%% *}"
+                valid_address "$mac" || continue
+                paired="$(device_value "$mac" Paired)"
+                trusted="$(device_value "$mac" Trusted)"
+                connected="$(device_value "$mac" Connected)"
+                if truthy "$connected"; then
+                    continue
+                fi
+                if truthy "$paired" || truthy "$trusted"; then
+                    connect_device "$mac"
+                fi
+                ;;
+        esac
+    done
+}
+
 scan_devices() {
     local seconds="${BLUETOOTH_SCAN_SECONDS:-10}"
 
@@ -1720,6 +1838,24 @@ case "$action" in
         emit_status
         emit_device "$address"
         ;;
+    reconnect)
+        require_available
+        if ! systemctl is-enabled --quiet "$unit" >/dev/null 2>&1; then
+            emit_status
+            emit_devices
+            exit 0
+        fi
+        if systemd_live; then
+            systemctl start "$unit" >/dev/null
+            unblock_bluetooth
+            power_on_controllers
+            bluetoothctl agent on >/dev/null 2>&1 || true
+            bluetoothctl default-agent >/dev/null 2>&1 || true
+            reconnect_known_devices
+        fi
+        emit_status
+        emit_devices
+        ;;
     forget)
         require_available
         valid_address "$address" || {
@@ -1732,7 +1868,7 @@ case "$action" in
         emit_devices
         ;;
     *)
-        echo "usage: $0 [status|enable|disable|scan|pair-connect <mac>|connect <mac>|forget <mac>]" >&2
+        echo "usage: $0 [status|enable|disable|scan|pair-connect <mac>|connect <mac>|reconnect|forget <mac>]" >&2
         exit 2
         ;;
 esac
@@ -1745,6 +1881,8 @@ SUDOERS
     if command -v visudo >/dev/null 2>&1; then
         pi240_root visudo -cf /etc/sudoers.d/240mp-bluetooth-control
     fi
+
+    pi240_install_bluetooth_reconnect_service "$helper"
 
     case "$default_enabled" in
         1|true|TRUE|yes|YES|on|ON)
