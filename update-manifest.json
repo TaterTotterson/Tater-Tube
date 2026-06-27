@@ -1,15 +1,15 @@
 {
-  "version": "v1.0.15",
-  "app_version": "1.0.15",
+  "version": "v1.0.16",
+  "app_version": "1.0.16",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/CRT-Station",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/CRT-Station/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/CRT-Station/releases/download/v1.0.15/240-MP-v1.0.15-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/CRT-Station/archive/refs/tags/v1.0.15.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/CRT-Station/releases/download/v1.0.16/240-MP-v1.0.16-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/CRT-Station/archive/refs/tags/v1.0.16.tar.gz",
   "notes": [
-    "Fixes the generated Bluetooth control helper syntax error from v1.0.14 that made Gamepad settings show N/A.",
-    "Adds release-time syntax validation for generated Pi helper scripts so helper heredoc errors fail CI.",
-    "Keeps the improved BlueZ gamepad pairing flow for XInput, Android, Switch, 8BitDo-style, and generic HID controllers.",
-    "Keeps Gamepad pair, connect, and remove actions off the UI thread so Settings remains responsive while Bluetooth is working."
+    "Fixes Bluetooth pairing hangs caused by unbounded btmgmt calls on Raspberry Pi OS.",
+    "Stops any stale Bluetooth reconnect helper during update so an older stuck process cannot survive the install.",
+    "Adds a systemd timeout and a slower retry cadence for the Bluetooth reconnect service.",
+    "Keeps generated Pi helper syntax validation in the release workflow."
   ]
 }

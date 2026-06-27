@@ -1593,6 +1593,7 @@ Wants=bluetooth.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=20s
 ExecStart=${helper} reconnect
 UNIT
 
@@ -1602,7 +1603,7 @@ Description=Retry CRT Station Bluetooth controller reconnect
 
 [Timer]
 OnBootSec=12s
-OnUnitActiveSec=5s
+OnUnitActiveSec=30s
 AccuracySec=1s
 Unit=240mp-bluetooth-reconnect.service
 
@@ -1612,6 +1613,7 @@ UNIT
 
     if [ -d /run/systemd/system ]; then
         pi240_root systemctl daemon-reload || true
+        pi240_root systemctl stop 240mp-bluetooth-reconnect.service >/dev/null 2>&1 || true
         pi240_root systemctl enable --now 240mp-bluetooth-reconnect.timer >/dev/null 2>&1 || true
     else
         pi240_root systemctl enable 240mp-bluetooth-reconnect.timer >/dev/null 2>&1 || true
@@ -1812,13 +1814,19 @@ power_on_controllers() {
     bluetoothctl power on >/dev/null 2>&1 || true
 }
 
-configure_adapter_runtime() {
-    if command -v btmgmt >/dev/null 2>&1; then
-        btmgmt -i hci0 fast-conn on >/dev/null 2>&1 || true
-        btmgmt -i hci0 connectable on >/dev/null 2>&1 || true
-        btmgmt -i hci0 bondable on >/dev/null 2>&1 || true
-        btmgmt -i hci0 discov on >/dev/null 2>&1 || true
+run_bluetooth_mgmt() {
+    if ! command -v btmgmt >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
+        return 0
     fi
+
+    timeout 3 btmgmt -i hci0 "$@" >/dev/null 2>&1 || true
+}
+
+configure_adapter_runtime() {
+    run_bluetooth_mgmt fast-conn on
+    run_bluetooth_mgmt connectable on
+    run_bluetooth_mgmt bondable on
+    run_bluetooth_mgmt discov on
     bluetoothctl pairable on >/dev/null 2>&1 || true
     bluetoothctl discoverable on >/dev/null 2>&1 || true
 }
