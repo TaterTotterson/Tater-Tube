@@ -16,12 +16,14 @@ FocusScope {
     property string statusText: "LOADING GAME CENTER..."
     property var systems: []
     property var games: []
+    property var gameRows: []
     property int currentSystemIndex: 0
     property int currentGameIndex: 0
     property int setupRow: 0
     property bool mounting: false
     property string selectedSystemId: ""
     property string selectedSystemTitle: ""
+    property string currentGameFolder: ""
 
     focus: true
 
@@ -29,6 +31,107 @@ FocusScope {
         var value = appCore.get_setting(moduleId, key)
         if (value === undefined || value === null || value === "") return fallback
         return value
+    }
+
+    function truthySetting(key, fallback) {
+        var value = settingValue(key, fallback)
+        return value === true || value === "ON" || value === "on" || value === "true" || value === "1"
+    }
+
+    function keepDirectoryStructure() {
+        return truthySetting("keep_directory_structure", false)
+    }
+
+    function normalizedFolder(folder) {
+        var value = ((folder || "") + "").replace(/\\/g, "/").trim()
+        while (value.charAt(0) === "/")
+            value = value.substring(1)
+        while (value.length > 0 && value.charAt(value.length - 1) === "/")
+            value = value.substring(0, value.length - 1)
+        return value === "." ? "" : value
+    }
+
+    function childFolderFor(baseFolder, gameFolder) {
+        var base = normalizedFolder(baseFolder)
+        var folder = normalizedFolder(gameFolder)
+        if (folder === "" || folder === base)
+            return ""
+
+        var rest = folder
+        if (base !== "") {
+            var prefix = base + "/"
+            if (folder.indexOf(prefix) !== 0)
+                return ""
+            rest = folder.substring(prefix.length)
+        }
+
+        var slash = rest.indexOf("/")
+        return slash < 0 ? rest : rest.substring(0, slash)
+    }
+
+    function parentFolder(folder) {
+        var value = normalizedFolder(folder)
+        var slash = value.lastIndexOf("/")
+        return slash < 0 ? "" : value.substring(0, slash)
+    }
+
+    function compareRows(left, right) {
+        var a = ((left.title || "") + "").toUpperCase()
+        var b = ((right.title || "") + "").toUpperCase()
+        if (a < b) return -1
+        if (a > b) return 1
+        return 0
+    }
+
+    function buildGameRows() {
+        var rows = []
+        if (!keepDirectoryStructure()) {
+            for (var i = 0; i < games.length; i++) {
+                var flatGame = Object.assign({}, games[i])
+                flatGame.rowType = "game"
+                flatGame.gameIndex = i
+                rows.push(flatGame)
+            }
+            gameRows = rows
+            return
+        }
+
+        var base = normalizedFolder(currentGameFolder)
+        var folderSeen = ({})
+        var folders = []
+        var directGames = []
+
+        for (var j = 0; j < games.length; j++) {
+            var game = Object.assign({}, games[j])
+            game.rowType = "game"
+            game.gameIndex = j
+
+            var folder = normalizedFolder(game.folder)
+            if (folder === base) {
+                directGames.push(game)
+                continue
+            }
+
+            var child = childFolderFor(base, folder)
+            if (child !== "" && folderSeen[child] !== true) {
+                folderSeen[child] = true
+                folders.push({
+                    rowType: "folder",
+                    title: child + "/",
+                    folderPath: base === "" ? child : base + "/" + child
+                })
+            }
+        }
+
+        folders.sort(compareRows)
+        directGames.sort(compareRows)
+        gameRows = folders.concat(directGames)
+    }
+
+    function setGameRowIndex(index) {
+        var next = Math.max(0, Math.min(gameList.count - 1, index))
+        gameList.currentIndex = next
+        currentGameIndex = next
     }
 
     function focusSetupRow() {
@@ -122,6 +225,7 @@ FocusScope {
         var system = systems[index] || ({})
         selectedSystemId = system.id || ""
         selectedSystemTitle = system.label || "RETRO"
+        currentGameFolder = ""
         mode = "loading"
         statusText = "LOADING " + selectedSystemTitle
         retroBackend.load_games(selectedSystemId)
@@ -129,22 +233,29 @@ FocusScope {
 
     function launchSelectedGame() {
         var index = gameList.currentIndex
-        if (index < 0 || index >= games.length) return
+        if (index < 0 || index >= gameRows.length) return
+        var row = gameRows[index] || ({})
+        if (row.rowType === "folder") {
+            currentGameFolder = row.folderPath || ""
+            buildGameRows()
+            setGameRowIndex(0)
+            return
+        }
+        if (row.rowType !== "game") return
+
         currentGameIndex = index
-        var game = games[index] || ({})
-        var title = game.title || "GAME"
+        var title = row.title || "GAME"
         statusText = "LOADING " + title
         mode = "loading"
-        retroBackend.launch_game(selectedSystemId, game.path || "")
+        retroBackend.launch_game(selectedSystemId, row.path || "")
     }
 
     function pageGameList(direction) {
-        if (games.length === 0) return
+        if (gameRows.length === 0) return
         var rowHeight = root.sh * 0.0583333
         var rows = Math.max(1, Math.floor(gameList.height / rowHeight) - 1)
         var next = Math.max(0, Math.min(gameList.count - 1, gameList.currentIndex + direction * rows))
-        gameList.currentIndex = next
-        currentGameIndex = next
+        setGameRowIndex(next)
         gameList.positionViewAtIndex(next, ListView.Contain)
     }
 
@@ -178,12 +289,10 @@ FocusScope {
 
         if (mode === "games") {
             if (event.key === Qt.Key_Up) {
-                gameList.currentIndex = Math.max(0, gameList.currentIndex - 1)
-                currentGameIndex = gameList.currentIndex
+                setGameRowIndex(gameList.currentIndex - 1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Down) {
-                gameList.currentIndex = Math.min(gameList.count - 1, gameList.currentIndex + 1)
-                currentGameIndex = gameList.currentIndex
+                setGameRowIndex(gameList.currentIndex + 1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Left) {
                 pageGameList(-1)
@@ -192,8 +301,14 @@ FocusScope {
                 pageGameList(1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
-                mode = "systems"
-                systemList.currentIndex = currentSystemIndex
+                if (keepDirectoryStructure() && normalizedFolder(currentGameFolder) !== "") {
+                    currentGameFolder = parentFolder(currentGameFolder)
+                    buildGameRows()
+                    setGameRowIndex(0)
+                } else {
+                    mode = "systems"
+                    systemList.currentIndex = currentSystemIndex
+                }
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
                 launchSelectedGame()
@@ -255,14 +370,16 @@ FocusScope {
 
         function onGamesLoaded(items) {
             games = items || []
-            if (games.length === 0) {
+            currentGameFolder = ""
+            buildGameRows()
+            if (gameRows.length === 0) {
                 mode = "message"
                 statusText = "NO ROMS IN " + selectedSystemTitle
                 return
             }
             mode = "games"
             currentGameIndex = 0
-            gameList.currentIndex = 0
+            setGameRowIndex(0)
         }
 
         function onGameStarted(title) {
@@ -272,7 +389,7 @@ FocusScope {
 
         function onGameFinished() {
             if (mode === "playing" || mode === "loading")
-                mode = games.length > 0 ? "games" : "systems"
+                mode = gameRows.length > 0 ? "games" : "systems"
         }
 
         function onErrorOccurred(message) {
@@ -431,7 +548,7 @@ FocusScope {
     ListView {
         id: gameList
         visible: mode === "games"
-        model: games
+        model: gameRows
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: root.sh * 0.25

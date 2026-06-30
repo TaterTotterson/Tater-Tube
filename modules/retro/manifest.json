@@ -30,6 +30,12 @@
       "default": "games"
     },
     {
+      "key": "keep_directory_structure",
+      "label": "KEEP ROM FOLDERS",
+      "type": "toggle",
+      "default": "OFF"
+    },
+    {
       "key": "local_path",
       "label": "LOCAL ROM PATH",
       "type": "directory_browser",
