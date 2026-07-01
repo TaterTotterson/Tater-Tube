@@ -1,0 +1,53 @@
+{
+  "id": "com.240mp.usenet",
+  "name": "Usenet",
+  "order": 27,
+  "icon": "assets/images/logo.svg",
+  "entry_point_qml": "views/Root.qml",
+  "settings": [
+    {
+      "key": "enabled",
+      "label": "ENABLED",
+      "type": "toggle",
+      "default": "ON"
+    },
+    {
+      "key": "newznab_url",
+      "label": "NEWZNAB URL",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "newznab_api_key",
+      "label": "NEWZNAB API KEY",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "altmount_url",
+      "label": "ALTMOUNT URL",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "altmount_api_key",
+      "label": "ALTMOUNT API KEY",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "browse_limit",
+      "label": "BROWSE LIMIT",
+      "type": "list_single",
+      "options": ["25", "50", "100"],
+      "default": "50"
+    },
+    {
+      "key": "stream_timeout",
+      "label": "STREAM TIMEOUT",
+      "type": "list_single",
+      "options": ["120", "300", "600", "900"],
+      "default": "300"
+    }
+  ]
+}

@@ -1,16 +1,15 @@
 {
-  "version": "v1.2.1",
-  "app_version": "1.2.1",
+  "version": "v1.2.2",
+  "app_version": "1.2.2",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.2.1/Tater-Tube-v1.2.1-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.2.1.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.2.2/Tater-Tube-v1.2.2-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.2.2.tar.gz",
   "notes": [
-    "Adds Video on Demand TV Mode with randomized movie and TV episode channels.",
-    "Keeps same-show TV episodes in order when TV Mode schedules them back-to-back.",
-    "Shares YouTube commercial playlists between Public Access TV Mode and Video on Demand TV Mode.",
-    "Moves TV Mode commercial controls into compact TV Mode setup menus in both Public Access and Video on Demand.",
-    "Updates the boot and updater splash image."
+    "Adds a Usenet module for browsing Newznab categories and releases.",
+    "Streams selected NZBs through AltMount without storing media on the Pi.",
+    "Adds in-app setup for Newznab and AltMount connection details.",
+    "Supports multiple playable stream choices when AltMount returns more than one media file."
   ]
 }

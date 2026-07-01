@@ -17,6 +17,7 @@
 #include "modules/retro/RetroBackend.h"
 #include "modules/youtube_playlist/YouTubePlaylistBackend.h"
 #include "modules/moonlight/MoonlightBackend.h"
+#include "modules/usenet/UsenetBackend.h"
 #include "player/MpvController.h"
 #include "input/InputManager.h"
 #include "api/ControlApiServer.h"
@@ -94,6 +95,7 @@ int main(int argc, char *argv[]) {
     RetroBackend        retroBackend(appRoot, dataRoot);
     YouTubePlaylistBackend youtubePlaylistBackend(appRoot, dataRoot);
     MoonlightBackend    moonlightBackend(appRoot, dataRoot);
+    UsenetBackend       usenetBackend(appRoot, dataRoot);
     MpvController       mpvController(appRoot, &appCore);
     InputManager        inputManager(dataRoot);
     ControlApiServer    controlApi(&mpvController, &embyBackend, &retroBackend);
@@ -116,6 +118,8 @@ int main(int argc, char *argv[]) {
                            "youtubePlaylistBackend", &youtubePlaylistBackend, ctx);
     appCore.registerModule("com.240mp.moonlight",
                            "moonlightBackend", &moonlightBackend, ctx);
+    appCore.registerModule("com.240mp.usenet",
+                           "usenetBackend", &usenetBackend, ctx);
 
     ctx->setContextProperty("appCore",       &appCore);
     ctx->setContextProperty("mpvController", &mpvController);

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(TaterTube VERSION 1.2.1 LANGUAGES CXX)
+project(TaterTube VERSION 1.2.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,6 +29,7 @@ add_executable(240mp
     src/modules/retro/RetroBackend.cpp
     src/modules/youtube_playlist/YouTubePlaylistBackend.cpp
     src/modules/moonlight/MoonlightBackend.cpp
+    src/modules/usenet/UsenetBackend.cpp
     src/player/MpvController.cpp
     src/input/InputManager.cpp
     src/api/ControlApiServer.cpp
