@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Question / how do I…?
-    url: https://github.com/TaterTotterson/CRT-Station/discussions/categories/q-a
+    url: https://github.com/TaterTotterson/Tater-Tube/discussions/categories/q-a
     about: For setup help and open-ended questions, please use Discussions > Q&A instead of opening an issue.
   - name: Share an idea or discuss
-    url: https://github.com/TaterTotterson/CRT-Station/discussions/categories/ideas
+    url: https://github.com/TaterTotterson/Tater-Tube/discussions/categories/ideas
     about: For brainstorming and open-ended ideas, please start a Discussion in Ideas.

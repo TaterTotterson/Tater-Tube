@@ -1,13 +1,13 @@
-# CRT Station
+# Tater Tube
 
-CRT Station is a retro VCR-style media frontend for a Raspberry Pi 4 connected to a CRT over composite video.
+Tater Tube is a retro VCR-style media frontend for Raspberry Pi appliance builds.
 
-This fork is focused on one appliance-style setup:
+This fork is focused on two appliance-style setups:
 
-- Raspberry Pi 4
-- CRT display over composite output
+- Raspberry Pi 4 with CRT display over composite output
+- Raspberry Pi 5 with HDMI output using the display's preferred EDID mode
 - Ready-to-flash SD card images
-- Boot screen and automatic launch straight into CRT Station
+- Boot screen and automatic launch straight into Tater Tube
 - Argon IR remote support through a GPIO IR receiver on GPIO23
 - Local Emby/Jellyfin or Plex browsing and playback
 - Emby/Jellyfin or Plex music playback through the Tape Deck module
@@ -16,9 +16,9 @@ This fork is focused on one appliance-style setup:
 - Game Center ROM browsing from RetroNAS/MiSTer shares with clean RetroArch game launch
 - PC Link game streaming from Sunshine/Moonlight hosts
 - Bluetooth controller pairing from Settings
-- NTSC and PAL composite image builds
+- NTSC composite, PAL composite, and Pi 5 HDMI auto image builds
 
-The easiest way to use it is to download the ready-to-flash NTSC or PAL `.img.xz` from the latest GitHub release, flash it to an SD card, and boot the Pi.
+The easiest way to use it is to download the ready-to-flash `.img.xz` for your display from the latest GitHub release, flash it to an SD card, and boot the Pi.
 
 ## Features
 
@@ -30,7 +30,7 @@ The easiest way to use it is to download the ready-to-flash NTSC or PAL `.img.xz
 - Autoplay next episode
 - Playlist and Collection support for Emby/Jellyfin
 - Audio and subtitle track selection
-- H.264/AAC transcode playback with selectable 1080p, 720p, and 480p quality targets
+- H.264/AAC transcode playback with display-adaptive Auto plus 4K, 1440p, 1080p, 720p, and 480p quality targets
 
 ### Tape Deck
 - Streams music from Emby/Jellyfin or Plex music libraries
@@ -59,7 +59,7 @@ The easiest way to use it is to download the ready-to-flash NTSC or PAL `.img.xz
 - Shows only systems with a supported installed RetroArch core and matching ROM folder
 - Supports NES, Master System, Genesis, Game Boy, Game Boy Color, Game Boy Advance, SNES, and PlayStation when the matching cores are available
 - Launches games directly into RetroArch with no RetroArch menu browsing
-- Remote Home stops RetroArch and returns to the CRT Station menu
+- Remote Home stops RetroArch and returns to the Tater Tube menu
 - Bluetooth controllers can be paired from Settings and then used by SDL/RetroArch
 - VHS-style controller mapper saves one global RetroPad layout for all cores
 
@@ -67,8 +67,8 @@ The easiest way to use it is to download the ready-to-flash NTSC or PAL `.img.xz
 - Pairs with Sunshine hosts through Moonlight PIN setup
 - Lists Sunshine apps from the host and caches them for faster launch
 - Defaults to a CRT-friendly `640x480`, `15 FPS`, `1000 Kbps`, H.264 stream
-- Includes stream presets for `640x480`, `720x480`, `768x576`, and `800x600`
-- The stream resolution is requested by CRT Station; the host desktop or game should also be set to a matching 4:3 resolution in Sunshine or the game settings
+- Includes CRT, HD, 1440p, and 4K stream presets up to `3840x2160`
+- The stream resolution is requested by Tater Tube; the host desktop or game should also be set to a matching 4:3 resolution in Sunshine or the game settings
 - Controller streaming needs host-side virtual gamepad support. Sunshine on Windows requires ViGEmBus; Sunshine on macOS currently does not support gamepads
 
 ### Local Files
@@ -78,14 +78,15 @@ The easiest way to use it is to download the ready-to-flash NTSC or PAL `.img.xz
 - Loop and shuffle playback
 
 ### Appliance Image
-- Boots straight into CRT Station
-- Separate NTSC and PAL composite CRT images
-- CRT Station boot screen
+- Boots straight into Tater Tube
+- Separate NTSC composite, PAL composite, and Pi 5 HDMI auto images
+- Tater Tube image boot screen
 - SSH enabled for debugging
 - Argon IR remote defaults
 - Argon ONE fan Auto, Off, and fixed-speed settings
 - GPIO IR receiver default: GPIO23, physical pin 16
 - Analog audio defaults for the Pi composite/3.5mm setup
+- HDMI/KMS defaults for the Pi 5 auto-resolution setup
 - RetroArch and RetroNAS mount support
 - yt-dlp support for Public Access playlist streaming
 - Bluetooth controller support through BlueZ
@@ -94,14 +95,14 @@ The easiest way to use it is to download the ready-to-flash NTSC or PAL `.img.xz
 - Keyboard navigation
 - USB remote/controller navigation
 - Bluetooth controller navigation after pairing
-- Global controller mapper for CRT Station navigation and RetroArch cores
+- Global controller mapper for Tater Tube navigation and RetroArch cores
 - Argon IR remote support
 - Media keys during playback
 - Local HTTP playback and launch API for companion apps
 
 ### Local Control API
 
-CRT Station includes a small HTTP API for companion apps and voice-assistant bridges. It is enabled by default on the Pi image at port `24024`.
+Tater Tube includes a small HTTP API for companion apps and voice-assistant bridges. It is enabled by default on the Pi image at port `24024`.
 
 ```bash
 curl http://240mp.local:24024/api/v1/status
@@ -138,7 +139,7 @@ Set `MP240_API_TOKEN` to require `Authorization: Bearer <token>` or `X-240MP-Tok
 
 ## Hardware Target
 
-This project targets one setup: a Raspberry Pi 4 connected to a CRT over composite video, with Emby/Jellyfin or Plex media playback, HDHomeRun OTA, RetroNAS-backed games, and Argon IR remote control. Release images are built for both NTSC and PAL composite CRTs.
+This project targets Raspberry Pi appliance builds: Pi 4 composite output for CRTs, plus a Pi 5 HDMI auto-resolution image for modern displays. Media modules cover Emby/Jellyfin, Plex, HDHomeRun OTA, YouTube playlists, RetroNAS-backed games, and Sunshine/Moonlight PC Link.
 
 ## License
 
@@ -148,4 +149,4 @@ You are free to use, study, and modify this code. If you distribute a modified v
 
 ## Credits
 
-CRT Station started as a fork of [anthonycaccese/240-MP](https://github.com/anthonycaccese/240-MP). This fork is focused on Raspberry Pi 4 composite CRT use, NTSC/PAL image builds, Emby/Jellyfin and Plex support, HDHomeRun OTA, RetroNAS games, and Argon IR remote defaults.
+Tater Tube started as a fork of [anthonycaccese/240-MP](https://github.com/anthonycaccese/240-MP). This fork is focused on appliance-style Pi images, Emby/Jellyfin and Plex support, HDHomeRun OTA, Public Access playlists, RetroNAS games, PC Link, and Argon IR defaults.

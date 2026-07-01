@@ -1,18 +1,19 @@
 name: Hardware validation report
-description: Report whether 240-MP works on a Raspberry Pi 4 composite CRT setup
+description: Report whether Tater Tube works on your Raspberry Pi appliance setup
 title: "[Hardware]: "
 labels: ["hardware-validation"]
 body:
   - type: markdown
     attributes:
       value: |
-        This fork targets Raspberry Pi 4 composite output to a CRT, with Argon IR remote support. Thank you for sharing your setup results.
+        Tater Tube targets Raspberry Pi 4 composite CRT output and Raspberry Pi 5 HDMI appliance setups, with Argon IR remote support. Thank you for sharing your setup results.
   - type: dropdown
     id: platform
     attributes:
       label: Platform
       options:
         - Raspberry Pi 4
+        - Raspberry Pi 5
     validations:
       required: true
   - type: dropdown
@@ -22,6 +23,7 @@ body:
       options:
         - CRT via composite (NTSC)
         - CRT via composite (PAL)
+        - HDMI
     validations:
       required: true
   - type: input
@@ -52,4 +54,4 @@ body:
     id: photos
     attributes:
       label: Photos of the setup (optional)
-      description: Drag & drop photos of your setup or screen here — always fun to see 240-MP running in the wild.
+      description: Drag & drop photos of your setup or screen here — always useful to see Tater Tube running on real hardware.

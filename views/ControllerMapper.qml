@@ -27,7 +27,7 @@ FocusScope {
         { id: "l3",     title: "LEFT STICK",     symbol: "L3",     note: "CLICK LEFT STICK" },
         { id: "r3",     title: "RIGHT STICK",    symbol: "R3",     note: "CLICK RIGHT STICK" },
         { id: "menu",   title: "MENU",           symbol: "MENU",   note: "ON SCREEN DISPLAY" },
-        { id: "home",   title: "HOME",           symbol: "HOME",   note: "RETURN TO CRT STATION" }
+        { id: "home",   title: "HOME",           symbol: "HOME",   note: "RETURN TO TATER TUBE" }
     ]
     property var bindings: ({})
     property int stepIndex: 0

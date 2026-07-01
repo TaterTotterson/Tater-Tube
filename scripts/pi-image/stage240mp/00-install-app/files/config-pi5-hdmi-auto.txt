@@ -1,0 +1,15 @@
+# Global
+disable_splash=1
+disable_overscan=1
+dtparam=audio=on
+
+# Pi 5 HDMI appliance output. KMS reads the display EDID and chooses the
+# preferred mode, so 4K TVs can use 4K while 1080p/720p displays still work.
+display_auto_detect=1
+hdmi_force_hotplug=1
+dtoverlay=vc4-kms-v3d
+
+[pi5]
+# HDMI mode is intentionally not forced through cmdline.txt.
+
+[all]

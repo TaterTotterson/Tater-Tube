@@ -7,7 +7,7 @@ Row {
     // Custom Properties 
     property url iconSource: "../../assets/images/logo.svg"
     property real iconHeight: root.sh * 0.05
-    property string title: "CRT STATION"
+    property string title: "TATER TUBE"
     property string subtitle: ""
 
     spacing: root.sw * 0.025 //16

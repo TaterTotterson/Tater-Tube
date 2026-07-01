@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(240mp VERSION 1.1.4 LANGUAGES CXX)
+project(TaterTube VERSION 1.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -60,16 +60,16 @@ target_include_directories(240mp PRIVATE
 )
 
 target_compile_definitions(240mp PRIVATE
-    CRT_STATION_VERSION="${PROJECT_VERSION}"
+    TATER_TUBE_VERSION="${PROJECT_VERSION}"
 )
 
 # ── macOS bundle metadata ──────────────────────────────────────────────────────
 set_target_properties(240mp PROPERTIES
     MACOSX_BUNDLE TRUE
-    MACOSX_BUNDLE_BUNDLE_NAME "CRT Station"
+    MACOSX_BUNDLE_BUNDLE_NAME "Tater Tube"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.240mp.app"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.tatertotterson.tatertube"
     MACOSX_BUNDLE_ICON_FILE "assets/images/240-mp"
     INSTALL_RPATH_USE_LINK_PATH TRUE
 )
@@ -147,10 +147,10 @@ endif()
 # Releases are Linux arm64 tarballs for Raspberry Pi. macOS builds remain a local
 # development smoke-test path and are not packaged by CPack.
 if(NOT APPLE)
-    set(CPACK_PACKAGE_NAME "CRT Station")
+    set(CPACK_PACKAGE_NAME "Tater Tube")
     set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "CRT Station Media Player")
-    set(CPACK_PACKAGE_VENDOR "CRT Station")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Tater Tube Media Player")
+    set(CPACK_PACKAGE_VENDOR "Tater Tube")
     set(CPACK_GENERATOR "TGZ")
     set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local")
     include(CPack)

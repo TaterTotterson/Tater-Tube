@@ -568,15 +568,11 @@ QStringList MoonlightBackend::streamArguments(const QString &appName, bool force
     QString width = QStringLiteral("640");
     QString height = QStringLiteral("480");
     const QString resolution = setting(QStringLiteral("resolution"), QStringLiteral("640x480"));
-    if (resolution == QStringLiteral("720x480")) {
-        width = QStringLiteral("720");
-        height = QStringLiteral("480");
-    } else if (resolution == QStringLiteral("768x576")) {
-        width = QStringLiteral("768");
-        height = QStringLiteral("576");
-    } else if (resolution == QStringLiteral("800x600")) {
-        width = QStringLiteral("800");
-        height = QStringLiteral("600");
+    const QRegularExpressionMatch resolutionMatch =
+        QRegularExpression(QStringLiteral("^(\\d{3,5})x(\\d{3,5})$")).match(resolution);
+    if (resolutionMatch.hasMatch()) {
+        width = resolutionMatch.captured(1);
+        height = resolutionMatch.captured(2);
     }
 
     QString bitrate = setting(QStringLiteral("bitrate"), QStringLiteral("1000 Kbps"));

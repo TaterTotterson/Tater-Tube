@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
-# Run a locally-built CRT Station binary with the same display environment the
+# Run a locally-built Tater Tube binary with the same display environment the
 # installed launcher sets up. Use this to test a dev build on real hardware —
 # notably the Pi 5, whose EGLFS display-card selection lives in that launcher and
 # is otherwise missing when you run ./build/240mp directly.

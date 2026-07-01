@@ -234,7 +234,7 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
     {
         QFile lf(m_logFilePath);
         if (lf.open(QFile::Append | QFile::Text)) {
-            lf.write(QString("\n=== CRT Station session start %1 ===\n    url: %2\n\n")
+            lf.write(QString("\n=== Tater Tube session start %1 ===\n    url: %2\n\n")
                          .arg(QDateTime::currentDateTime().toString(Qt::ISODate))
                          .arg(url)
                          .toUtf8());

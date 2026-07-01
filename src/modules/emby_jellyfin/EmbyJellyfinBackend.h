@@ -141,7 +141,6 @@ private:
 
     static QString normalizeServerUrl(const QString &raw);
     static QString itemType(const QJsonObject &item);
-    static bool codecNeedsTranscode(const QString &codec);
     static QString msToDisplay(int ms);
     static qint64 ticksToMs(const QJsonValue &ticks);
     static qint64 msToTicks(int ms);

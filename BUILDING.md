@@ -1,8 +1,8 @@
-# Building CRT Station
+# Building Tater Tube
 
-Most users should use the ready-to-flash Raspberry Pi image for their CRT standard from the latest GitHub release.
+Most users should use the ready-to-flash Raspberry Pi image for their display from the latest GitHub release.
 
-This fork is built around one production target: Raspberry Pi 4, composite video to a CRT, Argon IR remote support, and Emby/Jellyfin or Plex playback.
+This fork is built around appliance targets: Raspberry Pi 4 composite video to a CRT, and Raspberry Pi 5 HDMI auto-resolution.
 
 Use this page when you want to customize the image, change the app, or do local development.
 
@@ -77,7 +77,7 @@ Pi settings are stored in:
 
 ## Build A Custom Pi Image
 
-The image builder wraps Raspberry Pi's `pi-gen` arm64 branch, builds CRT Station inside the rootfs, installs it under `/opt/240mp`, enables `240mp.service`, enables the boot screen, and applies the CRT/composite, Bluetooth controller, and Argon IR defaults.
+The image builder wraps Raspberry Pi's `pi-gen` arm64 branch, builds Tater Tube inside the rootfs, installs it under `/opt/240mp`, enables `240mp.service`, enables the boot screen, and applies the selected display profile plus Bluetooth controller and Argon IR defaults.
 
 Requirements on your build machine:
 
@@ -94,7 +94,13 @@ Build the default Raspberry Pi 4 composite/Argon IR image:
 Build a PAL composite image:
 
 ```bash
-PI_IMAGE_PROFILE=crt-pal PI_IMAGE_NAME=240mp-pal ./scripts/build-pi-image.sh
+PI_IMAGE_PROFILE=crt-pal PI_IMAGE_NAME=tater-tube-pal ./scripts/build-pi-image.sh
+```
+
+Build a Pi 5 HDMI auto-resolution image:
+
+```bash
+PI_IMAGE_PROFILE=pi5-hdmi-auto PI_IMAGE_NAME=tater-tube-pi5-hdmi-auto ./scripts/build-pi-image.sh
 ```
 
 Build with a stronger login password:
@@ -135,7 +141,7 @@ For custom audio setups, `mpv_audio_args` can be added beside it. The default co
 
 ### Service Logs
 
-The ready-to-flash image runs CRT Station through `240mp.service`.
+The ready-to-flash image runs Tater Tube through `240mp.service`.
 
 ```bash
 journalctl -u 240mp -b
@@ -190,7 +196,7 @@ git push origin v2026.06.20.22
 The release workflow builds and publishes:
 
 - Linux arm64 app update tarball
-- Ready-to-flash Raspberry Pi images for NTSC and PAL composite CRTs
+- Ready-to-flash Raspberry Pi images for NTSC composite, PAL composite, and Pi 5 HDMI auto-resolution
 - Image checksum
 - Installer script
 

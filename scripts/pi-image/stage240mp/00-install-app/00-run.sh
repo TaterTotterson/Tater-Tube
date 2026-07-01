@@ -10,7 +10,7 @@ ENABLE_BLUETOOTH="${PI240_ENABLE_BLUETOOTH:-1}"
 ENABLE_BOOT_SPLASH="${PI240_ENABLE_BOOT_SPLASH:-1}"
 
 if [ ! -d "$SOURCE_DIR" ]; then
-        echo "CRT Station source directory not found: $SOURCE_DIR" >&2
+        echo "Tater Tube source directory not found: $SOURCE_DIR" >&2
     echo "Set PI240_SOURCE_DIR or use scripts/build-pi-image.sh." >&2
     exit 1
 fi
@@ -43,8 +43,8 @@ install -m 0755 "$SOURCE_DIR/scripts/lib/pi-setup.sh" "${ROOTFS_DIR}/tmp/240mp-p
 if [ "$PROFILE" != "none" ]; then
     SNIPPET="${SUBSTAGE_DIR}/files/config-${PROFILE}.txt"
     if [ ! -f "$SNIPPET" ]; then
-        echo "Unknown CRT Station display profile: $PROFILE" >&2
-        echo "Expected one of: hdmi, crt-ntsc, crt-pal, none" >&2
+        echo "Unknown Tater Tube display profile: $PROFILE" >&2
+        echo "Expected one of: hdmi, pi5-hdmi-auto, crt-ntsc, crt-pal, none" >&2
         exit 1
     fi
 
@@ -67,7 +67,7 @@ if [ "$PROFILE" != "none" ]; then
     fi
 
     {
-        printf '\n# --- CRT Station display profile: %s ---\n' "$PROFILE"
+        printf '\n# --- Tater Tube display profile: %s ---\n' "$PROFILE"
         cat "$SNIPPET"
     } >> "$CONFIG_TXT"
 fi
@@ -85,7 +85,7 @@ if [ "$ENABLE_IR" = "1" ]; then
     touch "$CONFIG_TXT"
 
     {
-        printf '\n# --- CRT Station IR remote receiver ---\n'
+        printf '\n# --- Tater Tube IR remote receiver ---\n'
         printf 'dtoverlay=gpio-ir,gpio_pin=%s\n' "$IR_GPIO_PIN"
     } >> "$CONFIG_TXT"
 fi

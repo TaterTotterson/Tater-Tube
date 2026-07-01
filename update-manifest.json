@@ -1,15 +1,17 @@
 {
-  "version": "v1.1.4",
-  "app_version": "1.1.4",
+  "version": "v1.2.0",
+  "app_version": "1.2.0",
   "channel": "main",
-  "repo": "https://github.com/TaterTotterson/CRT-Station",
-  "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/CRT-Station/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/CRT-Station/releases/download/v1.1.4/240-MP-v1.1.4-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/CRT-Station/archive/refs/tags/v1.1.4.tar.gz",
+  "repo": "https://github.com/TaterTotterson/Tater-Tube",
+  "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.2.0/Tater-Tube-v1.2.0-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.2.0.tar.gz",
   "notes": [
-    "Adds Public Access TV Mode with shuffled playlist channels starting at channel 02.",
-    "Adds commercial playlists and a TV Mode commercial toggle for random ad breaks between videos.",
-    "Pre-resolves YouTube stream URLs before launching mpv so the app static stays active longer during tuning.",
-    "Persists mpv volume between Public Access channel and video changes."
+    "Renames the app to Tater Tube.",
+    "Adds the new image-based Tater Tube boot splash with aspect-correct scaling for composite and HDMI builds.",
+    "Adds a ready-to-flash Raspberry Pi 5 HDMI auto-resolution image alongside the NTSC and PAL composite images.",
+    "Updates Emby/Jellyfin and Plex Video on Demand to use display-adaptive transcode quality, up to 4K on HDMI displays while keeping CRT builds capped appropriately.",
+    "Adds PC Link HDMI presets up to 3840x2160 with higher bitrate and H.265 options.",
+    "Keeps the updater on the same Tater Tube image splash during firmware updates."
   ]
 }

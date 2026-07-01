@@ -671,12 +671,12 @@ pi240_enable_moonlight_composite_display_stack() {
     if ! pi240_root grep -Eq '^[[:space:]]*dtoverlay=vc4-fkms-v3d([,[:space:]]|$)' "$config_txt"; then
         if pi240_is_root; then
             {
-                printf '\n# --- CRT Station PC Link display compatibility ---\n'
+                printf '\n# --- Tater Tube PC Link display compatibility ---\n'
                 printf 'dtoverlay=vc4-fkms-v3d\n'
             } >> "$config_txt"
         else
             {
-                printf '\n# --- CRT Station PC Link display compatibility ---\n'
+                printf '\n# --- Tater Tube PC Link display compatibility ---\n'
                 printf 'dtoverlay=vc4-fkms-v3d\n'
             } | sudo tee -a "$config_txt" >/dev/null
         fi
@@ -708,12 +708,12 @@ pi240_enable_ir_overlay() {
 
     if pi240_is_root; then
         {
-            printf '\n# --- CRT Station IR remote receiver ---\n'
+            printf '\n# --- Tater Tube IR remote receiver ---\n'
             printf 'dtoverlay=gpio-ir,gpio_pin=%s\n' "$gpio_pin"
         } >> "$config_txt"
     else
         {
-            printf '\n# --- CRT Station IR remote receiver ---\n'
+            printf '\n# --- Tater Tube IR remote receiver ---\n'
             printf 'dtoverlay=gpio-ir,gpio_pin=%s\n' "$gpio_pin"
         } | sudo tee -a "$config_txt" >/dev/null
     fi
@@ -734,12 +734,12 @@ pi240_enable_i2c() {
         fi
     elif pi240_is_root; then
         {
-            printf '\n# --- CRT Station Argon ONE fan control ---\n'
+            printf '\n# --- Tater Tube Argon ONE fan control ---\n'
             printf 'dtparam=i2c_arm=on\n'
         } >> "$config_txt"
     else
         {
-            printf '\n# --- CRT Station Argon ONE fan control ---\n'
+            printf '\n# --- Tater Tube Argon ONE fan control ---\n'
             printf 'dtparam=i2c_arm=on\n'
         } | sudo tee -a "$config_txt" >/dev/null
     fi
@@ -758,10 +758,27 @@ pi240_install_boot_splash() {
         return 0
     fi
 
+    local boot_image_source=""
+    local boot_image_candidate
+    for boot_image_candidate in \
+        /opt/240mp/share/240mp/assets/images/tater-tube-boot.png \
+        /usr/local/share/240mp/assets/images/tater-tube-boot.png \
+        /opt/240mp-src/assets/images/tater-tube-boot.png \
+        ./assets/images/tater-tube-boot.png; do
+        if [ -f "$boot_image_candidate" ]; then
+            boot_image_source="$boot_image_candidate"
+            break
+        fi
+    done
+
+    if [ -n "$boot_image_source" ]; then
+        pi240_root install -D -m 0644 "$boot_image_source" /usr/share/plymouth/themes/240mp/tater-tube-boot.png
+    fi
+
     pi240_install_file_from_stdin /usr/share/plymouth/themes/240mp/240mp.plymouth 0644 <<'PLYMOUTH_THEME'
 [Plymouth Theme]
-Name=CRT Station
-Description=CRT Station boot splash
+Name=Tater Tube
+Description=Tater Tube boot splash
 ModuleName=script
 
 [script]
@@ -771,18 +788,46 @@ PLYMOUTH_THEME
 
     pi240_install_file_from_stdin /usr/share/plymouth/themes/240mp/240mp.script 0644 <<'PLYMOUTH_SCRIPT'
 Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
-Window.SetBackgroundBottomColor(0.02, 0.02, 0.02);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
 
 screen_width = Window.GetWidth();
 screen_height = Window.GetHeight();
 
-title_y = screen_height * 0.31;
-line_y = screen_height * 0.43;
-sub_y = screen_height * 0.53;
-load_y = screen_height * 0.68;
-hint_y = screen_height * 0.77;
+fun min(a, b) {
+    if (a < b) {
+        return a;
+    }
+    return b;
+}
 
-fun center_sprite(sprite, image, y) {
+fun center_sprite(sprite, image) {
+    sprite.SetX((screen_width - image.GetWidth()) / 2);
+    sprite.SetY((screen_height - image.GetHeight()) / 2);
+}
+
+boot_image = Image("tater-tube-boot.png");
+boot_sprite = Sprite();
+
+if (boot_image.GetWidth() > 0 && boot_image.GetHeight() > 0) {
+    fit_width = screen_width;
+    fit_height = screen_height;
+    scale = min((fit_width * 1.0) / boot_image.GetWidth(), (fit_height * 1.0) / boot_image.GetHeight());
+    scaled_width = boot_image.GetWidth() * scale;
+    scaled_height = boot_image.GetHeight() * scale;
+    boot_image = boot_image.Scale(scaled_width, scaled_height);
+    boot_sprite.SetImage(boot_image);
+    center_sprite(boot_sprite, boot_image);
+} else {
+    boot_image = Image.Text("TATER TUBE", 1.0, 1.0, 1.0);
+    boot_sprite.SetImage(boot_image);
+    center_sprite(boot_sprite, boot_image);
+}
+
+overlay_y = screen_height * 0.76;
+line_y = screen_height * 0.82;
+hint_y = screen_height * 0.88;
+
+fun center_text_sprite(sprite, image, y) {
     sprite.SetX((screen_width - image.GetWidth()) / 2);
     sprite.SetY(y);
 }
@@ -790,36 +835,27 @@ fun center_sprite(sprite, image, y) {
 fun set_sprite_text(sprite, text, red, green, blue, y) {
     image = Image.Text(text, red, green, blue);
     sprite.SetImage(image);
-    center_sprite(sprite, image, y);
+    center_text_sprite(sprite, image, y);
+    sprite.SetOpacity(1.0);
 }
 
-title_image = Image.Text("CRT STATION", 1.0, 1.0, 1.0);
-title_sprite = Sprite(title_image);
-center_sprite(title_sprite, title_image, title_y);
-
-line_image = Image.Text("///// COMPOSITE VIDEO SYSTEM /////", 1.0, 0.42, 0.0);
-line_sprite = Sprite(line_image);
-center_sprite(line_sprite, line_image, line_y);
-
-sub_image = Image.Text("SIGNAL LOCK  --  CRT READY", 0.55, 0.55, 0.55);
-sub_sprite = Sprite(sub_image);
-center_sprite(sub_sprite, sub_image, sub_y);
-
-load_image = Image.Text("BOOTING", 1.0, 0.42, 0.0);
-load_sprite = Sprite(load_image);
-center_sprite(load_sprite, load_image, load_y);
-
-hint_image = Image.Text("PLEASE WAIT", 0.55, 0.55, 0.55);
-hint_sprite = Sprite(hint_image);
-center_sprite(hint_sprite, hint_image, hint_y);
+overlay_sprite = Sprite();
+line_sprite = Sprite();
+hint_sprite = Sprite();
+overlay_sprite.SetOpacity(0.0);
+line_sprite.SetOpacity(0.0);
+hint_sprite.SetOpacity(0.0);
 
 fun message_callback(text) {
     if (text == "240MP_UPDATE") {
-        set_sprite_text(title_sprite, "CRT STATION", 1.0, 1.0, 1.0, title_y);
-        set_sprite_text(line_sprite, "///// FLASHING FIRMWARE /////", 1.0, 0.42, 0.0, line_y);
-        set_sprite_text(sub_sprite, "UPDATE IN PROGRESS", 0.55, 0.55, 0.55, sub_y);
-        set_sprite_text(load_sprite, "DO NOT POWER OFF", 1.0, 0.42, 0.0, load_y);
-        set_sprite_text(hint_sprite, "VIDEO WILL RETURN", 0.55, 0.55, 0.55, hint_y);
+        set_sprite_text(overlay_sprite, "///// FLASHING FIRMWARE /////", 1.0, 0.42, 0.0, overlay_y);
+        set_sprite_text(line_sprite, "DO NOT POWER OFF", 1.0, 1.0, 1.0, line_y);
+        set_sprite_text(hint_sprite, "VIDEO WILL RETURN", 0.65, 0.65, 0.65, hint_y);
+    }
+    if (text == "240MP_UPDATE_FAILED") {
+        set_sprite_text(overlay_sprite, "///// UPDATE FAILED /////", 1.0, 0.42, 0.0, overlay_y);
+        set_sprite_text(line_sprite, "CHECK UPDATE LOG", 1.0, 1.0, 1.0, line_y);
+        set_sprite_text(hint_sprite, "/var/log/240mp-update.log", 0.65, 0.65, 0.65, hint_y);
     }
 }
 
@@ -925,7 +961,7 @@ pi240_install_launcher() {
 
     {
         printf '#!/usr/bin/env bash\n'
-        printf '# CRT Station launcher - auto-detects display platform\n'
+        printf '# Tater Tube launcher - auto-detects display platform\n'
         printf 'INSTALL_DIR=%q\n' "$install_dir"
         cat <<'LAUNCHER'
 
@@ -1593,7 +1629,7 @@ pi240_install_bluetooth_reconnect_service() {
 
     pi240_install_file_from_stdin "$service" 0644 <<UNIT
 [Unit]
-Description=CRT Station Bluetooth controller reconnect
+Description=Tater Tube Bluetooth controller reconnect
 After=bluetooth.service
 Wants=bluetooth.service
 
@@ -1605,7 +1641,7 @@ UNIT
 
     pi240_install_file_from_stdin "$timer" 0644 <<'UNIT'
 [Unit]
-Description=Retry CRT Station Bluetooth controller reconnect
+Description=Retry Tater Tube Bluetooth controller reconnect
 
 [Timer]
 OnBootSec=12s
@@ -2503,7 +2539,7 @@ write_config() {
     local tmp
     tmp="$(mktemp)"
     {
-        echo '# CRT Station Argon ONE fan control'
+        echo '# Tater Tube Argon ONE fan control'
         echo '# mode=auto|off|fixed'
         printf 'mode=%s\n' "$mode"
         printf 'speed=%s\n' "$(bounded_speed "$speed")"
@@ -2567,7 +2603,7 @@ HELPER
 
     pi240_install_file_from_stdin "$service" 0644 <<UNIT
 [Unit]
-Description=CRT Station Argon ONE fan control
+Description=Tater Tube Argon ONE fan control
 After=multi-user.target
 
 [Service]
@@ -2635,12 +2671,12 @@ case "\$action" in
         fi
 
         {
-            echo "[\$(date -Is)] Installing CRT Station RetroArch cores"
+            echo "[\$(date -Is)] Installing Tater Tube RetroArch cores"
             # shellcheck source=/dev/null
             source "\$setup_script"
             export PI240_INSTALL_ALL_RETRO_CORE_FALLBACKS=1
             pi240_install_retro_core_dependencies
-            echo "[\$(date -Is)] Finished CRT Station RetroArch core install"
+            echo "[\$(date -Is)] Finished Tater Tube RetroArch core install"
         } >> "\$log_file" 2>&1
 
         echo "status=done"
@@ -2900,7 +2936,7 @@ IR_LEARN
 
     pi240_install_file_from_stdin /etc/systemd/system/240mp-ir-keymap.service 0644 <<'IR_SERVICE'
 [Unit]
-Description=CRT Station IR remote keymap
+Description=Tater Tube IR remote keymap
 After=systemd-udev-settle.service
 
 [Service]
@@ -2963,7 +2999,7 @@ pi240_install_autostart() {
 
     pi240_install_file_from_stdin "$systemd_service" 0644 <<UNIT
 [Unit]
-Description=CRT Station Media Player
+Description=Tater Tube Media Player
 After=multi-user.target sound.target
 
 [Service]
@@ -3045,7 +3081,7 @@ STOP_HELPER
 
     pi240_install_file_from_stdin /etc/systemd/system/240mp-terminal.service 0644 <<'TERMINAL_UNIT'
 [Unit]
-Description=CRT Station exit-to-terminal login shell
+Description=Tater Tube exit-to-terminal login shell
 
 [Service]
 Type=idle

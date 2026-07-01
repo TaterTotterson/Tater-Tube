@@ -1,28 +1,31 @@
 name: Bug report
-description: Report something broken in 240-MP
+description: Report something broken in Tater Tube
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to file a bug. This fork targets Raspberry Pi 4 composite output to a CRT, Argon IR remote input, and Emby/Jellyfin playback.
+        Thanks for taking the time to file a bug. Tater Tube targets Raspberry Pi appliance images, Argon IR remote input, Emby/Jellyfin and Plex playback, OTA, Public Access, Game Center, and PC Link.
   - type: checkboxes
     id: preflight
     attributes:
       label: Before you file
       options:
-        - label: I checked the docs and existing [issues](https://github.com/TaterTotterson/CRT-Station/issues) and didn't find this.
+        - label: I checked the docs and existing [issues](https://github.com/TaterTotterson/Tater-Tube/issues) and didn't find this.
           required: true
   - type: dropdown
     id: module
     attributes:
       label: Area / module
-      description: Which part of 240-MP does this affect?
+      description: Which part of Tater Tube does this affect?
       options:
         - Local Files module
         - Video on Demand module (Emby/Jellyfin)
-        - Ambient Mode module
+        - Tape Deck module
+        - Public Access module
+        - Game Center module
+        - PC Link module
         - App shell (browsing, settings, navigation)
         - Build (compiling from source)
         - Install / update / Pi image
@@ -35,6 +38,7 @@ body:
       label: Platform
       options:
         - Raspberry Pi 4
+        - Raspberry Pi 5
         - Local development machine
     validations:
       required: true
@@ -42,10 +46,11 @@ body:
     id: display
     attributes:
       label: Display & output
-      description: The supported image target is composite output to a CRT.
+      description: Which display path are you using?
       options:
         - CRT via composite (NTSC)
         - CRT via composite (PAL)
+        - HDMI
     validations:
       required: true
   - type: dropdown

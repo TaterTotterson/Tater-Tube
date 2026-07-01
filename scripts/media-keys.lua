@@ -1,4 +1,4 @@
--- HID media-key handling for CRT Station.
+-- HID media-key handling for Tater Tube.
 --
 -- Loaded for every mpv launch (all modules) so keyboard media keys work anytime
 -- mpv is playing. Binds the canonical mpv key names — which both real HID media

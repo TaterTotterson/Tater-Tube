@@ -24,8 +24,8 @@
 #include "macos_utils.h"
 #endif
 
-#ifndef CRT_STATION_VERSION
-#define CRT_STATION_VERSION "0.0.0"
+#ifndef TATER_TUBE_VERSION
+#define TATER_TUBE_VERSION "0.0.0"
 #endif
 
 static QString resolveAppRoot() {
@@ -51,7 +51,7 @@ static QString resolveDataRoot() {
         return QDir(envRoot).canonicalPath();
 
     // Keep the original storage path so existing Pi images retain settings after
-    // the visible app name changes to CRT Station.
+    // the visible app name changes to Tater Tube.
     QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     QString path = base.isEmpty()
         ? QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
@@ -62,10 +62,10 @@ static QString resolveDataRoot() {
 
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
-    app.setApplicationName("CRT Station");
-    app.setApplicationVersion(QStringLiteral(CRT_STATION_VERSION));
+    app.setApplicationName("Tater Tube");
+    app.setApplicationVersion(QStringLiteral(TATER_TUBE_VERSION));
 
-    // Hide cursor — CRT Station is keyboard-only so the cursor serves no purpose.
+    // Hide cursor — Tater Tube is keyboard-only so the cursor serves no purpose.
     // On Linux, only hide on headless EGLFS (not desktop X11/Wayland sessions).
 #ifdef Q_OS_LINUX
     if (qgetenv("DISPLAY").isEmpty() && qgetenv("WAYLAND_DISPLAY").isEmpty())

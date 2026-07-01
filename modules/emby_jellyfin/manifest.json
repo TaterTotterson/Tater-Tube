@@ -32,6 +32,7 @@
       "type": "list_single",
       "options_source": "dynamic",
       "options_slot": "getVideoQualities",
+      "default": "auto",
       "requires_auth": true
     },
     {

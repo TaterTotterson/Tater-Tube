@@ -36,8 +36,8 @@ constexpr Sint16 kAxisRelease = 12000;
 constexpr int kRepeatDelayMs    = 400;
 constexpr int kRepeatIntervalMs = 100;
 constexpr const char *kControllerMappingFile = "controller-map.json";
-constexpr const char *kGeneratedInputStart = "# --- CRT Station controller mapper start ---";
-constexpr const char *kGeneratedInputEnd = "# --- CRT Station controller mapper end ---";
+constexpr const char *kGeneratedInputStart = "# --- Tater Tube controller mapper start ---";
+constexpr const char *kGeneratedInputEnd = "# --- Tater Tube controller mapper end ---";
 
 // Qt reports both shift keys as Qt::Key_Shift; telling them apart takes the
 // platform code. Linux keymaps (eglfs/evdev, X11, Wayland) report evdev's

@@ -7,8 +7,10 @@
 #include <QDebug>
 #include <QFile>
 #include <QFileDevice>
+#include <QGuiApplication>
 #include <QJsonDocument>
 #include <QJsonValue>
+#include <QScreen>
 #include <QSet>
 #include <QStringList>
 #include <QSysInfo>
@@ -41,7 +43,15 @@ PlaybackLimits playbackLimitsFor(const QString &quality, bool forceTranscode) {
         return limits;
     }
 
-    if (quality == "1080p") {
+    if (quality == "2160p") {
+        limits.maxWidth = 3840;
+        limits.maxHeight = 2160;
+        limits.videoBitRate = 20000000;
+    } else if (quality == "1440p") {
+        limits.maxWidth = 2560;
+        limits.maxHeight = 1440;
+        limits.videoBitRate = 12000000;
+    } else if (quality == "1080p") {
         limits.maxWidth = 1920;
         limits.maxHeight = 1080;
         limits.videoBitRate = 8000000;
@@ -90,6 +100,37 @@ bool runningOnRaspberryPi3() {
 #else
     return false;
 #endif
+}
+
+QString displayAdaptiveVideoQuality() {
+    QScreen *screen = QGuiApplication::primaryScreen();
+    if (!screen)
+        return QStringLiteral("480p");
+
+    const QSize logicalSize = screen->geometry().size();
+    const qreal scale = screen->devicePixelRatio();
+    const int width = qMax(1, qRound(logicalSize.width() * scale));
+    const int height = qMax(1, qRound(logicalSize.height() * scale));
+    const int longSide = qMax(width, height);
+    const int shortSide = qMin(width, height);
+
+    if (shortSide >= 1800 || longSide >= 3200)
+        return QStringLiteral("2160p");
+    if (shortSide >= 1200 || longSide >= 2200)
+        return QStringLiteral("1440p");
+    if (shortSide >= 900 || longSide >= 1600)
+        return QStringLiteral("1080p");
+    if (shortSide >= 650 || longSide >= 1100)
+        return QStringLiteral("720p");
+    return QStringLiteral("480p");
+}
+
+bool isSupportedVideoQuality(const QString &quality) {
+    return quality == QStringLiteral("2160p") ||
+           quality == QStringLiteral("1440p") ||
+           quality == QStringLiteral("1080p") ||
+           quality == QStringLiteral("720p") ||
+           quality == QStringLiteral("480p");
 }
 
 QString musicArtistName(const QJsonObject &item) {
@@ -343,7 +384,15 @@ QString EmbyJellyfinBackend::videoQuality() const {
         return QStringLiteral("480p");
 
     QJsonObject cfg = loadConfig();
-    return cfg["modules"].toObject()[kModuleId].toObject()["video_quality"].toString("auto");
+    const QString configured = cfg["modules"].toObject()[kModuleId].toObject()["video_quality"]
+        .toString(QStringLiteral("auto"))
+        .trimmed()
+        .toLower();
+    if (configured.isEmpty() || configured == QStringLiteral("auto"))
+        return displayAdaptiveVideoQuality();
+    if (isSupportedVideoQuality(configured))
+        return configured;
+    return displayAdaptiveVideoQuality();
 }
 
 QNetworkRequest EmbyJellyfinBackend::apiRequest(const QUrl &url,
@@ -352,8 +401,8 @@ QNetworkRequest EmbyJellyfinBackend::apiRequest(const QUrl &url,
     req.setRawHeader("Accept", "application/json");
 
     QString auth = QStringLiteral(
-        "MediaBrowser Client=\"CRT Station\", Device=\"%1\", DeviceId=\"%2\", Version=\"%3\"")
-        .arg(QSysInfo::machineHostName().isEmpty() ? QStringLiteral("CRT Station")
+        "MediaBrowser Client=\"Tater Tube\", Device=\"%1\", DeviceId=\"%2\", Version=\"%3\"")
+        .arg(QSysInfo::machineHostName().isEmpty() ? QStringLiteral("Tater Tube")
                                                    : QSysInfo::machineHostName(),
              clientId(),
              QCoreApplication::applicationVersion());
@@ -395,14 +444,14 @@ QNetworkRequest EmbyJellyfinBackend::plexTvRequest(const QUrl &url,
                                                    const QString &token) const {
     QNetworkRequest req(url);
     req.setRawHeader("Accept", "application/json");
-    req.setRawHeader("X-Plex-Product", "CRT Station");
+    req.setRawHeader("X-Plex-Product", "Tater Tube");
     req.setRawHeader("X-Plex-Version", QCoreApplication::applicationVersion().toUtf8());
     req.setRawHeader("X-Plex-Client-Identifier", plexClientId().toUtf8());
     req.setRawHeader("X-Plex-Platform", "Qt");
-    req.setRawHeader("X-Plex-Device", "CRT Station");
+    req.setRawHeader("X-Plex-Device", "Tater Tube");
     req.setRawHeader("X-Plex-Device-Name",
                      QSysInfo::machineHostName().isEmpty()
-                         ? QByteArray("CRT Station")
+                         ? QByteArray("Tater Tube")
                          : QSysInfo::machineHostName().toUtf8());
     req.setRawHeader("X-Plex-Provides", "player");
     if (!token.isEmpty())
@@ -425,7 +474,7 @@ QNetworkReply *EmbyJellyfinBackend::plexTvPostForm(const QUrl &url,
 QNetworkRequest EmbyJellyfinBackend::plexServerRequest(const QUrl &url) const {
     QNetworkRequest req(url);
     req.setRawHeader("Accept", "application/xml");
-    req.setRawHeader("X-Plex-Product", "CRT Station");
+    req.setRawHeader("X-Plex-Product", "Tater Tube");
     req.setRawHeader("X-Plex-Version", QCoreApplication::applicationVersion().toUtf8());
     req.setRawHeader("X-Plex-Client-Identifier", plexClientId().toUtf8());
     req.setRawHeader("X-Plex-Token", plexToken().toUtf8());
@@ -497,11 +546,6 @@ QString EmbyJellyfinBackend::itemType(const QJsonObject &item) {
     if (type == "BoxSet" || type == "CollectionFolder") return "collection";
     if (type == "Playlist") return "playlist";
     return "video";
-}
-
-bool EmbyJellyfinBackend::codecNeedsTranscode(const QString &codec) {
-    const QString c = codec.toLower();
-    return c == "av1" || c == "av01";
 }
 
 QString EmbyJellyfinBackend::get_auth_state() {
@@ -1387,12 +1431,9 @@ void EmbyJellyfinBackend::plexBuildAudioStreamUrl(const QString &ratingKey,
 
 QString EmbyJellyfinBackend::plexTranscodeQuality() const {
     const QString quality = videoQuality();
-    if (quality == QStringLiteral("1080p") ||
-        quality == QStringLiteral("720p") ||
-        quality == QStringLiteral("480p")) {
+    if (isSupportedVideoQuality(quality))
         return quality;
-    }
-    return QStringLiteral("480p");
+    return displayAdaptiveVideoQuality();
 }
 
 QString EmbyJellyfinBackend::plexHttpHeaderFields() const {
@@ -2161,7 +2202,7 @@ QJsonObject EmbyJellyfinBackend::playbackDeviceProfile(bool forceTranscode,
     subtitleProfiles.append(QJsonObject{{"Format", "dvbsub"}, {"Method", "Encode"}});
 
     return QJsonObject{
-        {"Name", "CRT Station"},
+        {"Name", "Tater Tube"},
         {"MaxStreamingBitrate", limits.maxStreamingBitrate},
         {"MaxStaticBitrate", 100000000},
         {"DirectPlayProfiles", directPlayProfiles},
@@ -2306,7 +2347,15 @@ QString EmbyJellyfinBackend::streamUrlFor(const QString &itemId,
         int maxWidth = 854;
         int maxHeight = 480;
         int videoBitRate = 2000000;
-        if (effectiveQuality == "1080p") {
+        if (effectiveQuality == "2160p") {
+            maxWidth = 3840;
+            maxHeight = 2160;
+            videoBitRate = 20000000;
+        } else if (effectiveQuality == "1440p") {
+            maxWidth = 2560;
+            maxHeight = 1440;
+            videoBitRate = 12000000;
+        } else if (effectiveQuality == "1080p") {
             maxWidth = 1920;
             maxHeight = 1080;
             videoBitRate = 8000000;
@@ -2411,7 +2460,7 @@ QVariantMap EmbyJellyfinBackend::buildItemDetail(const QJsonObject &item) const 
     base["selectedAudioId"] = selectedAudio;
     base["selectedSubtitleId"] = selectedSubtitle;
     base["videoCodec"] = videoCodec;
-    base["forceTranscode"] = (videoQuality() != "auto") || codecNeedsTranscode(videoCodec);
+    base["forceTranscode"] = true;
     return base;
 }
 
@@ -3145,17 +3194,10 @@ void EmbyJellyfinBackend::getLibraries() {
 }
 
 void EmbyJellyfinBackend::getVideoQualities() {
-    if (mediaProvider() == kProviderPlex) {
-        emit dynamicOptionsReady("video_quality", QVariantList{
-            QVariantMap{{"id","480p"}, {"label","TRANSCODE 480P"}},
-            QVariantMap{{"id","720p"}, {"label","TRANSCODE 720P"}},
-            QVariantMap{{"id","1080p"}, {"label","TRANSCODE 1080P"}},
-        });
-        return;
-    }
-
     emit dynamicOptionsReady("video_quality", QVariantList{
-        QVariantMap{{"id","auto"}, {"label","AUTO"}},
+        QVariantMap{{"id","auto"}, {"label","AUTO DISPLAY"}},
+        QVariantMap{{"id","2160p"}, {"label","TRANSCODE 4K"}},
+        QVariantMap{{"id","1440p"}, {"label","TRANSCODE 1440P"}},
         QVariantMap{{"id","1080p"}, {"label","TRANSCODE 1080P"}},
         QVariantMap{{"id","720p"}, {"label","TRANSCODE 720P"}},
         QVariantMap{{"id","480p"}, {"label","TRANSCODE 480P"}},

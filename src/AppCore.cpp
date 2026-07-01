@@ -21,7 +21,7 @@
 
 namespace {
 constexpr const char *kDefaultUpdateManifestUrl =
-    "https://raw.githubusercontent.com/TaterTotterson/CRT-Station/main/update-manifest.json";
+    "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json";
 constexpr const char *kPiUpdateHelper = "/usr/local/sbin/240mp-update";
 constexpr const char *kSshControlHelper = "/usr/local/sbin/240mp-ssh-control";
 constexpr const char *kBluetoothControlHelper = "/usr/local/sbin/240mp-bluetooth-control";
@@ -805,7 +805,7 @@ QVariantMap AppCore::getUpdateInfo() const {
     return QVariantMap{
         {"currentVersion", appVersion()},
         {"manifestUrl", updateManifestUrl()},
-        {"repo", "https://github.com/TaterTotterson/CRT-Station"},
+        {"repo", "https://github.com/TaterTotterson/Tater-Tube"},
         {"canInstall", canInstallUpdates()}
     };
 }
@@ -823,7 +823,7 @@ void AppCore::checkForUpdates() {
     }
 
     QNetworkRequest request(url);
-    request.setRawHeader("User-Agent", QByteArray("CRT Station/") + appVersion().toUtf8());
+    request.setRawHeader("User-Agent", QByteArray("Tater Tube/") + appVersion().toUtf8());
 
     QNetworkReply *reply = m_updateNetwork->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
@@ -904,7 +904,7 @@ void AppCore::installUpdate() {
     result["ok"] = started;
     result["status"] = started ? "started" : "error";
     result["message"] = started
-        ? "INSTALLING UPDATE. CRT STATION WILL RESTART."
+        ? "INSTALLING UPDATE. TATER TUBE WILL RESTART."
         : "COULD NOT START THE UPDATE HELPER.";
     emit updateInstallFinished(result);
 }

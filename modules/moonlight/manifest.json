@@ -21,7 +21,7 @@
       "key": "resolution",
       "label": "RESOLUTION",
       "type": "list_single",
-      "options": ["640x480", "720x480", "768x576", "800x600"],
+      "options": ["640x480", "720x480", "768x576", "800x600", "1280x720", "1920x1080", "2560x1440", "3840x2160"],
       "default": "640x480"
     },
     {
@@ -35,14 +35,14 @@
       "key": "bitrate",
       "label": "BITRATE",
       "type": "list_single",
-      "options": ["1000 Kbps", "3000 Kbps", "5000 Kbps", "8000 Kbps", "12000 Kbps"],
+      "options": ["1000 Kbps", "3000 Kbps", "5000 Kbps", "8000 Kbps", "12000 Kbps", "20000 Kbps", "40000 Kbps", "60000 Kbps"],
       "default": "1000 Kbps"
     },
     {
       "key": "codec",
       "label": "CODEC",
       "type": "list_single",
-      "options": ["h264", "auto"],
+      "options": ["h264", "h265", "auto"],
       "default": "h264"
     },
     {

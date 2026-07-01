@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
-# CRT Station installer for Raspberry Pi OS Trixie (arm64)
+# Tater Tube installer for Raspberry Pi OS Trixie (arm64)
 #
 # Usage:
 #   bash install.sh             # install latest release
@@ -8,7 +8,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-REPO="TaterTotterson/CRT-Station"
+REPO="TaterTotterson/Tater-Tube"
 INSTALL_DIR="/opt/240mp"
 LAUNCHER="/usr/local/bin/240mp"
 SYSTEMD_SERVICE="/etc/systemd/system/240mp.service"
@@ -21,11 +21,11 @@ if [ "$VERSION" = "latest" ]; then
         "https://api.github.com/repos/${REPO}/releases/latest" \
         | python3 -c "import sys, json; print(json.load(sys.stdin)['tag_name'])")
 fi
-echo "Installing CRT Station ${VERSION}"
+echo "Installing Tater Tube ${VERSION}"
 export PI240_REPO="${REPO}"
 export PI240_VERSION="${VERSION}"
 
-TARBALL="240-MP-${VERSION}-linux-arm64.tar.gz"
+TARBALL="Tater-Tube-${VERSION}-linux-arm64.tar.gz"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${TARBALL}"
 
 # ── Verify architecture ────────────────────────────────────────────────────────
@@ -101,5 +101,5 @@ if [[ "${REPLY}" =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-echo "CRT Station ${VERSION} installed successfully."
+echo "Tater Tube ${VERSION} installed successfully."
 echo "Run: 240mp"

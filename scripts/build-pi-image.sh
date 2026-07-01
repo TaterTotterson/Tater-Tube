@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build a Raspberry Pi OS Lite appliance image that boots directly into CRT Station.
+# Build a Raspberry Pi OS Lite appliance image that boots directly into Tater Tube.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +10,7 @@ PI_GEN_BRANCH="${PI_GEN_BRANCH:-arm64}"
 PI_GEN_DIR="${PI_GEN_DIR:-${REPO_ROOT}/.cache/pi-gen-arm64}"
 PI_GEN_CONFIG="${PI_GEN_CONFIG:-${PI_GEN_DIR}/config}"
 
-PI_IMAGE_NAME="${PI_IMAGE_NAME:-240mp}"
+PI_IMAGE_NAME="${PI_IMAGE_NAME:-tater-tube}"
 PI_IMAGE_RELEASE="${PI_IMAGE_RELEASE:-trixie}"
 PI_IMAGE_PROFILE="${PI_IMAGE_PROFILE:-crt-ntsc}"
 PI_IMAGE_ROOT_MARGIN_MB="${PI_IMAGE_ROOT_MARGIN_MB:-1536}"
@@ -87,10 +87,10 @@ patch_pi_gen_disable_apt_listchanges() {
 }
 
 case "$PI_IMAGE_PROFILE" in
-    hdmi|crt-ntsc|crt-pal|none) ;;
+    hdmi|pi5-hdmi-auto|crt-ntsc|crt-pal|none) ;;
     *)
         echo "Unknown PI_IMAGE_PROFILE: $PI_IMAGE_PROFILE" >&2
-        echo "Use one of: hdmi, crt-ntsc, crt-pal, none" >&2
+        echo "Use one of: hdmi, pi5-hdmi-auto, crt-ntsc, crt-pal, none" >&2
         exit 1
         ;;
 esac

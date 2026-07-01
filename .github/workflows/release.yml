@@ -64,13 +64,13 @@ jobs:
       - name: Create tarball
         run: |
           cd "${GITHUB_WORKSPACE}/install"
-          tar -czf "${GITHUB_WORKSPACE}/240-MP-${{ github.ref_name }}-linux-arm64.tar.gz" .
+          tar -czf "${GITHUB_WORKSPACE}/Tater-Tube-${{ github.ref_name }}-linux-arm64.tar.gz" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4.6.2
         with:
           name: tarball-linux-arm64
-          path: "240-MP-*-linux-arm64.tar.gz"
+          path: "Tater-Tube-*-linux-arm64.tar.gz"
           if-no-files-found: error
 
   # ──────────────────────────────────────────────────────────────────────────────
@@ -86,6 +86,7 @@ jobs:
         image_profile:
           - crt-ntsc
           - crt-pal
+          - pi5-hdmi-auto
 
     steps:
       - name: Checkout
@@ -96,7 +97,7 @@ jobs:
 
       - name: Build image
         env:
-          PI_IMAGE_NAME: 240mp-${{ github.ref_name }}-${{ matrix.image_profile }}
+          PI_IMAGE_NAME: tater-tube-${{ github.ref_name }}-${{ matrix.image_profile }}
           PI_IMAGE_PROFILE: ${{ matrix.image_profile }}
           PI_ENABLE_SSH: "1"
           PI_FIRST_USER_NAME: tater
@@ -150,7 +151,7 @@ jobs:
           shopt -s nullglob
 
           previous_tag="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
-          app_assets=(artifacts/tarball-linux-arm64/240-MP-*-linux-arm64.tar.gz)
+          app_assets=(artifacts/tarball-linux-arm64/Tater-Tube-*-linux-arm64.tar.gz)
           image_assets=(artifacts/pi-image-*/image_*.img.xz)
           release_highlights="$(python3 -c 'import json, pathlib; manifest=json.loads(pathlib.Path("update-manifest.json").read_text()); print("\n".join("- " + str(note).strip() for note in manifest.get("notes", []) if str(note).strip()))')"
 
@@ -184,6 +185,7 @@ jobs:
               case "$image_asset_name" in
                 *crt-ntsc*) image_label="Ready-to-flash Raspberry Pi OS image (NTSC composite)" ;;
                 *crt-pal*) image_label="Ready-to-flash Raspberry Pi OS image (PAL composite)" ;;
+                *pi5-hdmi-auto*) image_label="Ready-to-flash Raspberry Pi OS image (Pi 5 HDMI auto)" ;;
               esac
               echo "| ${image_label} | [\`${image_asset_name}\`](${download_base}/${image_asset_name}) |"
             done
@@ -205,15 +207,15 @@ jobs:
             echo
             echo "### Install Instructions"
             echo
-            echo "- Ready-to-flash image: download the NTSC or PAL image asset for your CRT, flash it with Raspberry Pi Imager or Balena Etcher, then boot the Pi."
-            echo "- Raspberry Pi OS Trixie app update: [Instructions](INSTALL.md#update-an-existing-crt-station-image)"
+            echo "- Ready-to-flash image: download the NTSC composite, PAL composite, or Pi 5 HDMI auto image asset, flash it with Raspberry Pi Imager or Balena Etcher, then boot the Pi."
+            echo "- Raspberry Pi OS Trixie app update: [Instructions](INSTALL.md#update-an-existing-tater-tube-image)"
           } > release-notes.md
 
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "CRT Station ${{ github.ref_name }}"
+          name: "Tater Tube ${{ github.ref_name }}"
           draft: false
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
           files: |

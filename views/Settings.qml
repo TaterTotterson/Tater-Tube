@@ -642,7 +642,7 @@ FocusScope {
     function handleUpdateInstallResult(result) {
         if ((result.status || "") === "started") {
             updateBusy = true
-            updateMessage = result.message || "INSTALLING UPDATE. CRT STATION WILL RESTART."
+            updateMessage = result.message || "INSTALLING UPDATE. TATER TUBE WILL RESTART."
             updateDetail = "SWITCHING TO UPDATE PROGRESS"
             updateOptions = []
         } else {
