@@ -1,15 +1,14 @@
 {
-  "version": "v1.2.3",
-  "app_version": "1.2.3",
+  "version": "v1.2.4",
+  "app_version": "1.2.4",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.2.3/Tater-Tube-v1.2.3-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.2.3.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.2.4/Tater-Tube-v1.2.4-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.2.4.tar.gz",
   "notes": [
-    "Fixes Newznab/OMGWTF browsing by using supported search APIs and clearer XML error handling.",
-    "Fixes Usenet playback selecting the wrong cached stream by uploading each NZB to AltMount with a unique filename.",
-    "Accepts AltMount keys or Stremio manifest URLs in the Newsgroups setup screen.",
-    "Routes Pi 5 HDMI audio correctly for video playback, PC Link, and Game Center while keeping composite defaults unchanged."
+    "Fixes PC Link reset pairing by unpairing the Sunshine host through Moonlight before clearing local pairing state.",
+    "Clears the full app-specific Moonlight state directory so the next PC Link pairing can show a fresh PIN.",
+    "Adjusts the Off Air orange highlight toward a deeper red-orange for CRT/composite displays."
   ]
 }

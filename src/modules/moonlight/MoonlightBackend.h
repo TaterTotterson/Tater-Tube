@@ -71,6 +71,7 @@ private:
     QVariantList loadAppCache() const;
     bool saveAppCache(const QVariantList &apps) const;
     void clearAppCache() const;
+    void unpairMoonlightHost(const QString &hostValue) const;
     void removeMoonlightPairingState() const;
     void startAppList(bool forceRefresh);
     QVariantList parseAppList(const QString &output) const;

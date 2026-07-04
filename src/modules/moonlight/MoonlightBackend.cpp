@@ -278,6 +278,43 @@ void MoonlightBackend::clearAppCache() const
     QFile::remove(appCachePath());
 }
 
+void MoonlightBackend::unpairMoonlightHost(const QString &hostValue) const
+{
+    const QString cleanHost = hostValue.trimmed();
+    if (cleanHost.isEmpty())
+        return;
+
+    const QString bin = moonlightPath();
+    if (bin.isEmpty())
+        return;
+
+    QProcess process;
+    process.setProcessChannelMode(QProcess::MergedChannels);
+    prepareMoonlightEnvironment(&process);
+    qInfo("[MoonlightBackend] unpairing Moonlight host: %s", qPrintable(cleanHost));
+    process.start(bin, {QStringLiteral("unpair"), cleanHost});
+    if (!process.waitForStarted(2000)) {
+        qWarning("[MoonlightBackend] could not start Moonlight unpair command");
+        return;
+    }
+    if (!process.waitForFinished(10000)) {
+        process.kill();
+        process.waitForFinished(1000);
+        qWarning("[MoonlightBackend] Moonlight unpair command timed out");
+        return;
+    }
+
+    const QString output = QString::fromUtf8(process.readAll()).trimmed();
+    if (process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0) {
+        qInfo("[MoonlightBackend] Moonlight host unpaired");
+    } else if (!output.isEmpty()) {
+        qWarning("[MoonlightBackend] Moonlight unpair returned %d: %s",
+                 process.exitCode(), qPrintable(output));
+    } else {
+        qWarning("[MoonlightBackend] Moonlight unpair returned %d", process.exitCode());
+    }
+}
+
 void MoonlightBackend::removeMoonlightPairingState() const
 {
     clearAppCache();
@@ -288,6 +325,7 @@ void MoonlightBackend::removeMoonlightPairingState() const
         return;
 
     const QStringList paths{
+        root,
         QDir(root).absoluteFilePath(QStringLiteral("config")),
         QDir(root).absoluteFilePath(QStringLiteral("data")),
         QDir(root).absoluteFilePath(QStringLiteral("cache")),
@@ -446,8 +484,10 @@ void MoonlightBackend::repair_host(const QString &hostValue)
 
 void MoonlightBackend::forget_pairing()
 {
+    const QString currentHost = host();
     cancel_pairing();
     stop_stream();
+    unpairMoonlightHost(currentHost);
     removeMoonlightPairingState();
     emit authStateChanged();
 }

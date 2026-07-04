@@ -69,14 +69,14 @@ Window {
             "secondary": "#E8E8E8",
             "tertiary": "#8A8A8A",
             "surface": "#050505",
-            "accent": "#FF6A00",
+            "accent": "#FF4A00",
             "static": true
         }
     })
     property var allThemes: themes  // may gain a "Custom" entry on startup
     property string currentTheme: "Off Air"
     readonly property var offAirHighlightColors: ({
-        "Orange": "#FF6A00",
+        "Orange": "#FF4A00",
         "Cyan": "#00E5FF",
         "Green": "#39FF14",
         "Magenta": "#FF2BD6",
