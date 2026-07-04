@@ -31,7 +31,7 @@
     },
     {
       "key": "altmount_api_key",
-      "label": "ALTMOUNT API KEY",
+      "label": "ALTMOUNT KEY OR STREMIO URL",
       "type": "text",
       "default": ""
     },

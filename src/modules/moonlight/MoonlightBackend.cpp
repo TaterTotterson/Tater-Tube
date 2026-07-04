@@ -75,6 +75,35 @@ QString optionValue(QString value, const QString &fallback)
     value = value.trimmed();
     return value.isEmpty() ? fallback : value;
 }
+
+QString connectedPiHdmiAudioCard()
+{
+#ifdef Q_OS_LINUX
+    QDir drmDir(QStringLiteral("/sys/class/drm"));
+    const QStringList connectors = drmDir.entryList(
+        QStringList{QStringLiteral("card*-HDMI-A-*")},
+        QDir::Dirs | QDir::NoDotAndDotDot,
+        QDir::Name);
+    for (const QString &connector : connectors) {
+        QFile statusFile(drmDir.absoluteFilePath(connector + QStringLiteral("/status")));
+        if (!statusFile.open(QIODevice::ReadOnly))
+            continue;
+        const QString status = QString::fromLatin1(statusFile.readAll()).trimmed();
+        if (status != QStringLiteral("connected"))
+            continue;
+
+        QString card;
+        if (connector.endsWith(QStringLiteral("HDMI-A-1")))
+            card = QStringLiteral("vc4hdmi0");
+        else if (connector.endsWith(QStringLiteral("HDMI-A-2")))
+            card = QStringLiteral("vc4hdmi1");
+
+        if (!card.isEmpty() && QFile::exists(QStringLiteral("/proc/asound/") + card))
+            return card;
+    }
+#endif
+    return QString();
+}
 }
 
 MoonlightBackend::MoonlightBackend(const QString &appRoot, const QString &dataRoot,
@@ -611,8 +640,13 @@ QStringList MoonlightBackend::streamArguments(const QString &appName, bool force
     if (QFileInfo(mappingFile).exists())
         args << QStringLiteral("-mapping") << mappingFile;
 
-    if (!forceSdl && detectHeadlessMode() && hasPiHeadphonesAudioDevice())
-        args << QStringLiteral("-audio") << QStringLiteral("sysdefault:CARD=Headphones");
+    if (!forceSdl && detectHeadlessMode()) {
+        const QString hdmiCard = connectedPiHdmiAudioCard();
+        if (!hdmiCard.isEmpty())
+            args << QStringLiteral("-audio") << QStringLiteral("sysdefault:CARD=%1").arg(hdmiCard);
+        else if (hasPiHeadphonesAudioDevice())
+            args << QStringLiteral("-audio") << QStringLiteral("sysdefault:CARD=Headphones");
+    }
 
     args << host();
     return args;

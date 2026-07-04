@@ -1,5 +1,6 @@
 #include "UsenetBackend.h"
 
+#include <QCryptographicHash>
 #include <QFile>
 #include <QHttpMultiPart>
 #include <QJsonArray>
@@ -27,12 +28,6 @@ QString trimmedBaseUrl(QString value)
     while (value.endsWith(QLatin1Char('/')))
         value.chop(1);
     return value;
-}
-
-bool isSha256Hex(const QString &value)
-{
-    static const QRegularExpression re(QStringLiteral("^[0-9a-fA-F]{64}$"));
-    return re.match(value.trimmed()).hasMatch();
 }
 
 QString formatBytes(qint64 bytes)
@@ -63,6 +58,64 @@ qint64 attrSizeToInteger(const QString &value)
 QString attrValue(const QXmlStreamAttributes &attrs, const QString &name)
 {
     return attrs.value(name).toString();
+}
+
+bool isOmgwtfHost(const QString &host)
+{
+    const QString normalized = host.trimmed().toLower();
+    return normalized == QStringLiteral("omgwtfnzbs.org")
+        || normalized == QStringLiteral("api.omgwtfnzbs.org");
+}
+
+bool isRedirectStatus(int status)
+{
+    return status >= 300 && status < 400;
+}
+
+QString extractSha256Hex(const QString &value)
+{
+    static const QRegularExpression re(QStringLiteral("([0-9a-fA-F]{64})"));
+    const QRegularExpressionMatch match = re.match(value);
+    return match.hasMatch() ? match.captured(1).toLower() : QString();
+}
+
+QString hashApiKey(const QString &value)
+{
+    return QString::fromLatin1(QCryptographicHash::hash(value.toUtf8(), QCryptographicHash::Sha256).toHex());
+}
+
+QString stableNzbFilename(QString title, const QString &sourceUrl)
+{
+    title = cleanText(title);
+    title.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9._-]+")), QStringLiteral("_"));
+    title.replace(QRegularExpression(QStringLiteral("_+")), QStringLiteral("_"));
+    title = title.trimmed();
+    while (title.startsWith(QLatin1Char('_')) || title.startsWith(QLatin1Char('.')))
+        title.remove(0, 1);
+    while (title.endsWith(QLatin1Char('_')) || title.endsWith(QLatin1Char('.')))
+        title.chop(1);
+    if (title.isEmpty())
+        title = QStringLiteral("tater-tube");
+    if (title.size() > 80)
+        title = title.left(80);
+
+    const QString digest = QString::fromLatin1(
+        QCryptographicHash::hash(sourceUrl.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
+    return QStringLiteral("%1-%2.nzb").arg(title, digest);
+}
+
+QString newznabErrorMessage(const QByteArray &data)
+{
+    QXmlStreamReader xml(data);
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (!xml.isStartElement() || xml.name() != QStringLiteral("error"))
+            continue;
+        const QString code = attrValue(xml.attributes(), QStringLiteral("code"));
+        const QString description = attrValue(xml.attributes(), QStringLiteral("description"));
+        return cleanText(QStringLiteral("NEWZNAB %1 %2").arg(code, description));
+    }
+    return QString();
 }
 }
 
@@ -95,6 +148,14 @@ QString UsenetBackend::setting(const QString &key, const QString &fallback) cons
     return value.isEmpty() ? fallback : value;
 }
 
+QString UsenetBackend::newznabApiKey() const
+{
+    QString key = setting(QStringLiteral("newznab_api_key"));
+    if (key.endsWith(QStringLiteral("Copy"), Qt::CaseSensitive))
+        key.chop(4);
+    return key.trimmed();
+}
+
 QString UsenetBackend::newznabApiBase() const
 {
     QString base = trimmedBaseUrl(setting(QStringLiteral("newznab_url")));
@@ -104,6 +165,8 @@ QString UsenetBackend::newznabApiBase() const
     QUrl url(base);
     if (!url.isValid() || url.scheme().isEmpty())
         url = QUrl(QStringLiteral("http://") + base);
+    if (isOmgwtfHost(url.host()) && url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) != 0)
+        url.setScheme(QStringLiteral("https"));
 
     QString path = url.path();
     while (path.endsWith(QLatin1Char('/')))
@@ -129,6 +192,19 @@ QString UsenetBackend::altMountApiBase() const
     return url.toString(QUrl::StripTrailingSlash);
 }
 
+QString UsenetBackend::altMountDownloadKey() const
+{
+    const QString value = setting(QStringLiteral("altmount_api_key")).trimmed();
+    if (value.isEmpty())
+        return QString();
+
+    const QString extracted = extractSha256Hex(value);
+    if (!extracted.isEmpty())
+        return extracted;
+
+    return hashApiKey(value);
+}
+
 QUrl UsenetBackend::newznabUrl(const QVariantMap &params) const
 {
     QUrl url(newznabApiBase());
@@ -136,7 +212,7 @@ QUrl UsenetBackend::newznabUrl(const QVariantMap &params) const
     for (auto it = params.constBegin(); it != params.constEnd(); ++it)
         query.addQueryItem(it.key(), it.value().toString());
 
-    const QString apiKey = setting(QStringLiteral("newznab_api_key"));
+    const QString apiKey = newznabApiKey();
     if (!apiKey.isEmpty() && !query.hasQueryItem(QStringLiteral("apikey")))
         query.addQueryItem(QStringLiteral("apikey"), apiKey);
 
@@ -159,7 +235,7 @@ QUrl UsenetBackend::altMountStreamsUrl() const
 QString UsenetBackend::ensureNewznabApiKey(const QString &rawUrl) const
 {
     QUrl url(rawUrl.trimmed());
-    const QString apiKey = setting(QStringLiteral("newznab_api_key"));
+    const QString apiKey = newznabApiKey();
     if (!url.isValid() || apiKey.isEmpty())
         return rawUrl.trimmed();
 
@@ -192,7 +268,7 @@ int UsenetBackend::streamTimeout() const
 QString UsenetBackend::get_auth_state()
 {
     return newznabApiBase().isEmpty()
-        || setting(QStringLiteral("newznab_api_key")).isEmpty()
+        || newznabApiKey().isEmpty()
         || altMountApiBase().isEmpty()
         || setting(QStringLiteral("altmount_api_key")).isEmpty()
         ? QStringLiteral("none")
@@ -234,7 +310,7 @@ void UsenetBackend::load_items(const QString &categoryId, const QString &categor
     }
 
     QNetworkRequest request(newznabUrl({
-        {QStringLiteral("t"), QStringLiteral("browse")},
+        {QStringLiteral("t"), QStringLiteral("search")},
         {QStringLiteral("cat"), categoryId},
         {QStringLiteral("extended"), QStringLiteral("1")},
         {QStringLiteral("limit"), QString::number(browseLimit())}
@@ -258,8 +334,38 @@ void UsenetBackend::request_streams(const QString &requestId, const QVariantMap 
         return;
     }
 
+    const QString downloadUrl = ensureNewznabApiKey(nzbUrl);
+    QNetworkRequest nzbRequest{QUrl(downloadUrl)};
+    QNetworkReply *nzbReply = m_network.get(nzbRequest);
+    connect(nzbReply, &QNetworkReply::finished, this,
+            [this, nzbReply, requestId, title, downloadUrl]() {
+        nzbReply->deleteLater();
+        const QByteArray body = nzbReply->readAll();
+        const int status = nzbReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (nzbReply->error() != QNetworkReply::NoError || status >= 400) {
+            emit errorOccurred(QStringLiteral("NZB DOWNLOAD FAILED"));
+            return;
+        }
+        if (body.trimmed().isEmpty()) {
+            emit errorOccurred(QStringLiteral("NZB DOWNLOAD EMPTY"));
+            return;
+        }
+
+        const QString newznabError = newznabErrorMessage(body);
+        if (!newznabError.isEmpty()) {
+            emit errorOccurred(newznabError);
+            return;
+        }
+
+        postNzbToAltMount(requestId, title, downloadUrl, body);
+    });
+}
+
+void UsenetBackend::postNzbToAltMount(const QString &requestId, const QString &title,
+                                      const QString &sourceUrl, const QByteArray &nzbData)
+{
     QNetworkRequest request(altMountStreamsUrl());
-    const QString altKey = setting(QStringLiteral("altmount_api_key"));
+    const QString downloadKey = altMountDownloadKey();
 
     auto *multi = new QHttpMultiPart(QHttpMultiPart::FormDataType);
 
@@ -271,14 +377,17 @@ void UsenetBackend::request_streams(const QString &requestId, const QVariantMap 
         multi->append(part);
     };
 
-    addTextPart(QStringLiteral("nzb_url"), ensureNewznabApiKey(nzbUrl));
+    QHttpPart filePart;
+    filePart.setHeader(QNetworkRequest::ContentDispositionHeader,
+                       QStringLiteral("form-data; name=\"file\"; filename=\"%1\"")
+                           .arg(stableNzbFilename(title, sourceUrl)));
+    filePart.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/x-nzb"));
+    filePart.setBody(nzbData);
+    multi->append(filePart);
+
     addTextPart(QStringLiteral("category"), QStringLiteral("tater-tube"));
     addTextPart(QStringLiteral("timeout"), QString::number(streamTimeout()));
-    if (isSha256Hex(altKey)) {
-        addTextPart(QStringLiteral("download_key"), altKey);
-    } else {
-        request.setRawHeader("X-Api-Key", altKey.toUtf8());
-    }
+    addTextPart(QStringLiteral("download_key"), downloadKey);
 
     QNetworkReply *reply = m_network.post(request, multi);
     multi->setParent(reply);
@@ -292,6 +401,10 @@ void UsenetBackend::handleCategoriesReply(QNetworkReply *reply)
     reply->deleteLater();
     const QByteArray body = reply->readAll();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (isRedirectStatus(status)) {
+        emit errorOccurred(QStringLiteral("NEWZNAB URL NEEDS HTTPS"));
+        return;
+    }
     if (reply->error() != QNetworkReply::NoError || status >= 400) {
         emit errorOccurred(QStringLiteral("CATEGORY LOAD FAILED"));
         return;
@@ -311,6 +424,10 @@ void UsenetBackend::handleItemsReply(QNetworkReply *reply, const QString &catego
     reply->deleteLater();
     const QByteArray body = reply->readAll();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (isRedirectStatus(status)) {
+        emit errorOccurred(QStringLiteral("NEWZNAB URL NEEDS HTTPS"));
+        return;
+    }
     if (reply->error() != QNetworkReply::NoError || status >= 400) {
         emit errorOccurred(QStringLiteral("BROWSE FAILED"));
         return;
@@ -332,6 +449,20 @@ void UsenetBackend::handleStreamsReply(QNetworkReply *reply, const QString &requ
     const QByteArray body = reply->readAll();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (reply->error() != QNetworkReply::NoError || status >= 400) {
+        QString error;
+        parseStreams(body, &error);
+        if (!error.isEmpty()) {
+            emit errorOccurred(error);
+            return;
+        }
+        if (status == 401) {
+            emit errorOccurred(QStringLiteral("ALTMOUNT AUTH FAILED"));
+            return;
+        }
+        if (status == 408) {
+            emit errorOccurred(QStringLiteral("ALTMOUNT STILL DOWNLOADING"));
+            return;
+        }
         emit errorOccurred(QStringLiteral("ALTMOUNT STREAM FAILED"));
         return;
     }
@@ -363,8 +494,15 @@ QVariantList UsenetBackend::parseCategories(const QByteArray &data, QString *err
 
     while (!xml.atEnd()) {
         xml.readNext();
-        if (!xml.isStartElement() || xml.name() != QStringLiteral("category"))
+        if (!xml.isStartElement() || xml.name() != QStringLiteral("category")) {
+            if (xml.isStartElement() && xml.name() == QStringLiteral("error") && errorOut) {
+                const QString code = attrValue(xml.attributes(), QStringLiteral("code"));
+                const QString description = attrValue(xml.attributes(), QStringLiteral("description"));
+                *errorOut = cleanText(QStringLiteral("NEWZNAB %1 %2").arg(code, description));
+                return {};
+            }
             continue;
+        }
 
         const QXmlStreamAttributes attrs = xml.attributes();
         const QString id = attrValue(attrs, QStringLiteral("id"));
@@ -426,6 +564,15 @@ QVariantList UsenetBackend::parseItems(const QByteArray &data, QString *errorOut
                 currentTextElement.clear();
                 continue;
             }
+
+            if (name == QStringLiteral("error") && errorOut) {
+                const QXmlStreamAttributes attrs = xml.attributes();
+                const QString code = attrValue(attrs, QStringLiteral("code"));
+                const QString description = attrValue(attrs, QStringLiteral("description"));
+                *errorOut = cleanText(QStringLiteral("NEWZNAB %1 %2").arg(code, description));
+                return {};
+            }
+
             if (!inItem)
                 continue;
 
@@ -455,6 +602,8 @@ QVariantList UsenetBackend::parseItems(const QByteArray &data, QString *errorOut
                     size = qMax(size, attrSizeToInteger(value));
                 } else if (attrName == QStringLiteral("category")) {
                     item[QStringLiteral("category")] = cleanText(value);
+                } else if (attrName == QStringLiteral("guid")) {
+                    item[QStringLiteral("guid")] = value.trimmed();
                 } else if (attrName == QStringLiteral("files")) {
                     item[QStringLiteral("files")] = value;
                 } else if (attrName == QStringLiteral("grabs")) {
@@ -487,7 +636,14 @@ QVariantList UsenetBackend::parseItems(const QByteArray &data, QString *errorOut
             if (name == QStringLiteral("item")) {
                 inItem = false;
                 const QString title = cleanText(item.value(QStringLiteral("title")).toString());
-                const QString nzbUrl = item.value(QStringLiteral("nzbUrl")).toString().trimmed();
+                QString nzbUrl = item.value(QStringLiteral("nzbUrl")).toString().trimmed();
+                const QString guid = item.value(QStringLiteral("guid")).toString().trimmed();
+                if (nzbUrl.isEmpty() && !guid.isEmpty()) {
+                    nzbUrl = newznabUrl({
+                        {QStringLiteral("t"), QStringLiteral("get")},
+                        {QStringLiteral("id"), guid}
+                    }).toString();
+                }
                 if (!title.isEmpty() && !nzbUrl.isEmpty()) {
                     item[QStringLiteral("title")] = title;
                     item[QStringLiteral("nzbUrl")] = ensureNewznabApiKey(nzbUrl);

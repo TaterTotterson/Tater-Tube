@@ -111,7 +111,7 @@ FocusScope {
             return
         }
         if (altmountKey === "") {
-            statusText = "ENTER ALTMOUNT API KEY"
+            statusText = "ENTER ALTMOUNT KEY"
             setupRow = 3
             focusSetupRow()
             return
@@ -422,7 +422,7 @@ FocusScope {
         SetupField { id: newznabUrlField; label: "NEWZNAB URL"; selected: setupRow === 0 }
         SetupField { id: newznabKeyField; label: "NEWZNAB API KEY"; selected: setupRow === 1; password: true }
         SetupField { id: altmountUrlField; label: "ALTMOUNT URL"; selected: setupRow === 2 }
-        SetupField { id: altmountKeyField; label: "ALTMOUNT API KEY"; selected: setupRow === 3; password: true }
+        SetupField { id: altmountKeyField; label: "ALTMOUNT KEY OR STREMIO URL"; selected: setupRow === 3; password: true }
 
         Rectangle {
             id: connectButton
@@ -470,7 +470,11 @@ FocusScope {
         onCurrentIndexChanged: currentCategoryIndex = currentIndex
 
         delegate: MenuRow {
+            required property var modelData
+            required property int index
+
             list: categoryList
+            rowIndex: index
             text: modelData.title || "CATEGORY"
             detail: modelData.id || ""
         }
@@ -491,7 +495,11 @@ FocusScope {
         onCurrentIndexChanged: currentItemIndex = currentIndex
 
         delegate: MenuRow {
+            required property var modelData
+            required property int index
+
             list: itemList
+            rowIndex: index
             text: modelData.title || "ITEM"
             detail: modelData.sizeText || modelData.date || ""
         }
@@ -512,7 +520,11 @@ FocusScope {
         onCurrentIndexChanged: currentStreamIndex = currentIndex
 
         delegate: MenuRow {
+            required property var modelData
+            required property int index
+
             list: streamList
+            rowIndex: index
             text: modelData.title || modelData.name || "STREAM"
             detail: "PLAY"
         }
@@ -520,22 +532,34 @@ FocusScope {
 
     component MenuRow: Item {
         property var list
+        property int rowIndex: -1
         property string text: ""
         property string detail: ""
+        readonly property bool selected: list.currentIndex === rowIndex
 
         width: list.width
         height: root.sh * 0.0583333
 
         Rectangle {
-            anchors.fill: rowText
+            anchors.fill: parent
             color: root.accentColor
-            visible: list.currentIndex === index
+            opacity: selected ? 0.32 : 0.0
+            visible: selected
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.sw * 0.00625
+            height: parent.height * 0.82
+            color: root.accentColor
+            visible: selected
         }
 
         Text {
             id: rowText
             text: parent.text
-            color: list.currentIndex === index ? root.surfaceColor : root.primaryColor
+            color: root.primaryColor
             font.family: root.globalFont
             font.capitalization: Font.AllUppercase
             anchors.verticalCenter: parent.verticalCenter
@@ -549,7 +573,7 @@ FocusScope {
         Text {
             visible: detail !== ""
             text: detail
-            color: list.currentIndex === index ? root.surfaceColor : root.tertiaryColor
+            color: selected ? root.secondaryColor : root.tertiaryColor
             font.family: root.globalFont
             font.capitalization: Font.AllUppercase
             anchors.verticalCenter: parent.verticalCenter

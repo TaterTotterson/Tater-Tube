@@ -89,6 +89,35 @@ static bool readSavedMpvVolume(double *volumeOut)
     return true;
 }
 
+static QString connectedPiHdmiAudioCard()
+{
+#ifdef Q_OS_LINUX
+    QDir drmDir(QStringLiteral("/sys/class/drm"));
+    const QStringList connectors = drmDir.entryList(
+        QStringList{QStringLiteral("card*-HDMI-A-*")},
+        QDir::Dirs | QDir::NoDotAndDotDot,
+        QDir::Name);
+    for (const QString &connector : connectors) {
+        QFile statusFile(drmDir.absoluteFilePath(connector + QStringLiteral("/status")));
+        if (!statusFile.open(QIODevice::ReadOnly))
+            continue;
+        const QString status = QString::fromLatin1(statusFile.readAll()).trimmed();
+        if (status != QStringLiteral("connected"))
+            continue;
+
+        QString card;
+        if (connector.endsWith(QStringLiteral("HDMI-A-1")))
+            card = QStringLiteral("vc4hdmi0");
+        else if (connector.endsWith(QStringLiteral("HDMI-A-2")))
+            card = QStringLiteral("vc4hdmi1");
+
+        if (!card.isEmpty() && QFile::exists(QStringLiteral("/proc/asound/") + card))
+            return card;
+    }
+#endif
+    return QString();
+}
+
 MpvController::MpvController(const QString &appRoot, AppCore *appCore, QObject *parent)
     : QObject(parent)
     , m_appCore(appCore)
@@ -797,9 +826,19 @@ void MpvController::appendAudioArgs(QStringList &args) const {
         }
     }
 
-    if (m_headlessMode && hasCompositeDrmConnector() && hasPiHeadphonesAudioDevice()) {
+    if (!m_headlessMode)
+        return;
+
+    if (hasCompositeDrmConnector() && hasPiHeadphonesAudioDevice()) {
         args << QStringLiteral("--ao=alsa")
              << QStringLiteral("--audio-device=alsa/sysdefault:CARD=Headphones");
+        return;
+    }
+
+    const QString hdmiCard = connectedPiHdmiAudioCard();
+    if (!hdmiCard.isEmpty()) {
+        args << QStringLiteral("--ao=alsa")
+             << QStringLiteral("--audio-device=alsa/sysdefault:CARD=%1").arg(hdmiCard);
     }
 }
 

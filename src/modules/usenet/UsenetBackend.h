@@ -33,8 +33,10 @@ public slots:
 private:
     QVariantMap moduleConfig() const;
     QString setting(const QString &key, const QString &fallback = QString()) const;
+    QString newznabApiKey() const;
     QString newznabApiBase() const;
     QString altMountApiBase() const;
+    QString altMountDownloadKey() const;
     QUrl newznabUrl(const QVariantMap &params) const;
     QUrl altMountStreamsUrl() const;
     QString ensureNewznabApiKey(const QString &url) const;
@@ -45,6 +47,8 @@ private:
     void handleItemsReply(QNetworkReply *reply, const QString &categoryTitle);
     void handleStreamsReply(QNetworkReply *reply, const QString &requestId,
                             const QString &fallbackTitle);
+    void postNzbToAltMount(const QString &requestId, const QString &title,
+                           const QString &sourceUrl, const QByteArray &nzbData);
     QVariantList parseCategories(const QByteArray &data, QString *errorOut) const;
     QVariantList parseItems(const QByteArray &data, QString *errorOut) const;
     QVariantList parseStreams(const QByteArray &data, QString *errorOut) const;
