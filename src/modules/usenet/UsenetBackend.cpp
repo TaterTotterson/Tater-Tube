@@ -413,12 +413,12 @@ void UsenetBackend::load_trending(const QString &category, const QString &timePe
 
     const QUrl baseUrl(newznabApiBase());
     if (!isOmgwtfHost(baseUrl.host())) {
-        emit errorOccurred(QStringLiteral("TRENDING NEEDS OMGWTFNZBS"));
+        emit errorOccurred(QStringLiteral("TRENDING IS NOT AVAILABLE FOR THIS PROVIDER"));
         return;
     }
 
     if (omgUsername().isEmpty()) {
-        emit errorOccurred(QStringLiteral("ENTER OMG USERNAME"));
+        emit errorOccurred(QStringLiteral("ENTER TRENDING USERNAME"));
         return;
     }
 

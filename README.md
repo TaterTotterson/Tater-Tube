@@ -66,9 +66,9 @@ The easiest way to use it is to download the ready-to-flash `.img.xz` for your d
 - Includes Newsgroups search from the main Usenet menu
 - Supports larger browse limits of 50, 100, 250, or 500 results
 - Streams selected NZBs through an AltMount/Stremio-compatible streaming service
-- Supports OMGWTFNZBS Trending for movies and TV
+- Supports provider-backed trending for movies and TV
 - Trending views include today, week, month, and year
-- OMGWTFNZBS Trending uses the normal Newznab API key plus the optional OMG username setting
+- Trending uses the normal Newznab API key plus any provider-specific account setting required by that provider
 
 ### Game Center
 - Connects to a RetroNAS share using the MiSTer `games` folder layout
