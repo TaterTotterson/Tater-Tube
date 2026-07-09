@@ -84,6 +84,24 @@ FocusScope {
             moduleRoot.navStack = []
             moduleRoot.navigateTo(moduleRoot.loginView(), {})
         }
+        function onAuthStateChanged() {
+            if (embyBackend.get_auth_state() === "authed") {
+                moduleRoot.navStack = []
+                moduleRoot.replaceWith("Libraries.qml", {})
+            }
+        }
+    }
+
+    Connections {
+        target: appCore
+        function onModuleSettingChanged(mid, key, value) {
+            if (mid !== moduleRoot.moduleId || key !== "media_provider")
+                return
+            if (embyBackend.get_auth_state() !== "authed") {
+                moduleRoot.navStack = []
+                moduleRoot.replaceWith(moduleRoot.loginView(), {})
+            }
+        }
     }
 
     Component.onCompleted: {

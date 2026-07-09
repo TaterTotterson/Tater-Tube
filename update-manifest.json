@@ -1,14 +1,15 @@
 {
-  "version": "v1.2.7",
-  "app_version": "1.2.7",
+  "version": "v1.2.8",
+  "app_version": "1.2.8",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.2.7/Tater-Tube-v1.2.7-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.2.7.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.2.8/Tater-Tube-v1.2.8-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.2.8.tar.gz",
   "notes": [
-    "Expands Video on Demand TV Mode with extra genre, cartoon, movie, and decade channels when library metadata is available.",
-    "Shows the themed VoD TV channel name in the on-screen channel overlay while keeping the label constrained for CRT layouts.",
-    "Removes provider-specific Usenet wording from public docs and user-facing messages."
+    "Adds a mobile-friendly Web Setup UI at /setup for module logins, API keys, and appliance settings.",
+    "Adds setup API endpoints that save through the same AppCore settings path as the TV UI.",
+    "Refreshes open setup/settings screens when module settings are changed from the Web Setup UI.",
+    "Uses a module picker and mascot-focused module detail pages for easier phone setup."
   ]
 }

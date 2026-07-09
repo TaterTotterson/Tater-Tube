@@ -21,6 +21,7 @@ This fork is focused on two appliance-style setups:
 - Game Center ROM browsing from RetroNAS/MiSTer shares with clean RetroArch game launch
 - PC Link game streaming from Sunshine/Moonlight hosts
 - Bluetooth controller pairing from Settings
+- Mobile web setup UI for module logins and API keys
 - NTSC composite, PAL composite, and Pi 5 HDMI auto image builds
 
 The easiest way to use it is to download the ready-to-flash `.img.xz` for your display from the latest GitHub release, flash it to an SD card, and boot the Pi.
@@ -146,6 +147,12 @@ POST /api/v1/library/launch       {"id": "vod:movie:ITEM_ID"}
 ```
 
 Search results include normalized IDs such as `vod:movie:...`, `vod:show:...`, and `game:nes:...`. Pass the selected result `id` back to `/api/v1/library/launch` to start Video on Demand playback or a Game Center game.
+
+### Web Setup UI
+
+Open `http://240mp.local:24024/setup` from a phone or computer on the same network to update module settings, logins, API keys, RetroNAS settings, and Sunshine pairing without typing everything on the TV.
+
+The Web Setup UI uses the same API port as the Local Control API. If `MP240_API_TOKEN` is set, the page prompts for the token before loading or saving settings.
 
 Set `MP240_API_TOKEN` to require `Authorization: Bearer <token>` or `X-240MP-Token: <token>`. See [INSTALL.md](INSTALL.md#local-control-api) for the full API settings.
 

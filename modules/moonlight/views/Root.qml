@@ -328,6 +328,16 @@ FocusScope {
         }
     }
 
+    Connections {
+        target: appCore
+        function onModuleSettingChanged(mid, key, value) {
+            if (mid !== pcRoot.moduleId || key !== "sunshine_host")
+                return
+            if (mode === "setup" || mode === "message")
+                refresh()
+        }
+    }
+
     StaticBackground {
         anchors.fill: parent
         visible: root.staticBackgroundEnabled && mode !== "playing"

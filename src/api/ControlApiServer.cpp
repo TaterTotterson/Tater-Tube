@@ -1,14 +1,21 @@
 #include "ControlApiServer.h"
 
+#include "../AppCore.h"
 #include "../modules/emby_jellyfin/EmbyJellyfinBackend.h"
+#include "../modules/moonlight/MoonlightBackend.h"
 #include "../modules/retro/RetroBackend.h"
 #include "../player/MpvController.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QTimer>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -33,6 +40,7 @@ QByteArray statusText(int statusCode) {
     case 405: return "Method Not Allowed";
     case 409: return "Conflict";
     case 413: return "Payload Too Large";
+    case 503: return "Service Unavailable";
     case 504: return "Gateway Timeout";
     default: return "Internal Server Error";
     }
@@ -50,13 +58,17 @@ double jsonDouble(const QJsonObject &obj, const char *key, double fallback) {
 } // namespace
 
 ControlApiServer::ControlApiServer(MpvController *player,
+                                   AppCore *appCore,
                                    EmbyJellyfinBackend *mediaBackend,
                                    RetroBackend *retroBackend,
+                                   MoonlightBackend *moonlightBackend,
                                    QObject *parent)
     : QObject(parent)
     , m_player(player)
+    , m_appCore(appCore)
     , m_mediaBackend(mediaBackend)
     , m_retroBackend(retroBackend)
+    , m_moonlightBackend(moonlightBackend)
     , m_server(new QTcpServer(this))
     , m_apiTimelineTimer(new QTimer(this))
 {
@@ -73,6 +85,27 @@ ControlApiServer::ControlApiServer(MpvController *player,
         connect(m_player, &MpvController::playbackFailed, this, [this]() {
             stopApiTimeline(m_player ? m_player->position() : 0,
                             m_player ? m_player->duration() : 0);
+        });
+    }
+
+    if (m_moonlightBackend) {
+        connect(m_moonlightBackend, &MoonlightBackend::pairCodeReady, this,
+                [this](const QString &code) {
+            m_moonlightPairCode = code;
+            m_moonlightPairMessage = QStringLiteral("ENTER PIN IN SUNSHINE");
+            m_moonlightPairing = true;
+            m_moonlightPairOk = false;
+        });
+        connect(m_moonlightBackend, &MoonlightBackend::pairStatusChanged, this,
+                [this](const QString &message) {
+            if (!message.isEmpty())
+                m_moonlightPairMessage = message;
+        });
+        connect(m_moonlightBackend, &MoonlightBackend::pairFinished, this,
+                [this](bool ok, const QString &message) {
+            m_moonlightPairing = false;
+            m_moonlightPairOk = ok;
+            m_moonlightPairMessage = message;
         });
     }
 }
@@ -201,10 +234,16 @@ void ControlApiServer::handleRequest(QTcpSocket *socket, const HttpRequest &requ
         return;
     }
 
+    if (handleSetupStaticRequest(socket, request))
+        return;
+
     if (!isAuthorized(request)) {
         writeJson(socket, 401, {{"ok", false}, {"error", "unauthorized"}});
         return;
     }
+
+    if (handleSetupApiRequest(socket, request))
+        return;
 
     if (request.method == "GET" && request.path == QStringLiteral("/api/v1/status")) {
         writeJson(socket, 200, {{"ok", true}, {"status", playbackStatus()}});
@@ -355,6 +394,133 @@ bool ControlApiServer::isAuthorized(const HttpRequest &request) const {
     return request.headers.value("x-240mp-token") == m_token;
 }
 
+bool ControlApiServer::handleSetupStaticRequest(QTcpSocket *socket,
+                                                const HttpRequest &request) {
+    if (request.method != "GET")
+        return false;
+    if (!m_appCore)
+        return false;
+
+    QString relativePath;
+    QByteArray contentType;
+    if (request.path == QStringLiteral("/") ||
+        request.path == QStringLiteral("/setup") ||
+        request.path == QStringLiteral("/setup/")) {
+        relativePath = QStringLiteral("assets/setup/index.html");
+        contentType = "text/html; charset=utf-8";
+    } else if (request.path.startsWith(QStringLiteral("/setup/assets/"))) {
+        relativePath = QStringLiteral("assets/") + request.path.mid(QStringLiteral("/setup/assets/").size());
+        const QString lower = relativePath.toLower();
+        if (lower.endsWith(QStringLiteral(".png")))
+            contentType = "image/png";
+        else if (lower.endsWith(QStringLiteral(".jpg")) || lower.endsWith(QStringLiteral(".jpeg")))
+            contentType = "image/jpeg";
+        else if (lower.endsWith(QStringLiteral(".svg")))
+            contentType = "image/svg+xml";
+        else if (lower.endsWith(QStringLiteral(".css")))
+            contentType = "text/css; charset=utf-8";
+        else if (lower.endsWith(QStringLiteral(".js")))
+            contentType = "application/javascript; charset=utf-8";
+        else if (lower.endsWith(QStringLiteral(".ttf")))
+            contentType = "font/ttf";
+        else
+            contentType = "application/octet-stream";
+    } else {
+        return false;
+    }
+
+    const QDir appRoot(m_appCore->appRoot());
+    const QString assetsRoot = appRoot.absoluteFilePath(QStringLiteral("assets"));
+    const QString filePath = appRoot.absoluteFilePath(relativePath);
+    const QFileInfo rootInfo(assetsRoot);
+    const QFileInfo fileInfo(filePath);
+    const QString rootCanonical = rootInfo.canonicalFilePath();
+    const QString fileCanonical = fileInfo.canonicalFilePath();
+    if (rootCanonical.isEmpty() || fileCanonical.isEmpty() ||
+        !(fileCanonical == rootCanonical ||
+          fileCanonical.startsWith(rootCanonical + QDir::separator()))) {
+        writeJson(socket, 404, {{"ok", false}, {"error", "not_found"}});
+        return true;
+    }
+
+    QFile file(fileCanonical);
+    if (!file.open(QIODevice::ReadOnly)) {
+        writeJson(socket, 404, {{"ok", false}, {"error", "not_found"}});
+        return true;
+    }
+
+    writeBytes(socket, 200, file.readAll(), contentType);
+    return true;
+}
+
+bool ControlApiServer::handleSetupApiRequest(QTcpSocket *socket,
+                                             const HttpRequest &request) {
+    if (!request.path.startsWith(QStringLiteral("/api/v1/setup")))
+        return false;
+
+    if (!m_appCore) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "setup_unavailable"}});
+        return true;
+    }
+
+    if (request.method == "GET" && request.path == QStringLiteral("/api/v1/setup/status")) {
+        writeJson(socket, 200, setupStatus());
+        return true;
+    }
+
+    if (request.method == "GET" &&
+        (request.path == QStringLiteral("/api/v1/setup/modules") ||
+         request.path == QStringLiteral("/api/v1/setup/settings"))) {
+        writeJson(socket, 200, setupData());
+        return true;
+    }
+
+    if (request.method != "POST") {
+        writeJson(socket, 405, {{"ok", false}, {"error", "method_not_allowed"}});
+        return true;
+    }
+
+    if (request.path == QStringLiteral("/api/v1/setup/settings")) {
+        handleSetupSaveRequest(socket, request);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/action")) {
+        handleSetupActionRequest(socket, request);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/emby/login")) {
+        handleSetupEmbyLoginRequest(socket, request);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/plex/start")) {
+        handleSetupPlexStartRequest(socket);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/plex/poll")) {
+        handleSetupPlexPollRequest(socket);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/plex/select")) {
+        handleSetupPlexSelectRequest(socket, request);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/retro/connect")) {
+        handleSetupRetroConnectRequest(socket, request);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/moonlight/pair")) {
+        handleSetupMoonlightPairRequest(socket, request);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/moonlight/status")) {
+        handleSetupMoonlightStatusRequest(socket);
+        return true;
+    }
+
+    writeJson(socket, 404, {{"ok", false}, {"error", "not_found"}});
+    return true;
+}
+
 QJsonObject ControlApiServer::playbackStatus() const {
     return {
         {"app", QJsonObject{
@@ -372,6 +538,141 @@ QJsonObject ControlApiServer::playbackStatus() const {
     };
 }
 
+QJsonObject ControlApiServer::setupStatus() const {
+    return {
+        {"ok", true},
+        {"app", QJsonObject{
+            {"name", QCoreApplication::applicationName()},
+            {"version", QCoreApplication::applicationVersion()}
+        }},
+        {"token_required", !m_token.isEmpty()}
+    };
+}
+
+QString ControlApiServer::moduleIconAssetPath(const QString &moduleName) const {
+    QString slug = moduleName.trimmed().toLower();
+    slug.replace(QRegularExpression(QStringLiteral("[^a-z0-9]+")), QStringLiteral("-"));
+    slug.replace(QRegularExpression(QStringLiteral("(^-+|-+$)")), QString());
+    slug.replace(QRegularExpression(QStringLiteral("-+")), QStringLiteral("-"));
+    if (slug.isEmpty())
+        return QStringLiteral("/setup/assets/images/tater-tube-readme.png");
+
+    if (m_appCore) {
+        const QString relative = QStringLiteral("assets/images/mascots/%1.png").arg(slug);
+        if (QFileInfo(QDir(m_appCore->appRoot()).absoluteFilePath(relative)).exists())
+            return QStringLiteral("/setup/assets/images/mascots/%1.png").arg(slug);
+    }
+    return QStringLiteral("/setup/assets/images/tater-tube-readme.png");
+}
+
+bool ControlApiServer::isSecretSettingKey(const QString &key) const {
+    const QString normalized = key.toLower();
+    return normalized.contains(QStringLiteral("password")) ||
+           normalized.contains(QStringLiteral("api_key")) ||
+           normalized.contains(QStringLiteral("token")) ||
+           normalized.contains(QStringLiteral("secret"));
+}
+
+QVariantMap ControlApiServer::redactedSettingsMap(const QVariantMap &settings) const {
+    QVariantMap redacted;
+    for (auto it = settings.constBegin(); it != settings.constEnd(); ++it) {
+        if (isSecretSettingKey(it.key()) && !it.value().toString().isEmpty())
+            redacted.insert(it.key(), QStringLiteral("******"));
+        else
+            redacted.insert(it.key(), it.value());
+    }
+    return redacted;
+}
+
+QJsonObject ControlApiServer::setupData() const {
+    QJsonObject response = setupStatus();
+    if (!m_appCore)
+        return response;
+
+    const QVariantMap allSettings = m_appCore->get_settings().toMap();
+    const QVariantMap appSettings = allSettings.value(QStringLiteral("app")).toMap();
+    const QVariantMap modulesSettings = allSettings.value(QStringLiteral("modules")).toMap();
+
+    QJsonArray appSchema{
+        QJsonObject{
+            {"key", "color_scheme"},
+            {"label", "Color Scheme"},
+            {"type", "list_single"},
+            {"options", QJsonArray{"Off Air", "Video 1", "Late Night", "Synthwave",
+                                    "Terminal", "T-120", "Amber", "Kinescope", "Custom"}},
+            {"default", "Off Air"}
+        },
+        QJsonObject{
+            {"key", "off_air_highlight_color"},
+            {"label", "Highlight Color"},
+            {"type", "list_single"},
+            {"options", QJsonArray{"Orange", "Cyan", "Green", "Magenta",
+                                    "Red", "Blue", "Amber", "White"}},
+            {"default", "Orange"}
+        },
+        QJsonObject{
+            {"key", "show_module_mascots"},
+            {"label", "Menu Mascots"},
+            {"type", "toggle"},
+            {"default", "ON"}
+        },
+        QJsonObject{
+            {"key", "sleep_timer_mode"},
+            {"label", "Sleep Timer"},
+            {"type", "list_single"},
+            {"options", QJsonArray{"Off", "30 Min", "60 Min", "90 Min"}},
+            {"default", "Off"}
+        }
+    };
+    response[QStringLiteral("app_settings")] = QJsonObject{
+        {"schema", appSchema},
+        {"values", QJsonObject::fromVariantMap(redactedSettingsMap(appSettings))}
+    };
+
+    QJsonArray modules;
+    const QVariantList installed = m_appCore->get_installed_modules().toList();
+    for (const QVariant &moduleVariant : installed) {
+        const QVariantMap module = moduleVariant.toMap();
+        const QString id = module.value(QStringLiteral("id")).toString();
+        QString name = module.value(QStringLiteral("name")).toString();
+        if (name.isEmpty())
+            name = id;
+        const QVariantMap moduleValues = modulesSettings.value(id).toMap();
+        QJsonObject moduleObject{
+            {"id", id},
+            {"name", name},
+            {"icon", moduleIconAssetPath(name)},
+            {"has_settings", module.value(QStringLiteral("has_settings")).toBool()},
+            {"auth_state", m_appCore->get_module_auth_state(id)},
+            {"schema", QJsonArray::fromVariantList(
+                m_appCore->get_module_settings_schema(id).toList())},
+            {"values", QJsonObject::fromVariantMap(redactedSettingsMap(moduleValues))}
+        };
+
+        if (id == QStringLiteral("com.240mp.emby_jellyfin") && m_mediaBackend) {
+            moduleObject[QStringLiteral("setup")] = QJsonObject{
+                {"provider", m_mediaBackend->get_media_provider()},
+                {"saved_server_url", m_mediaBackend->get_saved_server_url()},
+                {"active_user", m_mediaBackend->get_active_user_name()},
+                {"active_server", m_mediaBackend->get_active_server_name()}
+            };
+        } else if (id == QStringLiteral("com.240mp.retro") && m_retroBackend) {
+            moduleObject[QStringLiteral("setup")] = QJsonObject::fromVariantMap(
+                redactedSettingsMap(m_retroBackend->get_setup_status()));
+        } else if (id == QStringLiteral("com.240mp.moonlight") && m_moonlightBackend) {
+            moduleObject[QStringLiteral("setup")] = QJsonObject::fromVariantMap(
+                redactedSettingsMap(m_moonlightBackend->get_setup_status()));
+        } else if (id == QStringLiteral("com.240mp.usenet")) {
+            moduleObject[QStringLiteral("setup")] = QJsonObject::fromVariantMap(
+                redactedSettingsMap(moduleValues));
+        }
+
+        modules.append(moduleObject);
+    }
+    response[QStringLiteral("modules")] = modules;
+    return response;
+}
+
 QJsonObject ControlApiServer::parseBodyObject(const HttpRequest &request, bool &ok) const {
     ok = false;
     if (request.body.trimmed().isEmpty()) {
@@ -385,6 +686,408 @@ QJsonObject ControlApiServer::parseBodyObject(const HttpRequest &request, bool &
 
     ok = true;
     return doc.object();
+}
+
+QVariant ControlApiServer::jsonValueToSaveValue(const QString &moduleId,
+                                                const QString &key,
+                                                const QJsonValue &value) const {
+    if (value.isBool())
+        return value.toBool();
+    if (value.isDouble())
+        return value.toVariant();
+    if (value.isArray())
+        return value.toArray().toVariantList();
+    if (value.isObject())
+        return value.toObject().toVariantMap();
+
+    const QString text = value.toString();
+    QVariantList schema;
+    if (m_appCore && !moduleId.isEmpty())
+        schema = m_appCore->get_module_settings_schema(moduleId).toList();
+
+    for (const QVariant &itemVariant : schema) {
+        const QVariantMap item = itemVariant.toMap();
+        if (item.value(QStringLiteral("key")).toString() != key)
+            continue;
+        if (item.value(QStringLiteral("type")).toString() == QStringLiteral("toggle")) {
+            const QString normalized = text.trimmed().toLower();
+            return normalized == QStringLiteral("on") ||
+                   normalized == QStringLiteral("true") ||
+                   normalized == QStringLiteral("1") ||
+                   normalized == QStringLiteral("yes");
+        }
+    }
+
+    return text;
+}
+
+void ControlApiServer::handleSetupSaveRequest(QTcpSocket *socket,
+                                              const HttpRequest &request) {
+    bool ok = false;
+    const QJsonObject body = parseBodyObject(request, ok);
+    if (!ok) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_json"}});
+        return;
+    }
+
+    const QString moduleId = body.value(QStringLiteral("module_id")).toString(
+        body.value(QStringLiteral("moduleId")).toString());
+    const QJsonObject values = body.value(QStringLiteral("values")).toObject();
+    if (values.isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "missing_values"}});
+        return;
+    }
+
+    for (auto it = values.constBegin(); it != values.constEnd(); ++it) {
+        const QString key = it.key();
+        if (key.isEmpty())
+            continue;
+        if (isSecretSettingKey(key) && it.value().isString()) {
+            const QString text = it.value().toString().trimmed();
+            if (text.isEmpty() || text == QStringLiteral("******"))
+                continue;
+        }
+
+        const QVariant value = jsonValueToSaveValue(moduleId, key, it.value());
+        m_appCore->save_setting(moduleId, key, value);
+
+        if (moduleId.isEmpty() && key == QStringLiteral("sleep_timer_mode")) {
+            const QString mode = value.toString();
+            int minutes = 0;
+            if (mode == QStringLiteral("30 Min"))
+                minutes = 30;
+            else if (mode == QStringLiteral("60 Min"))
+                minutes = 60;
+            else if (mode == QStringLiteral("90 Min"))
+                minutes = 90;
+            const qint64 endMs = minutes > 0
+                ? QDateTime::currentMSecsSinceEpoch() + qint64(minutes) * 60000
+                : 0;
+            m_appCore->save_setting(QString(), QStringLiteral("sleep_timer_end_ms"), endMs);
+        }
+    }
+
+    writeJson(socket, 200, QJsonObject{
+        {"ok", true},
+        {"settings", setupData()}
+    });
+}
+
+void ControlApiServer::handleSetupActionRequest(QTcpSocket *socket,
+                                                const HttpRequest &request) {
+    bool ok = false;
+    const QJsonObject body = parseBodyObject(request, ok);
+    if (!ok) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_json"}});
+        return;
+    }
+    const QString moduleId = body.value(QStringLiteral("module_id")).toString(
+        body.value(QStringLiteral("moduleId")).toString());
+    const QString actionSlot = body.value(QStringLiteral("action_slot")).toString(
+        body.value(QStringLiteral("actionSlot")).toString());
+    if (moduleId.isEmpty() || actionSlot.isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "missing_action"}});
+        return;
+    }
+    m_appCore->invoke_module_action(moduleId, actionSlot);
+    writeJson(socket, 200, {{"ok", true}, {"message", "action_started"}});
+}
+
+void ControlApiServer::handleSetupEmbyLoginRequest(QTcpSocket *socket,
+                                                   const HttpRequest &request) {
+    if (!m_mediaBackend) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "media_backend_unavailable"}});
+        return;
+    }
+
+    bool ok = false;
+    const QJsonObject body = parseBodyObject(request, ok);
+    if (!ok) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_json"}});
+        return;
+    }
+
+    const QString serverUrl = body.value(QStringLiteral("server_url")).toString(
+        body.value(QStringLiteral("serverUrl")).toString()).trimmed();
+    const QString username = body.value(QStringLiteral("username")).toString().trimmed();
+    const QString password = body.value(QStringLiteral("password")).toString();
+    if (serverUrl.isEmpty() || username.isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "missing_login"}});
+        return;
+    }
+
+    QPointer<QTcpSocket> safeSocket(socket);
+    auto done = std::make_shared<bool>(false);
+    auto finish = [this, safeSocket, done](int statusCode, const QJsonObject &response) {
+        if (*done || !safeSocket)
+            return;
+        *done = true;
+        writeJson(safeSocket, statusCode, response);
+    };
+
+    connect(m_mediaBackend, &EmbyJellyfinBackend::authSuccess, socket, [=]() {
+        finish(200, QJsonObject{
+            {"ok", true},
+            {"message", "signed_in"},
+            {"settings", setupData()}
+        });
+    });
+    connect(m_mediaBackend, &EmbyJellyfinBackend::errorOccurred, socket,
+            [=](const QString &message) {
+        finish(409, QJsonObject{
+            {"ok", false},
+            {"error", "login_failed"},
+            {"message", message}
+        });
+    });
+    QTimer::singleShot(20000, socket, [=]() {
+        finish(504, QJsonObject{{"ok", false}, {"error", "login_timeout"}});
+    });
+
+    m_appCore->save_setting(QStringLiteral("com.240mp.emby_jellyfin"),
+                            QStringLiteral("media_provider"),
+                            QStringLiteral("EMBY/JELLYFIN"));
+    m_mediaBackend->login(serverUrl, username, password);
+}
+
+void ControlApiServer::handleSetupPlexStartRequest(QTcpSocket *socket) {
+    if (!m_mediaBackend) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "media_backend_unavailable"}});
+        return;
+    }
+
+    QPointer<QTcpSocket> safeSocket(socket);
+    auto done = std::make_shared<bool>(false);
+    auto finish = [this, safeSocket, done](int statusCode, const QJsonObject &response) {
+        if (*done || !safeSocket)
+            return;
+        *done = true;
+        writeJson(safeSocket, statusCode, response);
+    };
+
+    connect(m_mediaBackend, &EmbyJellyfinBackend::plexPinReady, socket,
+            [=](const QString &code, const QString &linkUrl) {
+        finish(200, QJsonObject{
+            {"ok", true},
+            {"code", code},
+            {"url", linkUrl}
+        });
+    });
+    connect(m_mediaBackend, &EmbyJellyfinBackend::errorOccurred, socket,
+            [=](const QString &message) {
+        finish(409, QJsonObject{
+            {"ok", false},
+            {"error", "plex_start_failed"},
+            {"message", message}
+        });
+    });
+    QTimer::singleShot(12000, socket, [=]() {
+        finish(504, QJsonObject{{"ok", false}, {"error", "plex_start_timeout"}});
+    });
+
+    m_appCore->save_setting(QStringLiteral("com.240mp.emby_jellyfin"),
+                            QStringLiteral("media_provider"),
+                            QStringLiteral("PLEX"));
+    m_mediaBackend->start_plex_pin_login();
+}
+
+void ControlApiServer::handleSetupPlexPollRequest(QTcpSocket *socket) {
+    if (!m_mediaBackend) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "media_backend_unavailable"}});
+        return;
+    }
+
+    QPointer<QTcpSocket> safeSocket(socket);
+    auto done = std::make_shared<bool>(false);
+    auto finish = [this, safeSocket, done](int statusCode, const QJsonObject &response) {
+        if (*done || !safeSocket)
+            return;
+        *done = true;
+        writeJson(safeSocket, statusCode, response);
+    };
+
+    connect(m_mediaBackend, &EmbyJellyfinBackend::authSuccess, socket, [=]() {
+        finish(200, QJsonObject{
+            {"ok", true},
+            {"state", "authed"},
+            {"settings", setupData()}
+        });
+    });
+    connect(m_mediaBackend, &EmbyJellyfinBackend::plexServersLoaded, socket,
+            [=](const QVariant &servers) {
+        finish(200, QJsonObject{
+            {"ok", true},
+            {"state", "select_server"},
+            {"servers", QJsonArray::fromVariantList(servers.toList())}
+        });
+    });
+    connect(m_mediaBackend, &EmbyJellyfinBackend::errorOccurred, socket,
+            [=](const QString &message) {
+        finish(409, QJsonObject{
+            {"ok", false},
+            {"error", "plex_poll_failed"},
+            {"message", message}
+        });
+    });
+    QTimer::singleShot(2500, socket, [=]() {
+        finish(200, QJsonObject{{"ok", true}, {"state", "pending"}});
+    });
+
+    m_mediaBackend->poll_plex_pin_login();
+}
+
+void ControlApiServer::handleSetupPlexSelectRequest(QTcpSocket *socket,
+                                                    const HttpRequest &request) {
+    if (!m_mediaBackend) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "media_backend_unavailable"}});
+        return;
+    }
+
+    bool ok = false;
+    const QJsonObject body = parseBodyObject(request, ok);
+    if (!ok) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_json"}});
+        return;
+    }
+    const QString machineId = body.value(QStringLiteral("machine_identifier")).toString(
+        body.value(QStringLiteral("machineIdentifier")).toString()).trimmed();
+    if (machineId.isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "missing_machine_identifier"}});
+        return;
+    }
+
+    QPointer<QTcpSocket> safeSocket(socket);
+    auto done = std::make_shared<bool>(false);
+    auto finish = [this, safeSocket, done](int statusCode, const QJsonObject &response) {
+        if (*done || !safeSocket)
+            return;
+        *done = true;
+        writeJson(safeSocket, statusCode, response);
+    };
+    connect(m_mediaBackend, &EmbyJellyfinBackend::authSuccess, socket, [=]() {
+        finish(200, QJsonObject{
+            {"ok", true},
+            {"message", "signed_in"},
+            {"settings", setupData()}
+        });
+    });
+    connect(m_mediaBackend, &EmbyJellyfinBackend::errorOccurred, socket,
+            [=](const QString &message) {
+        finish(409, QJsonObject{
+            {"ok", false},
+            {"error", "plex_select_failed"},
+            {"message", message}
+        });
+    });
+    QTimer::singleShot(8000, socket, [=]() {
+        finish(504, QJsonObject{{"ok", false}, {"error", "plex_select_timeout"}});
+    });
+
+    m_mediaBackend->select_plex_server(machineId);
+}
+
+void ControlApiServer::handleSetupRetroConnectRequest(QTcpSocket *socket,
+                                                      const HttpRequest &request) {
+    if (!m_retroBackend) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "retro_backend_unavailable"}});
+        return;
+    }
+
+    bool ok = false;
+    const QJsonObject body = parseBodyObject(request, ok);
+    if (!ok) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_json"}});
+        return;
+    }
+    const QJsonObject values = body.value(QStringLiteral("values")).toObject();
+    const QString host = values.value(QStringLiteral("retronas_host")).toString().trimmed();
+    const QString share = values.value(QStringLiteral("retronas_share")).toString(QStringLiteral("mister")).trimmed();
+    const QString path = values.value(QStringLiteral("retronas_path")).toString(QStringLiteral("games")).trimmed();
+    const QString username = values.value(QStringLiteral("retronas_username")).toString().trimmed();
+    const QString password = values.value(QStringLiteral("retronas_password")).toString();
+    if (host.isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "missing_retronas_host"}});
+        return;
+    }
+
+    m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_host"), host);
+    m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_share"), share.isEmpty() ? QStringLiteral("mister") : share);
+    m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_path"), path.isEmpty() ? QStringLiteral("games") : path);
+    m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_username"), username);
+    QString mountPassword = password;
+    if (password.trimmed().isEmpty() || password == QStringLiteral("******")) {
+        mountPassword = m_appCore->get_setting(QStringLiteral("com.240mp.retro"),
+                                               QStringLiteral("retronas_password")).toString();
+    } else {
+        m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_password"), password);
+    }
+
+    QPointer<QTcpSocket> safeSocket(socket);
+    auto done = std::make_shared<bool>(false);
+    auto finish = [this, safeSocket, done](int statusCode, const QJsonObject &response) {
+        if (*done || !safeSocket)
+            return;
+        *done = true;
+        writeJson(safeSocket, statusCode, response);
+    };
+    connect(m_retroBackend, &RetroBackend::mountFinished, socket,
+            [=](bool mountOk, const QString &message) {
+        finish(mountOk ? 200 : 409, QJsonObject{
+            {"ok", mountOk},
+            {"message", message},
+            {"settings", setupData()}
+        });
+    });
+    QTimer::singleShot(65000, socket, [=]() {
+        finish(504, QJsonObject{{"ok", false}, {"error", "retro_mount_timeout"}});
+    });
+
+    m_retroBackend->mount_retronas(host, share, path, username, mountPassword);
+}
+
+void ControlApiServer::handleSetupMoonlightPairRequest(QTcpSocket *socket,
+                                                       const HttpRequest &request) {
+    if (!m_moonlightBackend) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "moonlight_backend_unavailable"}});
+        return;
+    }
+
+    bool ok = false;
+    const QJsonObject body = parseBodyObject(request, ok);
+    if (!ok) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_json"}});
+        return;
+    }
+    const QString host = body.value(QStringLiteral("host")).toString(
+        body.value(QStringLiteral("sunshine_host")).toString()).trimmed();
+    if (host.isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "missing_sunshine_host"}});
+        return;
+    }
+
+    m_appCore->save_setting(QStringLiteral("com.240mp.moonlight"),
+                            QStringLiteral("sunshine_host"), host);
+    m_moonlightPairCode.clear();
+    m_moonlightPairMessage = QStringLiteral("CONNECTING TO SUNSHINE");
+    m_moonlightPairing = true;
+    m_moonlightPairOk = false;
+    m_moonlightBackend->repair_host(host);
+    writeJson(socket, 200, {
+        {"ok", true},
+        {"state", "started"},
+        {"message", m_moonlightPairMessage}
+    });
+}
+
+void ControlApiServer::handleSetupMoonlightStatusRequest(QTcpSocket *socket) {
+    writeJson(socket, 200, {
+        {"ok", true},
+        {"pairing", m_moonlightPairing},
+        {"paired", m_moonlightPairOk},
+        {"code", m_moonlightPairCode},
+        {"message", m_moonlightPairMessage},
+        {"auth_state", m_appCore ? m_appCore->get_module_auth_state(QStringLiteral("com.240mp.moonlight")) : QString()}
+    });
 }
 
 void ControlApiServer::handleSearchRequest(QTcpSocket *socket, const HttpRequest &request) {
@@ -838,11 +1541,13 @@ void ControlApiServer::sendApiTimeline(const QString &state, int positionMs, int
                                     state, pos, dur);
 }
 
-void ControlApiServer::writeJson(QTcpSocket *socket, int statusCode, const QJsonObject &body) const {
-    const QByteArray payload = QJsonDocument(body).toJson(QJsonDocument::Compact);
+void ControlApiServer::writeBytes(QTcpSocket *socket,
+                                  int statusCode,
+                                  const QByteArray &payload,
+                                  const QByteArray &contentType) const {
     QByteArray response;
     response += "HTTP/1.1 " + QByteArray::number(statusCode) + " " + statusText(statusCode) + "\r\n";
-    response += "Content-Type: application/json; charset=utf-8\r\n";
+    response += "Content-Type: " + contentType + "\r\n";
     response += "Content-Length: " + QByteArray::number(payload.size()) + "\r\n";
     response += "Connection: close\r\n";
     response += "Access-Control-Allow-Origin: *\r\n";
@@ -852,6 +1557,11 @@ void ControlApiServer::writeJson(QTcpSocket *socket, int statusCode, const QJson
     response += payload;
     socket->write(response);
     socket->disconnectFromHost();
+}
+
+void ControlApiServer::writeJson(QTcpSocket *socket, int statusCode, const QJsonObject &body) const {
+    const QByteArray payload = QJsonDocument(body).toJson(QJsonDocument::Compact);
+    writeBytes(socket, statusCode, payload, "application/json; charset=utf-8");
 }
 
 void ControlApiServer::writeEmpty(QTcpSocket *socket, int statusCode) const {

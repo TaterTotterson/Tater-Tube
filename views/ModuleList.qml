@@ -59,6 +59,10 @@ FocusScope {
             if (key === "show_module_mascots")
                 appRoot.loadMascotSetting()
         }
+        function onModuleSettingChanged(mid, key, value) {
+            if (key === "enabled")
+                appCore.scan_for_modules()
+        }
         function onModulesLoaded(moduleData) {
             menuList.model = moduleData
             if (moduleData.length > 0) {

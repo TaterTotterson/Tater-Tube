@@ -460,6 +460,20 @@ FocusScope {
     }
 
     Connections {
+        target: appCore
+        function onModuleSettingChanged(mid, key, value) {
+            if (mid !== usenetRoot.moduleId)
+                return
+            if (key !== "newznab_url" && key !== "newznab_api_key"
+                    && key !== "omg_username" && key !== "altmount_url"
+                    && key !== "altmount_api_key")
+                return
+            if (mode === "setup" || mode === "message")
+                refresh()
+        }
+    }
+
+    Connections {
         target: mpvController
 
         function onPlaybackFinished(finalPositionMs, finalDurationMs) {

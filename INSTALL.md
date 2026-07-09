@@ -267,6 +267,14 @@ Tater Tube starts a small HTTP playback-control API with the app. By default it 
 curl http://240mp.local:24024/api/v1/status
 ```
 
+The same service also hosts the mobile setup page:
+
+```text
+http://240mp.local:24024/setup
+```
+
+Use the setup page from a phone or computer on the same network to update module settings, logins, API keys, RetroNAS settings, and Sunshine pairing. If `MP240_API_TOKEN` is set, the setup page prompts for the token before loading or saving settings.
+
 Useful endpoints:
 
 ```text

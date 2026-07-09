@@ -398,6 +398,20 @@ FocusScope {
         }
     }
 
+    Connections {
+        target: appCore
+        function onModuleSettingChanged(mid, key, value) {
+            if (mid !== retroRoot.moduleId)
+                return
+            if (key !== "retronas_host" && key !== "retronas_share"
+                    && key !== "retronas_path" && key !== "retronas_username"
+                    && key !== "retronas_password" && key !== "local_path")
+                return
+            if (mode === "setup" || mode === "message")
+                refresh()
+        }
+    }
+
     StaticBackground {
         anchors.fill: parent
         visible: root.staticBackgroundEnabled && mode !== "playing"

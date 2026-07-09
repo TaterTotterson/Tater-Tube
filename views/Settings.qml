@@ -699,6 +699,20 @@ FocusScope {
         function onBluetoothActionFinished(action, result) {
             settingsRoot.finishBluetoothAction(action, result)
         }
+        function onAppSettingChanged(key, value) {
+            if (updateOverlayVisible || bluetoothScanning || bluetoothBusy)
+                return
+            if (settingsMode === "section")
+                buildSectionModel(activeSection, settingsList.currentIndex)
+            else if (settingsMode === "main")
+                buildMainMenu(settingsList.currentIndex)
+        }
+        function onModuleSettingChanged(mid, key, value) {
+            if (updateOverlayVisible || bluetoothScanning || bluetoothBusy)
+                return
+            if (settingsMode === "section" && activeSection === "features")
+                buildSectionModel(activeSection, settingsList.currentIndex)
+        }
     }
 
     // Header

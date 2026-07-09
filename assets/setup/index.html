@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tater Tube Setup</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --panel: #101010;
+      --panel-2: #171717;
+      --text: #f8f8f8;
+      --muted: #9b9b9b;
+      --line: #303030;
+      --orange: #ff4a00;
+      --orange-2: #ff7a1a;
+      --danger: #ff3b30;
+      --ok: #38d66b;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--bg); color: var(--text); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background:
+        linear-gradient(rgba(255,255,255,.035) 50%, rgba(0,0,0,.035) 50%) 0 0 / 100% 4px,
+        radial-gradient(circle at 50% -20%, rgba(255,74,0,.16), transparent 42%),
+        var(--bg);
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(980px, 100%);
+      margin: 0 auto;
+      padding: 20px 14px 48px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      align-items: center;
+      padding: 10px 0 18px;
+    }
+
+    .logo {
+      width: min(390px, 92vw);
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .hero-copy {
+      text-align: center;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 13px;
+      line-height: 1.5;
+      letter-spacing: .02em;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      background: linear-gradient(var(--bg), rgba(5,5,5,.88));
+      backdrop-filter: blur(8px);
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      min-height: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: var(--muted);
+      background: #080808;
+      font-size: 12px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .pill.ok { color: var(--ok); border-color: rgba(56,214,107,.45); }
+    .pill.warn { color: var(--orange-2); border-color: rgba(255,122,26,.5); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .module-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .module-row {
+      width: 100%;
+      min-height: 84px;
+      display: grid;
+      grid-template-columns: 64px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      text-align: left;
+      color: var(--text);
+      background: linear-gradient(180deg, var(--panel), #080808);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      box-shadow: 0 12px 28px rgba(0,0,0,.24);
+    }
+
+    .module-row:focus {
+      outline: none;
+      border-color: var(--orange);
+      box-shadow: 0 0 0 2px rgba(255,74,0,.22);
+    }
+
+    .module-row img {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+    }
+
+    .module-row .title {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 17px;
+    }
+
+    .module-summary {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      text-transform: uppercase;
+    }
+
+    .module-caret {
+      color: var(--orange);
+      font-size: 24px;
+      line-height: 1;
+      padding: 0 4px;
+    }
+
+    .detail-wrap {
+      display: grid;
+      gap: 12px;
+    }
+
+    .detail-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .detail-nav button {
+      min-width: 112px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--panel), #090909);
+      overflow: hidden;
+      box-shadow: 0 16px 36px rgba(0,0,0,.28);
+    }
+
+    .card-head {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.025);
+    }
+
+    .card-head img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+    }
+
+    .title {
+      margin: 0 0 6px;
+      color: var(--text);
+      font-size: 19px;
+      line-height: 1.1;
+      text-transform: uppercase;
+    }
+
+    .sub {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .card-body {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .detail-mascot {
+      display: grid;
+      grid-template-columns: 1fr 112px;
+      gap: 12px;
+      align-items: center;
+      min-height: 116px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: radial-gradient(circle at 82% 35%, rgba(255,74,0,.18), transparent 42%), #000;
+    }
+
+    .detail-mascot img {
+      width: 112px;
+      height: 112px;
+      object-fit: contain;
+    }
+
+    .detail-mascot .note {
+      margin-top: 6px;
+    }
+
+    .section-label {
+      color: var(--orange-2);
+      font-size: 12px;
+      text-transform: uppercase;
+      margin: 8px 0 -2px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    input, select {
+      width: 100%;
+      min-height: 44px;
+      color: var(--text);
+      background: #000;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 11px;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 2px rgba(255,74,0,.22);
+    }
+
+    select {
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--orange) 50%),
+        linear-gradient(135deg, var(--orange) 50%, transparent 50%);
+      background-position: calc(100% - 18px) 18px, calc(100% - 12px) 18px;
+      background-size: 6px 6px;
+      background-repeat: no-repeat;
+    }
+
+    .toggle-row {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 9px 11px;
+      background: #000;
+    }
+
+    .switch {
+      position: relative;
+      width: 50px;
+      height: 28px;
+      flex: 0 0 auto;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #222;
+      transition: .16s;
+    }
+
+    .slider:before {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 3px;
+      top: 3px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: .16s;
+    }
+
+    .switch input:checked + .slider {
+      background: rgba(255,74,0,.22);
+      border-color: var(--orange);
+    }
+
+    .switch input:checked + .slider:before {
+      transform: translateX(22px);
+      background: var(--orange);
+    }
+
+    .actions {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr;
+      margin-top: 4px;
+    }
+
+    button {
+      min-height: 44px;
+      border: 1px solid var(--orange);
+      border-radius: 6px;
+      color: #110500;
+      background: var(--orange);
+      padding: 10px 12px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      color: var(--text);
+      background: #000;
+      border-color: var(--line);
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: wait;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      text-transform: uppercase;
+    }
+
+    .message {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px;
+      background: #000;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      text-transform: uppercase;
+    }
+
+    .message.show { display: block; }
+    .message.ok { color: var(--ok); border-color: rgba(56,214,107,.45); }
+    .message.err { color: var(--danger); border-color: rgba(255,59,48,.45); }
+
+    .token-card {
+      display: none;
+      margin-bottom: 14px;
+    }
+    .token-card.show { display: block; }
+
+    @media (min-width: 760px) {
+      .shell { padding: 28px 22px 64px; }
+      .grid { grid-template-columns: 1fr; }
+      .module-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .card.app-card { grid-column: 1 / -1; }
+      .actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <img class="logo" src="/setup/assets/images/tater-tube-readme.png" alt="Tater Tube">
+      <div class="hero-copy">Mobile setup for module logins, API keys, and system settings.</div>
+    </section>
+
+    <div class="topbar">
+      <div id="status" class="status">Loading setup...</div>
+      <button id="reload" class="secondary" type="button">Reload</button>
+    </div>
+
+    <section id="tokenCard" class="card token-card">
+      <div class="card-head">
+        <img src="/setup/assets/images/tater-tube-readme.png" alt="">
+        <div>
+          <h2 class="title">API Token</h2>
+          <div class="sub"><span class="pill warn">Required</span></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label for="apiToken">Token</label>
+          <input id="apiToken" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <button id="saveToken" type="button">Save Token</button>
+        <div class="note">This install has MP240_API_TOKEN set. Enter it once on this device.</div>
+      </div>
+    </section>
+
+    <section id="cards" class="grid"></section>
+  </main>
+
+  <script>
+    const cards = document.getElementById("cards");
+    const statusEl = document.getElementById("status");
+    const tokenCard = document.getElementById("tokenCard");
+    const tokenInput = document.getElementById("apiToken");
+    const labelOverrides = {
+      omg_username: "Indexer Username",
+      altmount_url: "Streamer URL",
+      altmount_api_key: "Streamer Key",
+      newznab_url: "Newznab URL",
+      newznab_api_key: "Newznab API Key"
+    };
+    let setupData = null;
+    let currentModuleId = "";
+    let plexPollTimer = null;
+    let moonlightPollTimer = null;
+
+    function token() {
+      return localStorage.getItem("taterTubeSetupToken") || "";
+    }
+
+    function setStatus(text, tone) {
+      statusEl.textContent = text || "";
+      statusEl.style.color = tone === "err" ? "var(--danger)" : (tone === "ok" ? "var(--ok)" : "var(--muted)");
+    }
+
+    function showTokenPrompt(show) {
+      tokenCard.classList.toggle("show", !!show);
+      if (show) tokenInput.focus();
+    }
+
+    async function api(path, options = {}) {
+      const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+      if (token()) {
+        headers.Authorization = "Bearer " + token();
+        headers["X-240MP-Token"] = token();
+      }
+      const response = await fetch(path, Object.assign({}, options, { headers }));
+      if (response.status === 401) {
+        showTokenPrompt(true);
+        throw new Error("Unauthorized");
+      }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.message || data.error || ("HTTP " + response.status));
+      }
+      return data;
+    }
+
+    function text(value) {
+      return value === undefined || value === null ? "" : String(value);
+    }
+
+    function titleCaseKey(key) {
+      return text(key).replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function labelFor(item) {
+      return labelOverrides[item.key] || item.label || titleCaseKey(item.key);
+    }
+
+    function isSecretKey(key, item = {}) {
+      const lower = text(key).toLowerCase();
+      return item.secret || lower.includes("password") || lower.includes("api_key") ||
+        lower.includes("token") || lower.includes("secret");
+    }
+
+    function isOn(value, fallback) {
+      if (value === undefined || value === null || value === "") return !!fallback;
+      if (typeof value === "boolean") return value;
+      const normalized = text(value).toLowerCase();
+      return normalized === "on" || normalized === "true" || normalized === "1" || normalized === "yes";
+    }
+
+    function currentValue(values, item) {
+      const value = values ? values[item.key] : undefined;
+      if (value === undefined || value === null || value === "") {
+        if (item.type === "toggle") return item.default === "ON";
+        return item.default || "";
+      }
+      return value;
+    }
+
+    function supportedField(item) {
+      if (!item || !item.key) return false;
+      if (item.type === "action") return false;
+      if (item.type === "multiselect_submenu") return false;
+      if (item.options_source === "dynamic") return false;
+      return ["text", "toggle", "list_single", "directory_browser"].includes(item.type);
+    }
+
+    function fieldHtml(moduleId, values, item) {
+      const key = item.key;
+      const id = "field-" + moduleId.replace(/[^a-z0-9]/gi, "-") + "-" + key;
+      const label = labelFor(item);
+      const value = currentValue(values, item);
+      if (item.type === "toggle") {
+        const checked = isOn(value, item.default === "ON") ? "checked" : "";
+        return `
+          <div class="field">
+            <label>${label}</label>
+            <div class="toggle-row">
+              <span>${label}</span>
+              <label class="switch">
+                <input type="checkbox" data-key="${key}" data-type="toggle" ${checked}>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>`;
+      }
+      if (item.type === "list_single") {
+        const options = Array.isArray(item.options) ? item.options : [];
+        const optionHtml = options.map(option => {
+          const selected = text(option) === text(value) ? "selected" : "";
+          return `<option value="${escapeAttr(option)}" ${selected}>${escapeHtml(option)}</option>`;
+        }).join("");
+        return `
+          <div class="field">
+            <label for="${id}">${label}</label>
+            <select id="${id}" data-key="${key}" data-type="text">${optionHtml}</select>
+          </div>`;
+      }
+      const secret = isSecretKey(key, item);
+      const inputType = secret ? "password" : "text";
+      const inputValue = secret ? "" : text(value);
+      const placeholder = secret && text(value) ? "Saved" : "";
+      return `
+        <div class="field">
+          <label for="${id}">${label}</label>
+          <input id="${id}" type="${inputType}" data-key="${key}" data-type="text"
+            ${secret ? "data-secret=\"1\"" : ""}
+            value="${escapeAttr(inputValue)}" placeholder="${escapeAttr(placeholder)}"
+            autocapitalize="off" autocomplete="off" spellcheck="false">
+        </div>`;
+    }
+
+    function actionHtml(moduleId, item) {
+      if (!item || item.type !== "action" || !item.action_slot) return "";
+      return `<button class="secondary" type="button" data-module="${escapeAttr(moduleId)}" data-action-slot="${escapeAttr(item.action_slot)}">${escapeHtml(labelFor(item))}</button>`;
+    }
+
+    function unsupportedHtml(item) {
+      if (!item || item.type === "action") return "";
+      return `<div class="note">${escapeHtml(labelFor(item))}: use the TV settings screen for this option.</div>`;
+    }
+
+    function escapeHtml(value) {
+      return text(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+
+    function authPill(state) {
+      if (state === "authed") return `<span class="pill ok">Configured</span>`;
+      return `<span class="pill warn">Needs Setup</span>`;
+    }
+
+    function moduleSummary(entry) {
+      if (!entry || entry.id === "__app") return "Theme, sleep timer, and global appliance settings.";
+      const summaries = {
+        "com.240mp.ota": "HDHomeRun address and over-the-air setup.",
+        "com.240mp.emby_jellyfin": "Emby, Jellyfin, Plex, playback, and library settings.",
+        "com.240mp.youtube_playlist": "Public Access playlists, commercials, quality, and cache refresh.",
+        "com.240mp.usenet": "Newznab indexer, streamer keys, browse limits, and trending.",
+        "com.240mp.audio_tapes": "Tape Deck module visibility.",
+        "com.240mp.retro": "RetroNAS share, local ROM path, core install, and game cache.",
+        "com.240mp.local_files": "Local media folder, loop, shuffle, and resume behavior.",
+        "com.240mp.moonlight": "Sunshine host pairing, stream preset, and app cache."
+      };
+      return summaries[entry.id] || "Module settings and setup actions.";
+    }
+
+    function appEntry() {
+      return {
+        id: "__app",
+        name: "Tater Tube",
+        icon: "/setup/assets/images/tater-tube-readme.png",
+        auth_state: "authed"
+      };
+    }
+
+    function setupEntries() {
+      return [appEntry()].concat(setupData.modules || []);
+    }
+
+    function findEntry(id) {
+      if (id === "__app") return appEntry();
+      return (setupData.modules || []).find(module => module.id === id) || null;
+    }
+
+    function renderModuleRow(entry) {
+      return `
+        <button class="module-row" type="button" data-open-module="${escapeAttr(entry.id)}">
+          <img src="${escapeAttr(entry.icon || "/setup/assets/images/tater-tube-readme.png")}" alt="">
+          <span>
+            <span class="title">${escapeHtml(entry.name)}</span>
+            <span class="sub">${authPill(entry.auth_state)}</span>
+            <span class="module-summary">${escapeHtml(moduleSummary(entry))}</span>
+          </span>
+          <span class="module-caret">&gt;</span>
+        </button>`;
+    }
+
+    function renderModulePicker() {
+      cards.className = "module-list";
+      cards.innerHTML = setupEntries().map(renderModuleRow).join("");
+      bindPicker();
+    }
+
+    function renderDetailHeader(entry) {
+      return `
+        <div class="detail-nav">
+          <button class="secondary" type="button" data-back-modules>Back</button>
+          <span class="pill">${escapeHtml(entry.name)}</span>
+        </div>`;
+    }
+
+    function renderDetailMascot(entry) {
+      return `
+        <div class="detail-mascot">
+          <div>
+            <h3 class="title">${escapeHtml(entry.name)}</h3>
+            <div class="sub">${authPill(entry.auth_state)}</div>
+            <div class="note">${escapeHtml(moduleSummary(entry))}</div>
+          </div>
+          <img src="${escapeAttr(entry.icon || "/setup/assets/images/tater-tube-readme.png")}" alt="">
+        </div>`;
+    }
+
+    function renderAppCard() {
+      const app = setupData.app_settings || { schema: [], values: {} };
+      const fields = (app.schema || []).map(item => fieldHtml("app", app.values || {}, item)).join("");
+      return `
+        <article class="card app-card" data-module="">
+          <div class="card-head">
+            <img src="/setup/assets/images/tater-tube-readme.png" alt="">
+            <div>
+              <h2 class="title">Tater Tube</h2>
+              <div class="sub">
+                <span class="pill ok">${escapeHtml(setupData.app.version || "")}</span>
+                <span class="pill">System</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            ${renderDetailMascot(appEntry())}
+            <div class="section-label">Appearance / System</div>
+            ${fields}
+            <div class="actions">
+              <button type="button" data-save-card>Save Tater Tube Settings</button>
+            </div>
+            <div class="message"></div>
+          </div>
+        </article>`;
+    }
+
+    function renderVodPanel(module) {
+      const values = module.values || {};
+      const provider = text(values.media_provider || "EMBY/JELLYFIN").toUpperCase();
+      if (provider === "PLEX") {
+        return `
+          <div class="section-label">Plex Login</div>
+          <div class="note">Go to plex.tv/link when the code appears.</div>
+          <div class="actions">
+            <button type="button" data-plex-start>Start Plex Login</button>
+          </div>
+          <div id="plexBox" class="message"></div>`;
+      }
+      const setup = module.setup || {};
+      return `
+        <div class="section-label">Emby / Jellyfin Login</div>
+        <div class="field">
+          <label>Server URL</label>
+          <input data-login-key="server_url" value="${escapeAttr(setup.saved_server_url || "")}" autocapitalize="off" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label>Username</label>
+          <input data-login-key="username" autocapitalize="off" autocomplete="username" spellcheck="false">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" data-login-key="password" autocomplete="current-password">
+        </div>
+        <div class="actions">
+          <button type="button" data-emby-login>Sign In</button>
+        </div>`;
+    }
+
+    function renderRetroPanel(module) {
+      const values = module.values || {};
+      return `
+        <div class="section-label">RetroNAS Connect</div>
+        ${fieldHtml(module.id, values, { key: "retronas_username", label: "RetroNAS Username", type: "text" })}
+        ${fieldHtml(module.id, values, { key: "retronas_password", label: "RetroNAS Password", type: "text", secret: true })}
+        <div class="actions">
+          <button type="button" data-retro-connect>Save And Mount RetroNAS</button>
+        </div>`;
+    }
+
+    function renderMoonlightPanel(module) {
+      const setup = module.setup || {};
+      return `
+        <div class="section-label">Sunshine Pairing</div>
+        <div class="field">
+          <label>Sunshine Host</label>
+          <input data-moonlight-host value="${escapeAttr(setup.host || "")}" autocapitalize="off" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="actions">
+          <button type="button" data-moonlight-pair>Pair Sunshine</button>
+        </div>
+        <div id="moonlightBox" class="message"></div>`;
+    }
+
+    function renderModule(module) {
+      const schema = module.schema || [];
+      const fieldItems = schema.filter(supportedField);
+      const unsupported = schema.filter(item => !supportedField(item) && item.type !== "action").map(unsupportedHtml).join("");
+      const actions = schema.map(item => actionHtml(module.id, item)).filter(Boolean).join("");
+      const fields = fieldItems.map(item => fieldHtml(module.id, module.values || {}, item)).join("");
+      let special = "";
+      if (module.id === "com.240mp.emby_jellyfin") special = renderVodPanel(module);
+      if (module.id === "com.240mp.retro") special += renderRetroPanel(module);
+      if (module.id === "com.240mp.moonlight") special += renderMoonlightPanel(module);
+
+      return `
+        <article class="card" data-module="${escapeAttr(module.id)}">
+          <div class="card-head">
+            <img src="${escapeAttr(module.icon || "/setup/assets/images/tater-tube-readme.png")}" alt="">
+            <div>
+              <h2 class="title">${escapeHtml(module.name)}</h2>
+              <div class="sub">
+                ${authPill(module.auth_state)}
+                <span class="pill">${escapeHtml(module.id.replace("com.240mp.", ""))}</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            ${renderDetailMascot(module)}
+            <div class="section-label">Settings</div>
+            ${fields || `<div class="note">No simple settings for this module.</div>`}
+            ${unsupported}
+            ${special}
+            <div class="actions">
+              <button type="button" data-save-card>Save Settings</button>
+              ${actions}
+            </div>
+            <div class="message"></div>
+          </div>
+        </article>`;
+    }
+
+    function render() {
+      if (!setupData) return;
+      if (!currentModuleId) {
+        renderModulePicker();
+        return;
+      }
+
+      const entry = findEntry(currentModuleId);
+      if (!entry) {
+        currentModuleId = "";
+        renderModulePicker();
+        return;
+      }
+
+      cards.className = "detail-wrap";
+      cards.innerHTML = renderDetailHeader(entry)
+        + (currentModuleId === "__app" ? renderAppCard() : renderModule(entry));
+      bindCards();
+      bindDetailNav();
+    }
+
+    function cardMessage(card, message, tone = "") {
+      const box = card.querySelector(".message");
+      if (!box) return;
+      box.textContent = message || "";
+      box.className = "message show " + tone;
+      if (!message) box.className = "message";
+    }
+
+    function collectValues(card) {
+      const values = {};
+      card.querySelectorAll("[data-key]").forEach(input => {
+        const key = input.dataset.key;
+        if (!key) return;
+        if (input.dataset.secret === "1" && input.value.trim() === "") return;
+        if (input.dataset.type === "toggle") values[key] = input.checked;
+        else values[key] = input.value;
+      });
+      return values;
+    }
+
+    async function saveCard(card) {
+      const moduleId = card.dataset.module || "";
+      const values = collectValues(card);
+      if (Object.keys(values).length === 0) {
+        cardMessage(card, "No changed values to save.", "ok");
+        return;
+      }
+      cardMessage(card, "Saving...");
+      const result = await api("/api/v1/setup/settings", {
+        method: "POST",
+        body: JSON.stringify({ module_id: moduleId, values })
+      });
+      setupData = result.settings || setupData;
+      cardMessage(card, "Saved.", "ok");
+      setStatus("Settings saved.", "ok");
+      setTimeout(loadSetup, 650);
+    }
+
+    function collectLogin(card) {
+      const body = {};
+      card.querySelectorAll("[data-login-key]").forEach(input => body[input.dataset.loginKey] = input.value);
+      return body;
+    }
+
+    async function embyLogin(card) {
+      cardMessage(card, "Signing in...");
+      const result = await api("/api/v1/setup/emby/login", {
+        method: "POST",
+        body: JSON.stringify(collectLogin(card))
+      });
+      setupData = result.settings || setupData;
+      cardMessage(card, "Signed in.", "ok");
+      setTimeout(loadSetup, 650);
+    }
+
+    async function startPlex(card) {
+      const box = card.querySelector("#plexBox");
+      box.className = "message show";
+      box.textContent = "Requesting Plex code...";
+      const result = await api("/api/v1/setup/plex/start", { method: "POST", body: "{}" });
+      box.innerHTML = `Code: <strong>${escapeHtml(result.code)}</strong><br>URL: ${escapeHtml(result.url || "https://plex.tv/link")}<br>Waiting for approval...`;
+      clearInterval(plexPollTimer);
+      plexPollTimer = setInterval(() => pollPlex(card), 2200);
+    }
+
+    async function pollPlex(card) {
+      const box = card.querySelector("#plexBox");
+      try {
+        const result = await api("/api/v1/setup/plex/poll", { method: "POST", body: "{}" });
+        if (result.state === "pending") return;
+        if (result.state === "authed") {
+          clearInterval(plexPollTimer);
+          box.className = "message show ok";
+          box.textContent = "Plex signed in.";
+          setupData = result.settings || setupData;
+          setTimeout(loadSetup, 650);
+          return;
+        }
+        if (result.state === "select_server") {
+          clearInterval(plexPollTimer);
+          const servers = result.servers || [];
+          box.className = "message show";
+          box.innerHTML = "Select Plex server:";
+          servers.forEach(server => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "secondary";
+            button.textContent = server.name || server.url || "Plex Server";
+            button.onclick = () => selectPlexServer(card, server.machineIdentifier);
+            box.appendChild(document.createElement("br"));
+            box.appendChild(button);
+          });
+        }
+      } catch (error) {
+        clearInterval(plexPollTimer);
+        box.className = "message show err";
+        box.textContent = error.message;
+      }
+    }
+
+    async function selectPlexServer(card, machineIdentifier) {
+      const box = card.querySelector("#plexBox");
+      box.className = "message show";
+      box.textContent = "Connecting Plex server...";
+      const result = await api("/api/v1/setup/plex/select", {
+        method: "POST",
+        body: JSON.stringify({ machine_identifier: machineIdentifier })
+      });
+      setupData = result.settings || setupData;
+      box.className = "message show ok";
+      box.textContent = "Plex signed in.";
+      setTimeout(loadSetup, 650);
+    }
+
+    async function retroConnect(card) {
+      const values = collectValues(card);
+      cardMessage(card, "Mounting RetroNAS...");
+      const result = await api("/api/v1/setup/retro/connect", {
+        method: "POST",
+        body: JSON.stringify({ values })
+      });
+      setupData = result.settings || setupData;
+      cardMessage(card, result.message || "RetroNAS ready.", "ok");
+      setTimeout(loadSetup, 650);
+    }
+
+    async function moonlightPair(card) {
+      const hostInput = card.querySelector("[data-moonlight-host]");
+      const host = hostInput ? hostInput.value.trim() : "";
+      const box = card.querySelector("#moonlightBox");
+      box.className = "message show";
+      box.textContent = "Starting Sunshine pairing...";
+      await api("/api/v1/setup/moonlight/pair", {
+        method: "POST",
+        body: JSON.stringify({ host })
+      });
+      clearInterval(moonlightPollTimer);
+      moonlightPollTimer = setInterval(() => pollMoonlight(card), 1200);
+      pollMoonlight(card);
+    }
+
+    async function pollMoonlight(card) {
+      const box = card.querySelector("#moonlightBox");
+      try {
+        const result = await api("/api/v1/setup/moonlight/status", { method: "POST", body: "{}" });
+        let body = result.message || "Pairing...";
+        if (result.code) body += "\nPIN: " + result.code;
+        box.textContent = body;
+        box.className = "message show " + (result.paired ? "ok" : "");
+        if (!result.pairing) {
+          clearInterval(moonlightPollTimer);
+          if (result.paired) setTimeout(loadSetup, 650);
+        }
+      } catch (error) {
+        clearInterval(moonlightPollTimer);
+        box.className = "message show err";
+        box.textContent = error.message;
+      }
+    }
+
+    async function moduleAction(card, button) {
+      const moduleId = button.dataset.module;
+      const actionSlot = button.dataset.actionSlot;
+      cardMessage(card, "Running action...");
+      await api("/api/v1/setup/action", {
+        method: "POST",
+        body: JSON.stringify({ module_id: moduleId, action_slot: actionSlot })
+      });
+      cardMessage(card, "Action started.", "ok");
+      setTimeout(loadSetup, 900);
+    }
+
+    function bindPicker() {
+      document.querySelectorAll("[data-open-module]").forEach(button => {
+        button.onclick = () => {
+          currentModuleId = button.dataset.openModule || "";
+          render();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        };
+      });
+    }
+
+    function bindDetailNav() {
+      document.querySelectorAll("[data-back-modules]").forEach(button => {
+        button.onclick = () => {
+          currentModuleId = "";
+          render();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        };
+      });
+    }
+
+    function bindCards() {
+      document.querySelectorAll("[data-save-card]").forEach(button => {
+        button.onclick = () => saveCard(button.closest(".card")).catch(error => {
+          cardMessage(button.closest(".card"), error.message, "err");
+        });
+      });
+      document.querySelectorAll("[data-action-slot]").forEach(button => {
+        button.onclick = () => moduleAction(button.closest(".card"), button).catch(error => {
+          cardMessage(button.closest(".card"), error.message, "err");
+        });
+      });
+      document.querySelectorAll("[data-emby-login]").forEach(button => {
+        button.onclick = () => embyLogin(button.closest(".card")).catch(error => {
+          cardMessage(button.closest(".card"), error.message, "err");
+        });
+      });
+      document.querySelectorAll("[data-plex-start]").forEach(button => {
+        button.onclick = () => startPlex(button.closest(".card")).catch(error => {
+          cardMessage(button.closest(".card"), error.message, "err");
+        });
+      });
+      document.querySelectorAll("[data-retro-connect]").forEach(button => {
+        button.onclick = () => retroConnect(button.closest(".card")).catch(error => {
+          cardMessage(button.closest(".card"), error.message, "err");
+        });
+      });
+      document.querySelectorAll("[data-moonlight-pair]").forEach(button => {
+        button.onclick = () => moonlightPair(button.closest(".card")).catch(error => {
+          const box = button.closest(".card").querySelector("#moonlightBox");
+          box.className = "message show err";
+          box.textContent = error.message;
+        });
+      });
+    }
+
+    async function loadSetup() {
+      setStatus("Loading setup...");
+      showTokenPrompt(false);
+      setupData = await api("/api/v1/setup/modules");
+      render();
+      setStatus("Connected to " + (setupData.app.name || "Tater Tube") + " " + (setupData.app.version || ""), "ok");
+    }
+
+    document.getElementById("reload").onclick = () => loadSetup().catch(error => setStatus(error.message, "err"));
+    document.getElementById("saveToken").onclick = () => {
+      localStorage.setItem("taterTubeSetupToken", tokenInput.value.trim());
+      loadSetup().catch(error => setStatus(error.message, "err"));
+    };
+
+    loadSetup().catch(error => setStatus(error.message, "err"));
+  </script>
+</body>
+</html>

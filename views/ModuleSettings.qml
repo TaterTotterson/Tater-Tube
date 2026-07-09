@@ -201,6 +201,17 @@ FocusScope {
             if (moduleSettingsRoot.actionStatusText === "PLEASE WAIT")
                 moduleSettingsRoot.showActionStatus("UPDATED", 2500)
         }
+        function onModuleSettingChanged(mid, key, value) {
+            if (mid !== moduleSettingsRoot.moduleId) return
+            var selected = settingsList.currentIndex
+            loadSettings()
+            if (settingsList.count > 0) {
+                settingsList.currentIndex = Math.max(0, Math.min(selected, settingsList.count - 1))
+                settingsList.positionViewAtIndex(settingsList.currentIndex, ListView.Contain)
+            }
+            if (!textOverlayVisible)
+                moduleSettingsRoot.showActionStatus("UPDATED FROM WEB SETUP", 2500)
+        }
     }
 
     Component.onCompleted: {
