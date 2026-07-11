@@ -1,15 +1,15 @@
 {
-  "version": "v1.3.2",
-  "app_version": "1.3.2",
+  "version": "v1.3.3",
+  "app_version": "1.3.3",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.3.2/Tater-Tube-v1.3.2-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.3.2.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.3.3/Tater-Tube-v1.3.3-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.3.3.tar.gz",
   "notes": [
-    "Adds shared local commercial categories for VoD, Public Access, and The Tube TV Modes.",
-    "Adds The Tube Local TV Mode powered by Tater Tube Server local media.",
-    "Adds Web Setup tools to build custom The Tube channels from server Local categories, folders, and files.",
-    "Adds Auto Channels toggles so TV Modes can use only custom channels when desired."
+    "Adds richer The Tube Local TV Mode auto channels for movies, TV, genres, classics, and decades.",
+    "Keeps The Tube Local TV Mode timeline position when changing channels, including server-transcoded local streams.",
+    "Adds Web Setup upload progress for commercial videos and uploads large batches one file at a time.",
+    "Makes the Web Setup commercial library collapsible by category."
   ]
 }

@@ -408,6 +408,15 @@
       overflow: hidden;
     }
 
+    details.commercial-category summary {
+      list-style: none;
+      cursor: pointer;
+    }
+
+    details.commercial-category summary::-webkit-details-marker {
+      display: none;
+    }
+
     .commercial-category-head,
     .commercial-video-row {
       display: grid;
@@ -421,6 +430,18 @@
       border-bottom: 1px solid var(--line);
       color: var(--orange-2);
       text-transform: uppercase;
+    }
+
+    .commercial-category-caret {
+      display: inline-block;
+      color: var(--orange);
+      margin-right: 8px;
+      transition: transform .14s ease;
+    }
+
+    details.commercial-category[open] .commercial-category-caret {
+      color: var(--orange-2);
+      transform: rotate(90deg);
     }
 
     .commercial-video-row {
@@ -445,6 +466,65 @@
       min-height: 32px;
       padding: 6px 8px;
       font-size: 11px;
+    }
+
+    .upload-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(0,0,0,.76);
+      backdrop-filter: blur(4px);
+    }
+
+    .upload-modal.show {
+      display: flex;
+    }
+
+    .upload-box {
+      width: min(520px, 100%);
+      border: 1px solid var(--orange);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(rgba(255,255,255,.035) 50%, rgba(0,0,0,.04) 50%) 0 0 / 100% 4px,
+        #050505;
+      box-shadow: 0 24px 60px rgba(0,0,0,.55);
+      padding: 16px;
+    }
+
+    .upload-title {
+      color: var(--orange-2);
+      font-size: 14px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .upload-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .progress-shell {
+      height: 16px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #000;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--orange), var(--orange-2));
+      transition: width .12s linear;
     }
 
     .picker-list {
@@ -534,11 +614,24 @@
     <section id="cards" class="grid"></section>
   </main>
 
+  <div id="uploadModal" class="upload-modal" role="status" aria-live="polite">
+    <div class="upload-box">
+      <div class="upload-title">Uploading Commercials</div>
+      <div id="uploadMeta" class="upload-meta">Preparing upload...</div>
+      <div class="progress-shell"><div id="uploadProgress" class="progress-fill"></div></div>
+      <div id="uploadDetail" class="upload-meta">0%</div>
+    </div>
+  </div>
+
   <script>
     const cards = document.getElementById("cards");
     const statusEl = document.getElementById("status");
     const tokenCard = document.getElementById("tokenCard");
     const tokenInput = document.getElementById("apiToken");
+    const uploadModal = document.getElementById("uploadModal");
+    const uploadMeta = document.getElementById("uploadMeta");
+    const uploadProgress = document.getElementById("uploadProgress");
+    const uploadDetail = document.getElementById("uploadDetail");
     const labelOverrides = {
       tater_server_url: "Tater Server URL",
       tater_server_token: "Tater Player Token",
@@ -546,6 +639,7 @@
       newznab_url: "Newznab URL",
       newznab_api_key: "Newznab API Key"
     };
+    const maxCommercialUploadBytes = 240 * 1024 * 1024;
     let setupData = null;
     let commercialLibrary = null;
     let vodChannels = null;
@@ -564,6 +658,7 @@
     let currentModuleId = "";
     let plexPollTimer = null;
     let moonlightPollTimer = null;
+    let commercialOpenCategories = new Set();
 
     function token() {
       return localStorage.getItem("taterTubeSetupToken") || "";
@@ -597,26 +692,72 @@
       return data;
     }
 
-    async function uploadApi(path, formData) {
-      const headers = {};
-      if (token()) {
-        headers.Authorization = "Bearer " + token();
-        headers["X-240MP-Token"] = token();
-      }
-      const response = await fetch(path, { method: "POST", headers, body: formData });
-      if (response.status === 401) {
-        showTokenPrompt(true);
-        throw new Error("Unauthorized");
-      }
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.ok === false) {
-        throw new Error(data.message || data.error || ("HTTP " + response.status));
-      }
-      return data;
+    function uploadApi(path, formData, onProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", path);
+        if (token()) {
+          xhr.setRequestHeader("Authorization", "Bearer " + token());
+          xhr.setRequestHeader("X-240MP-Token", token());
+        }
+        xhr.upload.onprogress = event => {
+          if (typeof onProgress === "function")
+            onProgress(event.lengthComputable ? event.loaded : 0,
+                       event.lengthComputable ? event.total : 0);
+        };
+        xhr.onerror = () => reject(new Error("Upload failed"));
+        xhr.onload = () => {
+          if (xhr.status === 401) {
+            showTokenPrompt(true);
+            reject(new Error("Unauthorized"));
+            return;
+          }
+          let data = {};
+          try {
+            data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+          } catch (error) {
+            reject(new Error("Invalid upload response"));
+            return;
+          }
+          if (xhr.status < 200 || xhr.status >= 300 || data.ok === false) {
+            reject(new Error(data.message || data.error || ("HTTP " + xhr.status)));
+            return;
+          }
+          resolve(data);
+        };
+        xhr.send(formData);
+      });
+    }
+
+    function showUploadModal() {
+      uploadModal.classList.add("show");
+      updateUploadModal(0, "Preparing upload...", "");
+    }
+
+    function hideUploadModalSoon() {
+      setTimeout(() => uploadModal.classList.remove("show"), 600);
+    }
+
+    function updateUploadModal(percent, meta, detail) {
+      const bounded = Math.max(0, Math.min(100, percent || 0));
+      uploadProgress.style.width = bounded.toFixed(1) + "%";
+      uploadMeta.textContent = meta || "";
+      uploadDetail.textContent = detail || (Math.round(bounded) + "%");
     }
 
     function text(value) {
       return value === undefined || value === null ? "" : String(value);
+    }
+
+    function formatBytes(bytes) {
+      const value = Number(bytes || 0);
+      if (value >= 1024 * 1024 * 1024)
+        return (value / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+      if (value >= 1024 * 1024)
+        return (value / (1024 * 1024)).toFixed(1) + " MB";
+      if (value >= 1024)
+        return (value / 1024).toFixed(1) + " KB";
+      return value + " B";
     }
 
     function titleCaseKey(key) {
@@ -876,23 +1017,25 @@
         <div class="commercial-library">
           ${categories.map(category => {
             const videos = category.videos || [];
+            const categoryId = category.id || category.name || "";
+            const isOpen = commercialOpenCategories.has(categoryId);
             return `
-              <div class="commercial-category">
-                <div class="commercial-category-head">
-                  <span>${escapeHtml(category.name || category.id || "Commercials")} (${videos.length})</span>
+              <details class="commercial-category" data-commercial-category-panel="${escapeAttr(categoryId)}" ${isOpen ? "open" : ""}>
+                <summary class="commercial-category-head">
+                  <span><span class="commercial-category-caret">▸</span>${escapeHtml(category.name || category.id || "Commercials")} (${videos.length})</span>
                   <button class="secondary tiny" type="button"
-                    data-commercial-delete-category="${escapeAttr(category.id || category.name || "")}">Delete</button>
-                </div>
+                    data-commercial-delete-category="${escapeAttr(categoryId)}">Delete</button>
+                </summary>
                 ${videos.length === 0
                   ? `<div class="commercial-empty">No videos in this category.</div>`
                   : videos.map(video => `
                     <div class="commercial-video-row">
                       <span>${escapeHtml(video.title || video.name || "Commercial")}</span>
                       <button class="secondary tiny" type="button"
-                        data-commercial-category="${escapeAttr(category.id || category.name || "")}"
+                        data-commercial-category="${escapeAttr(categoryId)}"
                         data-commercial-delete-file="${escapeAttr(video.name || "")}">Delete</button>
                     </div>`).join("")}
-              </div>`;
+              </details>`;
           }).join("")}
         </div>`;
     }
@@ -1567,21 +1710,80 @@
     async function uploadCommercialVideos(card) {
       const categoryInput = card.querySelector("[data-commercial-upload-category]");
       const fileInput = card.querySelector("[data-commercial-files]");
+      const uploadButton = card.querySelector("[data-commercial-upload]");
       const category = categoryInput ? categoryInput.value.trim() : "Commercials";
       const files = fileInput ? Array.from(fileInput.files || []) : [];
       if (!files.length) {
         cardMessage(card, "Choose one or more videos.", "err");
         return;
       }
-      const formData = new FormData();
-      formData.append("category", category || "Commercials");
-      files.forEach(file => formData.append("files", file, file.name));
+      const totalBytes = files.reduce((sum, file) => sum + (file.size || 0), 0);
+      let completedBytes = 0;
+      let saved = 0;
+      const skipped = [];
+
+      if (uploadButton) uploadButton.disabled = true;
+      showUploadModal();
       cardMessage(card, "Uploading " + files.length + " video" + (files.length === 1 ? "" : "s") + "...");
-      const result = await uploadApi("/api/v1/setup/commercials/upload", formData);
-      commercialLibrary = result.library || commercialLibrary;
-      const skipped = result.skipped && result.skipped.length ? " Skipped " + result.skipped.length + "." : "";
-      cardMessage(card, "Uploaded " + (result.saved || 0) + "." + skipped, "ok");
-      setStatus("Commercial videos uploaded.", "ok");
+      setStatus("Uploading commercial videos...");
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if ((file.size || 0) > maxCommercialUploadBytes) {
+          skipped.push({
+            name: file.name,
+            reason: "File is larger than " + formatBytes(maxCommercialUploadBytes)
+          });
+          completedBytes += file.size || 0;
+          updateUploadModal((completedBytes / Math.max(1, totalBytes)) * 100,
+            "Skipping oversized file " + (i + 1) + " of " + files.length,
+            file.name);
+          continue;
+        }
+
+        const formData = new FormData();
+        formData.append("category", category || "Commercials");
+        formData.append("files", file, file.name);
+
+        updateUploadModal((completedBytes / Math.max(1, totalBytes)) * 100,
+          "Uploading " + (i + 1) + " of " + files.length,
+          file.name);
+
+        try {
+          const result = await uploadApi("/api/v1/setup/commercials/upload", formData, loaded => {
+            const current = completedBytes + Math.min(file.size || loaded || 0, loaded || 0);
+            const percent = totalBytes > 0
+              ? (current / totalBytes) * 100
+              : ((i + (loaded > 0 ? 0.5 : 0)) / files.length) * 100;
+            updateUploadModal(percent,
+              "Uploading " + (i + 1) + " of " + files.length,
+              file.name);
+          });
+          saved += result.saved || 0;
+          if (result.skipped && result.skipped.length)
+            skipped.push(...result.skipped);
+          commercialLibrary = result.library || commercialLibrary;
+        } catch (error) {
+          if (error.message === "Unauthorized") {
+            hideUploadModalSoon();
+            if (uploadButton) uploadButton.disabled = false;
+            throw error;
+          }
+          skipped.push({ name: file.name, reason: error.message });
+        }
+
+        completedBytes += file.size || 0;
+      }
+
+      updateUploadModal(100, "Upload complete", saved + " saved / " + skipped.length + " skipped");
+      hideUploadModalSoon();
+      if (fileInput) fileInput.value = "";
+      if (uploadButton) uploadButton.disabled = false;
+
+      const skippedText = skipped.length ? " Skipped " + skipped.length + "." : "";
+      const tone = saved > 0 ? "ok" : "err";
+      cardMessage(card, "Uploaded " + saved + "." + skippedText, tone);
+      setStatus(saved > 0 ? "Commercial videos uploaded." : "No commercial videos uploaded.", tone);
       render();
     }
 
@@ -1960,6 +2162,16 @@
     }
 
     function bindCards() {
+      document.querySelectorAll("[data-commercial-category-panel]").forEach(panel => {
+        panel.ontoggle = () => {
+          const category = panel.dataset.commercialCategoryPanel || "";
+          if (!category) return;
+          if (panel.open)
+            commercialOpenCategories.add(category);
+          else
+            commercialOpenCategories.delete(category);
+        };
+      });
       document.querySelectorAll("[data-save-card]").forEach(button => {
         button.onclick = () => saveCard(button.closest(".card")).catch(error => {
           cardMessage(button.closest(".card"), error.message, "err");
@@ -2008,14 +2220,22 @@
         });
       });
       document.querySelectorAll("[data-commercial-delete-file]").forEach(button => {
-        button.onclick = () => deleteCommercialFile(button.closest(".card"), button).catch(error => {
-          cardMessage(button.closest(".card"), error.message, "err");
-        });
+        button.onclick = event => {
+          event.preventDefault();
+          event.stopPropagation();
+          deleteCommercialFile(button.closest(".card"), button).catch(error => {
+            cardMessage(button.closest(".card"), error.message, "err");
+          });
+        };
       });
       document.querySelectorAll("[data-commercial-delete-category]").forEach(button => {
-        button.onclick = () => deleteCommercialCategory(button.closest(".card"), button).catch(error => {
-          cardMessage(button.closest(".card"), error.message, "err");
-        });
+        button.onclick = event => {
+          event.preventDefault();
+          event.stopPropagation();
+          deleteCommercialCategory(button.closest(".card"), button).catch(error => {
+            cardMessage(button.closest(".card"), error.message, "err");
+          });
+        };
       });
       document.querySelectorAll("[data-vod-search]").forEach(button => {
         button.onclick = () => searchVodItems(button.closest(".card")).catch(error => {

@@ -111,6 +111,229 @@ FocusScope {
         return value === true || value === "ON" || value === "true" || value === "1"
     }
 
+    function cleanUpper(value) {
+        return String(value || "").trim().toUpperCase()
+    }
+
+    function sourceSearchText(item) {
+        if (!item)
+            return ""
+        var parts = [
+            item.title || "",
+            item.name || "",
+            item.detail || "",
+            item.description || "",
+            item.category || "",
+            item.path || "",
+            item.date || "",
+            item.year || "",
+            item.mediaType || "",
+            item.type || ""
+        ]
+        var genres = item.genres || item.genre || []
+        if (Array.isArray(genres))
+            parts.push(genres.join(" "))
+        else
+            parts.push(genres)
+        return parts.join(" ").toLowerCase()
+    }
+
+    function itemYear(item) {
+        var candidates = [
+            item ? item.year : "",
+            item ? item.date : "",
+            item ? item.title : "",
+            item ? item.path : ""
+        ]
+        for (var i = 0; i < candidates.length; i++) {
+            var match = String(candidates[i] || "").match(/(19[0-9]{2}|20[0-9]{2})/)
+            if (match)
+                return parseInt(match[1])
+        }
+        return 0
+    }
+
+    function textHasAnyTerm(text, terms) {
+        var haystack = String(text || "").toLowerCase()
+        for (var i = 0; i < terms.length; i++) {
+            if (haystack.indexOf(String(terms[i]).toLowerCase()) >= 0)
+                return true
+        }
+        return false
+    }
+
+    function programHasAnyTerm(program, terms) {
+        return textHasAnyTerm(sourceSearchText(program), terms)
+    }
+
+    function groupHasAnyTerm(group, terms) {
+        if (textHasAnyTerm(group ? group.title : "", terms))
+            return true
+        var episodes = group ? (group.episodes || []) : []
+        for (var i = 0; i < episodes.length; i++) {
+            if (programHasAnyTerm(episodes[i], terms))
+                return true
+        }
+        return false
+    }
+
+    function groupYear(group) {
+        var episodes = group ? (group.episodes || []) : []
+        for (var i = 0; i < episodes.length; i++) {
+            var year = itemYear(episodes[i])
+            if (year > 0)
+                return year
+        }
+        var match = String(group ? group.title : "").match(/(19[0-9]{2}|20[0-9]{2})/)
+        return match ? parseInt(match[1]) : 0
+    }
+
+    function filteredPrograms(programs, predicate) {
+        var rows = []
+        for (var i = 0; i < (programs || []).length; i++) {
+            var program = programs[i] || ({})
+            if (predicate(program))
+                rows.push(program)
+        }
+        return rows
+    }
+
+    function filteredGroups(groups, predicate) {
+        var rows = []
+        for (var i = 0; i < (groups || []).length; i++) {
+            var group = groups[i] || ({})
+            if (predicate(group))
+                rows.push(group)
+        }
+        return rows
+    }
+
+    function decadeLabel(decade) {
+        return decade >= 2000 ? (String(decade) + "S") : (String(decade).slice(2) + "S")
+    }
+
+    function themedTitle(sourceTitle, channelTitle) {
+        var source = cleanUpper(sourceTitle)
+        var title = cleanUpper(channelTitle)
+        var generic = ["", "LOCAL", "MOVIES", "MOVIE", "TV", "TELEVISION", "SHOWS", "SERIES", "VIDEO"]
+        for (var i = 0; i < generic.length; i++) {
+            if (source === generic[i])
+                return title
+        }
+        if (title.indexOf(source) === 0)
+            return title
+        return source + " " + title
+    }
+
+    function channelSignature(programs, groups) {
+        var keys = []
+        for (var i = 0; i < (programs || []).length; i++) {
+            var program = programs[i] || ({})
+            keys.push("p:" + (program.streamUrl || program.path || program.title || i))
+        }
+        for (var g = 0; g < (groups || []).length; g++) {
+            var group = groups[g] || ({})
+            keys.push("g:" + (group.title || g))
+        }
+        keys.sort()
+        return keys.join("|")
+    }
+
+    function appendThemedSource(rows, signatures, title, sourceType, programs, groups, minCount, commercialCategory) {
+        var programRows = programs || []
+        var groupRows = groups || []
+        var count = sourceType === "tv" ? groupRows.length : programRows.length
+        if (count < minCount)
+            return
+        var signature = sourceType + ":" + channelSignature(programRows, groupRows)
+        if (signature === sourceType + ":" || signatures[signature])
+            return
+        signatures[signature] = true
+        rows.push({
+            title: title,
+            sourceType: "auto_theme",
+            commercialCategory: commercialCategory || "",
+            programs: programRows,
+            groups: groupRows
+        })
+    }
+
+    function themedSourcesFor(source) {
+        var rows = []
+        var signatures = ({})
+        var programs = source.programs || []
+        var groups = source.groups || []
+        var baseTitle = source.title || "LOCAL"
+        var commercialCategory = source.commercialCategory || ""
+        var movieRules = [
+            { title: "ACTION MOVIES", terms: ["action", "adventure", "thriller"], min: 2 },
+            { title: "COMEDY MOVIES", terms: ["comedy"], min: 2 },
+            { title: "HORROR MOVIES", terms: ["horror"], min: 2 },
+            { title: "SCI-FI MOVIES", terms: ["science fiction", "sci-fi", "sci fi", "scifi"], min: 2 },
+            { title: "FANTASY MOVIES", terms: ["fantasy"], min: 2 },
+            { title: "FAMILY MOVIES", terms: ["family", "children", "kids", "disney", "pixar"], min: 2 },
+            { title: "CARTOON MOVIES", terms: ["animation", "animated", "anime", "cartoon"], min: 2 },
+            { title: "DOCUMENTARY MOVIES", terms: ["documentary", "docu"], min: 2 },
+            { title: "DRAMA MOVIES", terms: ["drama"], min: 2 },
+            { title: "CRIME MOVIES", terms: ["crime", "mystery"], min: 2 }
+        ]
+        for (var i = 0; i < movieRules.length; i++) {
+            var rule = movieRules[i]
+            appendThemedSource(rows, signatures, themedTitle(baseTitle, rule.title), "movie",
+                               filteredPrograms(programs, function(program) { return programHasAnyTerm(program, rule.terms) }),
+                               [], rule.min, commercialCategory)
+        }
+
+        appendThemedSource(rows, signatures, themedTitle(baseTitle, "CLASSIC MOVIES"), "movie",
+                           filteredPrograms(programs, function(program) {
+                               var year = itemYear(program)
+                               return year > 0 && year <= 1979
+                           }), [], 2, commercialCategory)
+
+        var decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
+        for (var d = 0; d < decades.length; d++) {
+            var decade = decades[d]
+            appendThemedSource(rows, signatures, themedTitle(baseTitle, decadeLabel(decade) + " MOVIES"), "movie",
+                               filteredPrograms(programs, function(program) {
+                                   var year = itemYear(program)
+                                   return year >= decade && year < decade + 10
+                               }), [], 2, commercialCategory)
+        }
+
+        var tvRules = [
+            { title: "CARTOON CHANNEL", terms: ["animation", "animated", "anime", "cartoon", "children", "kids"], min: 1 },
+            { title: "COMEDY CHANNEL", terms: ["comedy"], min: 1 },
+            { title: "DRAMA CHANNEL", terms: ["drama"], min: 1 },
+            { title: "SCI-FI CHANNEL", terms: ["science fiction", "sci-fi", "sci fi", "scifi"], min: 1 },
+            { title: "ACTION CHANNEL", terms: ["action", "adventure"], min: 1 },
+            { title: "CRIME CHANNEL", terms: ["crime", "mystery"], min: 1 },
+            { title: "REALITY CHANNEL", terms: ["reality"], min: 1 },
+            { title: "DOCUMENTARY CHANNEL", terms: ["documentary", "docu"], min: 1 }
+        ]
+        for (var r = 0; r < tvRules.length; r++) {
+            var tvRule = tvRules[r]
+            appendThemedSource(rows, signatures, themedTitle(baseTitle, tvRule.title), "tv",
+                               [], filteredGroups(groups, function(group) { return groupHasAnyTerm(group, tvRule.terms) }),
+                               tvRule.min, commercialCategory)
+        }
+
+        appendThemedSource(rows, signatures, themedTitle(baseTitle, "CLASSIC TV"), "tv", [],
+                           filteredGroups(groups, function(group) {
+                               var year = groupYear(group)
+                               return year > 0 && year <= 1979
+                           }), 1, commercialCategory)
+
+        for (var td = 0; td < decades.length; td++) {
+            var tvDecade = decades[td]
+            appendThemedSource(rows, signatures, themedTitle(baseTitle, decadeLabel(tvDecade) + " TV"), "tv", [],
+                               filteredGroups(groups, function(group) {
+                                   var year = groupYear(group)
+                                   return year >= tvDecade && year < tvDecade + 10
+                               }), 1, commercialCategory)
+        }
+        return rows
+    }
+
     function commercialStatePool(state) {
         return state && state.pool ? state.pool : []
     }
@@ -332,6 +555,7 @@ FocusScope {
             tvChannelMap[key] = {
                 key: key,
                 title: load.channelTitle || load.title || "LOCAL",
+                sourceType: load.sourceType || "auto",
                 commercialCategory: load.commercialCategory || "",
                 programs: [],
                 groups: []
@@ -418,6 +642,7 @@ FocusScope {
             ensureChannel({
                 channelKey: channelKey,
                 channelTitle: channel.title || "CUSTOM",
+                sourceType: "custom",
                 commercialCategory: channel.commercialCategory || ""
             })
             for (var j = 0; j < items.length; j++) {
@@ -425,6 +650,7 @@ FocusScope {
                 var load = {
                     channelKey: channelKey,
                     channelTitle: channel.title || "CUSTOM",
+                    sourceType: "custom",
                     commercialCategory: channel.commercialCategory || "",
                     categoryId: item.categoryId || item.id || "",
                     path: item.path || "",
@@ -460,6 +686,7 @@ FocusScope {
                 enqueueLoad({
                     channelKey: "auto:" + (row.id || row.categoryId || row.title || i),
                     channelTitle: row.title || "LOCAL",
+                    sourceType: "auto",
                     categoryId: row.id || row.categoryId || "",
                     path: "",
                     sourceIndex: -1,
@@ -484,8 +711,14 @@ FocusScope {
         var orderedSources = []
         for (var i = 0; i < tvChannelOrder.length; i++) {
             var source = tvChannelMap[tvChannelOrder[i]]
-            if (source)
+            if (source) {
                 orderedSources.push(source)
+                if (source.sourceType !== "custom") {
+                    var themed = themedSourcesFor(source)
+                    for (var t = 0; t < themed.length; t++)
+                        orderedSources.push(themed[t])
+                }
+            }
         }
 
         for (var s = 0; s < orderedSources.length; s++) {
@@ -565,6 +798,22 @@ FocusScope {
                  segmentRemaining: channel.schedule[0].duration || 0 }
     }
 
+    function usesServerSeek(item) {
+        if (!item)
+            return false
+        return item.serverSeek === true || String(item.seekMode || "").toLowerCase() === "server"
+    }
+
+    function urlWithStartOffset(url, offset) {
+        if (!url || offset <= 0.5)
+            return url
+        var hashIndex = url.indexOf("#")
+        var base = hashIndex >= 0 ? url.slice(0, hashIndex) : url
+        var hash = hashIndex >= 0 ? url.slice(hashIndex) : ""
+        var separator = base.indexOf("?") >= 0 ? "&" : "?"
+        return base + separator + "start=" + encodeURIComponent(offset.toFixed(3)) + hash
+    }
+
     function showStaticForChannel(channel) {
         scheduleAdvanceTimer.stop()
         tuningStaticVisible = true
@@ -602,7 +851,12 @@ FocusScope {
         var url = resolved.item.kind === "commercial"
             ? resolved.item.url
             : resolved.item.streamUrl
-        launchPlayback(url, resolved.offset || 0.0, label,
+        var offset = resolved.offset || 0.0
+        if (resolved.item.kind !== "commercial" && usesServerSeek(resolved.item)) {
+            url = urlWithStartOffset(url, offset)
+            offset = 0.0
+        }
+        launchPlayback(url, offset, label,
                        resolved.segmentRemaining || 0.0, resolved.item)
     }
 

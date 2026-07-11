@@ -1964,6 +1964,11 @@ void ControlApiServer::handleSetupTubeCustomChannelSaveRequest(QTcpSocket *socke
             item[QStringLiteral("sourceIndex")] = sourceIndex;
         if (!streamUrl.isEmpty())
             item[QStringLiteral("streamUrl")] = streamUrl;
+        const QString seekMode = raw.value(QStringLiteral("seekMode")).toString().trimmed();
+        if (!seekMode.isEmpty())
+            item[QStringLiteral("seekMode")] = seekMode;
+        if (raw.contains(QStringLiteral("serverSeek")))
+            item[QStringLiteral("serverSeek")] = raw.value(QStringLiteral("serverSeek")).toBool();
         if (raw.value(QStringLiteral("duration")).isDouble())
             item[QStringLiteral("duration")] = raw.value(QStringLiteral("duration")).toDouble();
         if (raw.value(QStringLiteral("durationSeconds")).isDouble())

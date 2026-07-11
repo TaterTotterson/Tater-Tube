@@ -2,11 +2,15 @@
   <img src="assets/images/tater-tube-readme.png" alt="Tater Tube" width="520">
   <br>
   <a href="https://tatertube.tv">Tatertube.tv</a>
+  ·
+  <a href="https://github.com/TaterTotterson/tater-tube-server">Tater Tube Server</a>
 </p>
 
 # Tater Tube
 
 Tater Tube is a retro VCR-style media frontend for Raspberry Pi appliance builds.
+
+For The Tube streaming, local media libraries, server-side transcoding, and Newznab-backed playback, pair Tater Tube with the companion [Tater Tube Server](https://github.com/TaterTotterson/tater-tube-server).
 
 This fork is focused on two appliance-style setups:
 
