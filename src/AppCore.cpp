@@ -777,14 +777,24 @@ void AppCore::onBackendAuthStateChanged() {
 
 QString AppCore::get_module_auth_state(const QString &moduleId) {
     auto it = m_backends.find(moduleId);
-    if (it == m_backends.end()) return QString{};
+    if (it == m_backends.end()) {
+        if (moduleId == QStringLiteral("com.240mp.ota")) {
+            return get_setting(moduleId, QStringLiteral("hdhomerun_host")).toString().trimmed().isEmpty()
+                ? QStringLiteral("none")
+                : QStringLiteral("authed");
+        }
+        if (moduleId == QStringLiteral("com.240mp.audio_tapes"))
+            return get_module_auth_state(QStringLiteral("com.240mp.emby_jellyfin"));
+        return QString{};
+    }
     QString result;
     bool ok = QMetaObject::invokeMethod(
         it.value(), "get_auth_state",
         Qt::DirectConnection,
         Q_RETURN_ARG(QString, result)
     );
-    if (!ok) return QString{};
+    if (!ok)
+        return QStringLiteral("authed");
     return result;
 }
 

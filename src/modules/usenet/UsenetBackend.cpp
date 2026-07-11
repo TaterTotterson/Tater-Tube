@@ -1,8 +1,6 @@
 #include "UsenetBackend.h"
 
-#include <QCryptographicHash>
 #include <QFile>
-#include <QHttpMultiPart>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -72,38 +70,6 @@ bool isRedirectStatus(int status)
     return status >= 300 && status < 400;
 }
 
-QString extractSha256Hex(const QString &value)
-{
-    static const QRegularExpression re(QStringLiteral("([0-9a-fA-F]{64})"));
-    const QRegularExpressionMatch match = re.match(value);
-    return match.hasMatch() ? match.captured(1).toLower() : QString();
-}
-
-QString hashApiKey(const QString &value)
-{
-    return QString::fromLatin1(QCryptographicHash::hash(value.toUtf8(), QCryptographicHash::Sha256).toHex());
-}
-
-QString stableNzbFilename(QString title, const QString &sourceUrl)
-{
-    title = cleanText(title);
-    title.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9._-]+")), QStringLiteral("_"));
-    title.replace(QRegularExpression(QStringLiteral("_+")), QStringLiteral("_"));
-    title = title.trimmed();
-    while (title.startsWith(QLatin1Char('_')) || title.startsWith(QLatin1Char('.')))
-        title.remove(0, 1);
-    while (title.endsWith(QLatin1Char('_')) || title.endsWith(QLatin1Char('.')))
-        title.chop(1);
-    if (title.isEmpty())
-        title = QStringLiteral("tater-tube");
-    if (title.size() > 80)
-        title = title.left(80);
-
-    const QString digest = QString::fromLatin1(
-        QCryptographicHash::hash(sourceUrl.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
-    return QStringLiteral("%1-%2.nzb").arg(title, digest);
-}
-
 QString omgItemIdFromUrl(const QString &value)
 {
     const QUrl url(value.trimmed());
@@ -112,20 +78,6 @@ QString omgItemIdFromUrl(const QString &value)
 
     const QUrlQuery query(url);
     return query.queryItemValue(QStringLiteral("id")).trimmed();
-}
-
-QString newznabErrorMessage(const QByteArray &data)
-{
-    QXmlStreamReader xml(data);
-    while (!xml.atEnd()) {
-        xml.readNext();
-        if (!xml.isStartElement() || xml.name() != QStringLiteral("error"))
-            continue;
-        const QString code = attrValue(xml.attributes(), QStringLiteral("code"));
-        const QString description = attrValue(xml.attributes(), QStringLiteral("description"));
-        return cleanText(QStringLiteral("NEWZNAB %1 %2").arg(code, description));
-    }
-    return QString();
 }
 
 bool isMediaCategoryGroup(const QString &id, const QString &name)
@@ -207,9 +159,9 @@ QString UsenetBackend::newznabApiBase() const
     return url.toString(QUrl::StripTrailingSlash);
 }
 
-QString UsenetBackend::altMountApiBase() const
+QString UsenetBackend::serverApiBase() const
 {
-    QString base = trimmedBaseUrl(setting(QStringLiteral("altmount_url")));
+    QString base = trimmedBaseUrl(setting(QStringLiteral("tater_server_url")));
     if (base.isEmpty())
         return QString();
 
@@ -221,17 +173,9 @@ QString UsenetBackend::altMountApiBase() const
     return url.toString(QUrl::StripTrailingSlash);
 }
 
-QString UsenetBackend::altMountDownloadKey() const
+QString UsenetBackend::serverPlayerToken() const
 {
-    const QString value = setting(QStringLiteral("altmount_api_key")).trimmed();
-    if (value.isEmpty())
-        return QString();
-
-    const QString extracted = extractSha256Hex(value);
-    if (!extracted.isEmpty())
-        return extracted;
-
-    return hashApiKey(value);
+    return setting(QStringLiteral("tater_server_token")).trimmed();
 }
 
 QUrl UsenetBackend::newznabUrl(const QVariantMap &params) const
@@ -274,16 +218,41 @@ QUrl UsenetBackend::omgTrendingUrl(const QString &category, const QString &timeP
     return url;
 }
 
-QUrl UsenetBackend::altMountStreamsUrl() const
+QUrl UsenetBackend::taterApiUrlFromBase(const QString &baseUrl, const QString &path,
+                                        const QVariantMap &params) const
 {
-    QUrl url(altMountApiBase());
-    QString path = url.path();
-    while (path.endsWith(QLatin1Char('/')))
-        path.chop(1);
-    path += QStringLiteral("/api/nzb/streams");
-    url.setPath(path);
-    url.setQuery(QString());
+    QString base = trimmedBaseUrl(baseUrl);
+    QUrl url(base);
+    if (!url.isValid() || url.scheme().isEmpty())
+        url = QUrl(QStringLiteral("http://") + base);
+
+    QString urlPath = url.path();
+    while (urlPath.endsWith(QLatin1Char('/')))
+        urlPath.chop(1);
+    if (urlPath.endsWith(QStringLiteral("/api"), Qt::CaseInsensitive)
+        && path.startsWith(QStringLiteral("/api/"), Qt::CaseInsensitive)) {
+        urlPath.chop(4);
+    }
+    urlPath += path.startsWith(QLatin1Char('/')) ? path : QStringLiteral("/") + path;
+    url.setPath(urlPath);
+
+    QUrlQuery query;
+    for (auto it = params.constBegin(); it != params.constEnd(); ++it)
+        query.addQueryItem(it.key(), it.value().toString());
+    url.setQuery(query);
     return url;
+}
+
+QUrl UsenetBackend::taterApiUrl(const QString &path, const QVariantMap &params) const
+{
+    return taterApiUrlFromBase(serverApiBase(), path, params);
+}
+
+void UsenetBackend::addTaterAuthHeader(QNetworkRequest &request) const
+{
+    const QString token = serverPlayerToken();
+    if (!token.isEmpty())
+        request.setRawHeader("Authorization", QStringLiteral("Bearer %1").arg(token).toUtf8());
 }
 
 QString UsenetBackend::ensureNewznabApiKey(const QString &rawUrl) const
@@ -321,10 +290,8 @@ int UsenetBackend::streamTimeout() const
 
 QString UsenetBackend::get_auth_state()
 {
-    return newznabApiBase().isEmpty()
-        || newznabApiKey().isEmpty()
-        || altMountApiBase().isEmpty()
-        || setting(QStringLiteral("altmount_api_key")).isEmpty()
+    return serverApiBase().isEmpty()
+        || serverPlayerToken().isEmpty()
         ? QStringLiteral("none")
         : QStringLiteral("authed");
 }
@@ -332,25 +299,50 @@ QString UsenetBackend::get_auth_state()
 QVariantMap UsenetBackend::get_setup_status()
 {
     QVariantMap status;
+    status[QStringLiteral("serverUrl")] = setting(QStringLiteral("tater_server_url"));
+    status[QStringLiteral("paired")] = !serverPlayerToken().isEmpty();
     status[QStringLiteral("newznabUrl")] = setting(QStringLiteral("newznab_url"));
     status[QStringLiteral("newznabApiKey")] = setting(QStringLiteral("newznab_api_key"));
     status[QStringLiteral("omgUsername")] = omgUsername();
-    status[QStringLiteral("altmountUrl")] = setting(QStringLiteral("altmount_url"));
-    status[QStringLiteral("altmountApiKey")] = setting(QStringLiteral("altmount_api_key"));
     status[QStringLiteral("configured")] = get_auth_state() == QStringLiteral("authed");
     return status;
+}
+
+void UsenetBackend::pair_server(const QString &serverUrl, const QString &pin)
+{
+    const QString base = trimmedBaseUrl(serverUrl);
+    const QString cleanPin = pin.trimmed();
+    if (base.isEmpty()) {
+        emit errorOccurred(QStringLiteral("ENTER SERVER URL"));
+        return;
+    }
+    if (cleanPin.isEmpty()) {
+        emit errorOccurred(QStringLiteral("ENTER PAIRING PIN"));
+        return;
+    }
+
+    QNetworkRequest request(taterApiUrlFromBase(base, QStringLiteral("/api/tater/players/pair")));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+
+    QJsonObject payload;
+    payload[QStringLiteral("pin")] = cleanPin;
+    payload[QStringLiteral("name")] = QStringLiteral("Tater Tube Player");
+
+    QNetworkReply *reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, base]() {
+        handlePairingReply(reply, base);
+    });
 }
 
 void UsenetBackend::load_categories()
 {
     if (get_auth_state() != QStringLiteral("authed")) {
-        emit errorOccurred(QStringLiteral("ENTER USENET SETTINGS"));
+        emit errorOccurred(QStringLiteral("ENTER SERVER SETTINGS"));
         return;
     }
 
-    QNetworkRequest request(newznabUrl({
-        {QStringLiteral("t"), QStringLiteral("caps")}
-    }));
+    QNetworkRequest request(taterApiUrl(QStringLiteral("/api/tater/usenet/catalog")));
+    addTaterAuthHeader(request);
     QNetworkReply *reply = m_network.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         handleCategoriesReply(reply);
@@ -360,16 +352,40 @@ void UsenetBackend::load_categories()
 void UsenetBackend::load_items(const QString &categoryId, const QString &categoryTitle)
 {
     if (get_auth_state() != QStringLiteral("authed")) {
-        emit errorOccurred(QStringLiteral("ENTER USENET SETTINGS"));
+        emit errorOccurred(QStringLiteral("ENTER SERVER SETTINGS"));
         return;
     }
 
-    QNetworkRequest request(newznabUrl({
-        {QStringLiteral("t"), QStringLiteral("search")},
-        {QStringLiteral("cat"), categoryId},
-        {QStringLiteral("extended"), QStringLiteral("1")},
-        {QStringLiteral("limit"), QString::number(browseLimit())}
+    QNetworkRequest request(taterApiUrl(QStringLiteral("/api/tater/usenet/items"), {
+        {QStringLiteral("category_id"), categoryId},
+        {QStringLiteral("title"), categoryTitle}
     }));
+    addTaterAuthHeader(request);
+    QNetworkReply *reply = m_network.get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, categoryTitle]() {
+        handleItemsReply(reply, categoryTitle);
+    });
+}
+
+void UsenetBackend::load_local_items(const QString &categoryId, const QString &path,
+                                     int sourceIndex, const QString &categoryTitle)
+{
+    if (get_auth_state() != QStringLiteral("authed")) {
+        emit errorOccurred(QStringLiteral("ENTER SERVER SETTINGS"));
+        return;
+    }
+
+    QVariantMap params{
+        {QStringLiteral("category_id"), categoryId},
+        {QStringLiteral("title"), categoryTitle}
+    };
+    if (!path.trimmed().isEmpty())
+        params[QStringLiteral("path")] = path.trimmed();
+    if (sourceIndex >= 0)
+        params[QStringLiteral("source")] = QString::number(sourceIndex);
+
+    QNetworkRequest request(taterApiUrl(QStringLiteral("/api/tater/usenet/items"), params));
+    addTaterAuthHeader(request);
     QNetworkReply *reply = m_network.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, categoryTitle]() {
         handleItemsReply(reply, categoryTitle);
@@ -379,7 +395,7 @@ void UsenetBackend::load_items(const QString &categoryId, const QString &categor
 void UsenetBackend::search_items(const QString &query)
 {
     if (get_auth_state() != QStringLiteral("authed")) {
-        emit errorOccurred(QStringLiteral("ENTER USENET SETTINGS"));
+        emit errorOccurred(QStringLiteral("ENTER SERVER SETTINGS"));
         return;
     }
 
@@ -389,15 +405,35 @@ void UsenetBackend::search_items(const QString &query)
         return;
     }
 
-    QNetworkRequest request(newznabUrl({
-        {QStringLiteral("t"), QStringLiteral("search")},
-        {QStringLiteral("q"), cleanQuery},
-        {QStringLiteral("cat"), QStringLiteral("2000,3000,5000")},
-        {QStringLiteral("extended"), QStringLiteral("1")},
-        {QStringLiteral("limit"), QString::number(browseLimit())}
+    QNetworkRequest request(taterApiUrl(QStringLiteral("/api/tater/usenet/search"), {
+        {QStringLiteral("q"), cleanQuery}
     }));
+    addTaterAuthHeader(request);
     QNetworkReply *reply = m_network.get(request);
     const QString title = QStringLiteral("Search: %1").arg(cleanQuery);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, title]() {
+        handleItemsReply(reply, title);
+    });
+}
+
+void UsenetBackend::load_discover(const QString &catalogId, const QString &title)
+{
+    if (get_auth_state() != QStringLiteral("authed")) {
+        emit errorOccurred(QStringLiteral("ENTER SERVER SETTINGS"));
+        return;
+    }
+
+    const QString cleanCatalog = catalogId.trimmed();
+    if (cleanCatalog.isEmpty()) {
+        emit errorOccurred(QStringLiteral("DISCOVER CATALOG INVALID"));
+        return;
+    }
+
+    QNetworkRequest request(taterApiUrl(QStringLiteral("/api/tater/usenet/discover"), {
+        {QStringLiteral("catalog"), cleanCatalog}
+    }));
+    addTaterAuthHeader(request);
+    QNetworkReply *reply = m_network.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, title]() {
         handleItemsReply(reply, title);
     });
@@ -407,18 +443,7 @@ void UsenetBackend::load_trending(const QString &category, const QString &timePe
                                   const QString &title)
 {
     if (get_auth_state() != QStringLiteral("authed")) {
-        emit errorOccurred(QStringLiteral("ENTER USENET SETTINGS"));
-        return;
-    }
-
-    const QUrl baseUrl(newznabApiBase());
-    if (!isOmgwtfHost(baseUrl.host())) {
-        emit errorOccurred(QStringLiteral("TRENDING IS NOT AVAILABLE FOR THIS PROVIDER"));
-        return;
-    }
-
-    if (omgUsername().isEmpty()) {
-        emit errorOccurred(QStringLiteral("ENTER TRENDING USERNAME"));
+        emit errorOccurred(QStringLiteral("ENTER SERVER SETTINGS"));
         return;
     }
 
@@ -437,7 +462,11 @@ void UsenetBackend::load_trending(const QString &category, const QString &timePe
         return;
     }
 
-    QNetworkRequest request(omgTrendingUrl(cleanCategory, cleanTime));
+    QNetworkRequest request(taterApiUrl(QStringLiteral("/api/tater/usenet/trending"), {
+        {QStringLiteral("category"), cleanCategory},
+        {QStringLiteral("period"), cleanTime}
+    }));
+    addTaterAuthHeader(request);
     QNetworkReply *reply = m_network.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, title]() {
         handleItemsReply(reply, title);
@@ -452,71 +481,68 @@ void UsenetBackend::request_streams(const QString &requestId, const QVariantMap 
         emit errorOccurred(QStringLiteral("NZB LINK MISSING"));
         return;
     }
-    if (altMountApiBase().isEmpty() || setting(QStringLiteral("altmount_api_key")).isEmpty()) {
-        emit errorOccurred(QStringLiteral("ENTER ALTMOUNT SETTINGS"));
+    if (serverApiBase().isEmpty() || serverPlayerToken().isEmpty()) {
+        emit errorOccurred(QStringLiteral("ENTER SERVER SETTINGS"));
         return;
     }
 
-    const QString downloadUrl = ensureNewznabApiKey(nzbUrl);
-    QNetworkRequest nzbRequest{QUrl(downloadUrl)};
-    QNetworkReply *nzbReply = m_network.get(nzbRequest);
-    connect(nzbReply, &QNetworkReply::finished, this,
-            [this, nzbReply, requestId, title, downloadUrl]() {
-        nzbReply->deleteLater();
-        const QByteArray body = nzbReply->readAll();
-        const int status = nzbReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (nzbReply->error() != QNetworkReply::NoError || status >= 400) {
-            emit errorOccurred(QStringLiteral("NZB DOWNLOAD FAILED"));
-            return;
-        }
-        if (body.trimmed().isEmpty()) {
-            emit errorOccurred(QStringLiteral("NZB DOWNLOAD EMPTY"));
-            return;
-        }
+    QNetworkRequest request(taterApiUrl(QStringLiteral("/api/tater/usenet/play")));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    addTaterAuthHeader(request);
 
-        const QString newznabError = newznabErrorMessage(body);
-        if (!newznabError.isEmpty()) {
-            emit errorOccurred(newznabError);
-            return;
-        }
+    QJsonObject payload;
+    payload[QStringLiteral("nzb_url")] = nzbUrl;
+    payload[QStringLiteral("title")] = title;
+    payload[QStringLiteral("timeout")] = streamTimeout();
 
-        postNzbToAltMount(requestId, title, downloadUrl, body);
-    });
-}
-
-void UsenetBackend::postNzbToAltMount(const QString &requestId, const QString &title,
-                                      const QString &sourceUrl, const QByteArray &nzbData)
-{
-    QNetworkRequest request(altMountStreamsUrl());
-    const QString downloadKey = altMountDownloadKey();
-
-    auto *multi = new QHttpMultiPart(QHttpMultiPart::FormDataType);
-
-    auto addTextPart = [multi](const QString &name, const QString &value) {
-        QHttpPart part;
-        part.setHeader(QNetworkRequest::ContentDispositionHeader,
-                       QStringLiteral("form-data; name=\"%1\"").arg(name));
-        part.setBody(value.toUtf8());
-        multi->append(part);
-    };
-
-    QHttpPart filePart;
-    filePart.setHeader(QNetworkRequest::ContentDispositionHeader,
-                       QStringLiteral("form-data; name=\"file\"; filename=\"%1\"")
-                           .arg(stableNzbFilename(title, sourceUrl)));
-    filePart.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/x-nzb"));
-    filePart.setBody(nzbData);
-    multi->append(filePart);
-
-    addTextPart(QStringLiteral("category"), QStringLiteral("tater-tube"));
-    addTextPart(QStringLiteral("timeout"), QString::number(streamTimeout()));
-    addTextPart(QStringLiteral("download_key"), downloadKey);
-
-    QNetworkReply *reply = m_network.post(request, multi);
-    multi->setParent(reply);
+    QNetworkReply *reply = m_network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, this, [this, reply, requestId, title]() {
         handleStreamsReply(reply, requestId, title);
     });
+}
+
+void UsenetBackend::handlePairingReply(QNetworkReply *reply, const QString &serverUrl)
+{
+    reply->deleteLater();
+    const QByteArray body = reply->readAll();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (isRedirectStatus(status)) {
+        emit errorOccurred(QStringLiteral("SERVER URL NEEDS HTTPS"));
+        return;
+    }
+    if (reply->error() != QNetworkReply::NoError || status >= 400) {
+        QString error;
+        parseJsonRows(body, QStringLiteral("players"), &error);
+        emit errorOccurred(error.isEmpty() ? QStringLiteral("PAIRING FAILED") : error);
+        return;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(body, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        emit errorOccurred(QStringLiteral("PAIRING RESPONSE INVALID"));
+        return;
+    }
+
+    QJsonObject obj = doc.object();
+    if (obj.value(QStringLiteral("success")).isBool() && !obj.value(QStringLiteral("success")).toBool()) {
+        const QJsonObject err = obj.value(QStringLiteral("error")).toObject();
+        QString message = err.value(QStringLiteral("message")).toString();
+        if (message.isEmpty())
+            message = obj.value(QStringLiteral("message")).toString();
+        emit errorOccurred(message.isEmpty() ? QStringLiteral("PAIRING FAILED") : message.toUpper());
+        return;
+    }
+
+    const QJsonObject data = obj.value(QStringLiteral("data")).toObject();
+    const QString token = data.value(QStringLiteral("token")).toString().trimmed();
+    const QString playerName = cleanText(data.value(QStringLiteral("player_name")).toString());
+    if (token.isEmpty()) {
+        emit errorOccurred(QStringLiteral("PAIRING TOKEN MISSING"));
+        return;
+    }
+
+    emit pairingSucceeded(serverUrl, token, playerName);
 }
 
 void UsenetBackend::handleCategoriesReply(QNetworkReply *reply)
@@ -525,11 +551,13 @@ void UsenetBackend::handleCategoriesReply(QNetworkReply *reply)
     const QByteArray body = reply->readAll();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (isRedirectStatus(status)) {
-        emit errorOccurred(QStringLiteral("NEWZNAB URL NEEDS HTTPS"));
+        emit errorOccurred(QStringLiteral("SERVER URL NEEDS HTTPS"));
         return;
     }
     if (reply->error() != QNetworkReply::NoError || status >= 400) {
-        emit errorOccurred(QStringLiteral("CATEGORY LOAD FAILED"));
+        QString error;
+        parseJsonRows(body, QStringLiteral("categories"), &error);
+        emit errorOccurred(error.isEmpty() ? QStringLiteral("CATEGORY LOAD FAILED") : error);
         return;
     }
 
@@ -548,11 +576,13 @@ void UsenetBackend::handleItemsReply(QNetworkReply *reply, const QString &catego
     const QByteArray body = reply->readAll();
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (isRedirectStatus(status)) {
-        emit errorOccurred(QStringLiteral("NEWZNAB URL NEEDS HTTPS"));
+        emit errorOccurred(QStringLiteral("SERVER URL NEEDS HTTPS"));
         return;
     }
     if (reply->error() != QNetworkReply::NoError || status >= 400) {
-        emit errorOccurred(QStringLiteral("BROWSE FAILED"));
+        QString error;
+        parseJsonRows(body, QStringLiteral("items"), &error);
+        emit errorOccurred(error.isEmpty() ? QStringLiteral("BROWSE FAILED") : error);
         return;
     }
 
@@ -579,14 +609,14 @@ void UsenetBackend::handleStreamsReply(QNetworkReply *reply, const QString &requ
             return;
         }
         if (status == 401) {
-            emit errorOccurred(QStringLiteral("ALTMOUNT AUTH FAILED"));
+            emit errorOccurred(QStringLiteral("SERVER AUTH FAILED"));
             return;
         }
         if (status == 408) {
-            emit errorOccurred(QStringLiteral("ALTMOUNT STILL DOWNLOADING"));
+            emit errorOccurred(QStringLiteral("SERVER STILL DOWNLOADING"));
             return;
         }
-        emit errorOccurred(QStringLiteral("ALTMOUNT STREAM FAILED"));
+        emit errorOccurred(QStringLiteral("SERVER STREAM FAILED"));
         return;
     }
 
@@ -612,6 +642,9 @@ void UsenetBackend::handleStreamsReply(QNetworkReply *reply, const QString &requ
 
 QVariantList UsenetBackend::parseCategories(const QByteArray &data, QString *errorOut) const
 {
+    if (data.trimmed().startsWith('{'))
+        return parseJsonRows(data, QStringLiteral("categories"), errorOut);
+
     QVariantList rows;
     QXmlStreamReader xml(data);
 
@@ -687,6 +720,9 @@ QVariantList UsenetBackend::parseCategories(const QByteArray &data, QString *err
 
 QVariantList UsenetBackend::parseItems(const QByteArray &data, QString *errorOut) const
 {
+    if (data.trimmed().startsWith('{'))
+        return parseJsonRows(data, QStringLiteral("items"), errorOut);
+
     QVariantList rows;
     QXmlStreamReader xml(data);
 
@@ -824,7 +860,7 @@ QVariantList UsenetBackend::parseStreams(const QByteArray &data, QString *errorO
     const QJsonDocument doc = QJsonDocument::fromJson(data, &error);
     if (error.error != QJsonParseError::NoError || !doc.isObject()) {
         if (errorOut)
-            *errorOut = QStringLiteral("ALTMOUNT RESPONSE INVALID");
+            *errorOut = QStringLiteral("SERVER RESPONSE INVALID");
         return {};
     }
 
@@ -835,7 +871,7 @@ QVariantList UsenetBackend::parseStreams(const QByteArray &data, QString *errorO
         if (message.isEmpty())
             message = obj.value(QStringLiteral("message")).toString();
         if (errorOut)
-            *errorOut = message.isEmpty() ? QStringLiteral("ALTMOUNT STREAM FAILED") : message.toUpper();
+            *errorOut = message.isEmpty() ? QStringLiteral("SERVER STREAM FAILED") : message.toUpper();
         return {};
     }
 
@@ -858,17 +894,52 @@ QVariantList UsenetBackend::parseStreams(const QByteArray &data, QString *errorO
     return streams;
 }
 
+QVariantList UsenetBackend::parseJsonRows(const QByteArray &data, const QString &arrayKey,
+                                          QString *errorOut) const
+{
+    QJsonParseError error;
+    const QJsonDocument doc = QJsonDocument::fromJson(data, &error);
+    if (error.error != QJsonParseError::NoError || !doc.isObject()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("SERVER RESPONSE INVALID");
+        return {};
+    }
+
+    QJsonObject obj = doc.object();
+    if (obj.value(QStringLiteral("success")).isBool() && !obj.value(QStringLiteral("success")).toBool()) {
+        const QJsonObject err = obj.value(QStringLiteral("error")).toObject();
+        QString message = err.value(QStringLiteral("message")).toString();
+        if (message.isEmpty())
+            message = obj.value(QStringLiteral("message")).toString();
+        if (errorOut)
+            *errorOut = message.isEmpty() ? QStringLiteral("SERVER REQUEST FAILED") : message.toUpper();
+        return {};
+    }
+
+    if (obj.value(QStringLiteral("data")).isObject())
+        obj = obj.value(QStringLiteral("data")).toObject();
+
+    const QJsonArray values = obj.value(arrayKey).toArray();
+    QVariantList rows;
+    for (const QJsonValue &value : values) {
+        if (!value.isObject())
+            continue;
+        rows.append(value.toObject().toVariantMap());
+    }
+    return rows;
+}
+
 void UsenetBackend::onSettingChanged(const QString &moduleId, const QString &key,
                                      const QVariant &value)
 {
     Q_UNUSED(value)
     if (moduleId != QString::fromUtf8(kModuleId))
         return;
-    if (key == QStringLiteral("newznab_url")
+    if (key == QStringLiteral("tater_server_url")
+        || key == QStringLiteral("tater_server_token")
+        || key == QStringLiteral("newznab_url")
         || key == QStringLiteral("newznab_api_key")
-        || key == QStringLiteral("omg_username")
-        || key == QStringLiteral("altmount_url")
-        || key == QStringLiteral("altmount_api_key")) {
+        || key == QStringLiteral("omg_username")) {
         emit authStateChanged();
     }
 }

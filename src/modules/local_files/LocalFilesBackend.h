@@ -10,6 +10,7 @@ public:
     explicit LocalFilesBackend(const QString &appRoot, const QString &dataRoot, QObject *parent = nullptr);
 
     Q_INVOKABLE QVariantList getItems(const QString &path);
+    Q_INVOKABLE QString      get_auth_state() const;
     Q_INVOKABLE QString      mediaRoot() const;
     Q_INVOKABLE void         setMediaRoot(const QString &path);
 

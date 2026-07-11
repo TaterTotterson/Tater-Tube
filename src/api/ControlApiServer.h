@@ -66,6 +66,7 @@ private:
     void handleSetupRetroConnectRequest(QTcpSocket *socket, const HttpRequest &request);
     void handleSetupMoonlightPairRequest(QTcpSocket *socket, const HttpRequest &request);
     void handleSetupMoonlightStatusRequest(QTcpSocket *socket);
+    void handleSetupTubePairRequest(QTcpSocket *socket, const HttpRequest &request);
     QString commercialsRootPath() const;
     QJsonObject commercialsLibrary() const;
     void notifyCommercialLibraryChanged();

@@ -11,27 +11,16 @@ FocusScope {
     property var navParams: ({})
     property string moduleId: "com.240mp.usenet"
     property var _moduleInfo: appCore.get_module_info(moduleId)
-    property string moduleName: _moduleInfo.name || "USENET"
+    property string moduleName: _moduleInfo.name || "THE TUBE"
     property string moduleIcon: _moduleInfo.icon || ""
 
     property string mode: "loading"
-    property string statusText: "LOADING USENET..."
+    property string statusText: "LOADING THE TUBE..."
     property var categories: []
     property var subcategories: []
-    property var trendingRows: [
-        { type: "trending", title: "Movies Today", detail: "MOVIE", category: "movie", time: "today" },
-        { type: "trending", title: "Movies Week", detail: "MOVIE", category: "movie", time: "week" },
-        { type: "trending", title: "Movies Month", detail: "MOVIE", category: "movie", time: "month" },
-        { type: "trending", title: "Movies Year", detail: "MOVIE", category: "movie", time: "year" },
-        { type: "trending", title: "TV Today", detail: "TV", category: "tv", time: "today" },
-        { type: "trending", title: "TV Week", detail: "TV", category: "tv", time: "week" },
-        { type: "trending", title: "TV Month", detail: "TV", category: "tv", time: "month" },
-        { type: "trending", title: "TV Year", detail: "TV", category: "tv", time: "year" }
-    ]
-    property var shortcutRows: [
-        { type: "search", title: "Search", detail: "ALL MEDIA" },
-        { type: "trendingRoot", title: "Trending", detail: "OMG", children: trendingRows }
-    ]
+    property var categoryStack: []
+    property var itemStack: []
+    property var shortcutRows: []
     property var categoryRows: mode === "subcategories" ? subcategories : shortcutRows.concat(categories)
     property var items: []
     property var streams: []
@@ -40,7 +29,7 @@ FocusScope {
     property int currentItemIndex: 0
     property int currentStreamIndex: 0
     property int setupRow: 0
-    readonly property int setupConnectRow: 5
+    readonly property int setupConnectRow: 2
     property string currentGroupTitle: ""
     property string currentCategoryTitle: ""
     property string searchQuery: ""
@@ -74,11 +63,8 @@ FocusScope {
     }
 
     function focusSetupRow() {
-        if (setupRow === 0) newznabUrlField.forceInputFocus()
-        else if (setupRow === 1) newznabKeyField.forceInputFocus()
-        else if (setupRow === 2) omgUsernameField.forceInputFocus()
-        else if (setupRow === 3) altmountUrlField.forceInputFocus()
-        else if (setupRow === 4) altmountKeyField.forceInputFocus()
+        if (setupRow === 0) serverUrlField.forceInputFocus()
+        else if (setupRow === 1) pairingPinField.forceInputFocus()
         else connectButton.forceActiveFocus()
     }
 
@@ -98,60 +84,39 @@ FocusScope {
 
     function showSetup(message) {
         var status = usenetBackend.get_setup_status()
-        newznabUrlField.text = status.newznabUrl || ""
-        newznabKeyField.text = status.newznabApiKey || ""
-        omgUsernameField.text = status.omgUsername || ""
-        altmountUrlField.text = status.altmountUrl || ""
-        altmountKeyField.text = status.altmountApiKey || ""
-        statusText = message || "ENTER USENET SETTINGS"
+        serverUrlField.text = status.serverUrl || ""
+        pairingPinField.text = ""
+        statusText = message || "ENTER SERVER SETTINGS"
         mode = "setup"
         setupFocusTimer.restart()
     }
 
     function saveSetup() {
-        var newznabUrl = (newznabUrlField.text || "").trim()
-        var newznabKey = (newznabKeyField.text || "").trim()
-        var omgUsername = (omgUsernameField.text || "").trim()
-        var altmountUrl = (altmountUrlField.text || "").trim()
-        var altmountKey = (altmountKeyField.text || "").trim()
+        var serverUrl = (serverUrlField.text || "").trim()
+        var pairingPin = (pairingPinField.text || "").trim()
 
-        if (newznabUrl === "") {
-            statusText = "ENTER NEWZNAB URL"
+        if (serverUrl === "") {
+            statusText = "ENTER SERVER URL"
             setupRow = 0
             focusSetupRow()
             return
         }
-        if (newznabKey === "") {
-            statusText = "ENTER NEWZNAB API KEY"
+        if (pairingPin === "") {
+            statusText = "ENTER PAIRING PIN"
             setupRow = 1
             focusSetupRow()
             return
         }
-        if (altmountUrl === "") {
-            statusText = "ENTER ALTMOUNT URL"
-            setupRow = 3
-            focusSetupRow()
-            return
-        }
-        if (altmountKey === "") {
-            statusText = "ENTER ALTMOUNT KEY"
-            setupRow = 4
-            focusSetupRow()
-            return
-        }
 
-        appCore.save_setting(moduleId, "newznab_url", newznabUrl)
-        appCore.save_setting(moduleId, "newznab_api_key", newznabKey)
-        appCore.save_setting(moduleId, "omg_username", omgUsername)
-        appCore.save_setting(moduleId, "altmount_url", altmountUrl)
-        appCore.save_setting(moduleId, "altmount_api_key", altmountKey)
-        loadCategories()
+        mode = "loading"
+        statusText = "PAIRING PLAYER..."
+        usenetBackend.pair_server(serverUrl, pairingPin)
     }
 
     function refresh() {
         var status = usenetBackend.get_setup_status()
         if (!status.configured) {
-            showSetup("ENTER USENET SETTINGS")
+            showSetup("ENTER SERVER SETTINGS")
             return
         }
         loadCategories()
@@ -164,15 +129,19 @@ FocusScope {
     }
 
     function showSearch() {
-        resetCategoryDrilldown()
         mode = "search"
-        statusText = "SEARCH NEWGROUPS"
+        statusText = "SEARCH STREAM"
         searchField.text = searchQuery
         searchFocusTimer.restart()
     }
 
     function runSearch() {
         var query = (searchField.text || "").trim()
+        searchForTitle(query)
+    }
+
+    function searchForTitle(query) {
+        query = (query || "").trim()
         searchQuery = query
         if (query.length < 3) {
             statusText = "ENTER 3 OR MORE LETTERS"
@@ -192,6 +161,13 @@ FocusScope {
         if (row.type === "trending") {
             statusText = "LOADING " + currentCategoryTitle
             usenetBackend.load_trending(row.category || "", row.time || "", currentCategoryTitle)
+        } else if (row.type === "discover") {
+            statusText = "LOADING " + currentCategoryTitle
+            usenetBackend.load_discover(row.id || "", currentCategoryTitle)
+        } else if (row.type === "local") {
+            statusText = "LOADING " + currentCategoryTitle
+            itemStack = []
+            usenetBackend.load_local_items(row.id || "", "", -1, currentCategoryTitle)
         } else {
             statusText = "BROWSING " + currentCategoryTitle
             usenetBackend.load_items(row.id || "", currentCategoryTitle)
@@ -202,25 +178,34 @@ FocusScope {
         if (index < 0 || index >= categoryRows.length) return
         var row = categoryRows[index] || ({})
         if (row.type === "search") {
-            currentCategoryIndex = index
+            if (mode === "subcategories") currentSubcategoryIndex = index
+            else currentCategoryIndex = index
             showSearch()
             return
         }
-        if (mode === "subcategories") {
-            currentSubcategoryIndex = index
-            browseCategory(row)
-            return
-        }
-
-        currentCategoryIndex = index
-        currentGroupTitle = row.title || "CATEGORY"
-        subcategories = row.children || []
-        currentSubcategoryIndex = 0
-        if (subcategories.length > 0) {
+        var children = row.children || []
+        if (children.length > 0) {
+            if (mode === "subcategories") {
+                categoryStack = categoryStack.concat([{
+                    rows: subcategories,
+                    title: currentGroupTitle,
+                    index: index
+                }])
+                currentSubcategoryIndex = index
+            } else {
+                categoryStack = []
+                currentCategoryIndex = index
+            }
+            currentGroupTitle = row.title || "CATEGORY"
+            subcategories = children
+            currentSubcategoryIndex = 0
             mode = "subcategories"
             setListIndex(categoryList, currentSubcategoryIndex)
             return
         }
+
+        if (mode === "subcategories") currentSubcategoryIndex = index
+        else currentCategoryIndex = index
         browseCategory(row)
     }
 
@@ -236,6 +221,8 @@ FocusScope {
 
     function resetCategoryDrilldown() {
         subcategories = []
+        categoryStack = []
+        itemStack = []
         currentSubcategoryIndex = 0
         currentGroupTitle = ""
         currentCategoryTitle = ""
@@ -245,8 +232,28 @@ FocusScope {
         if (index < 0 || index >= items.length) return
         currentItemIndex = index
         var row = items[index] || ({})
+        if (row.type === "discovery") {
+            searchForTitle(row.searchQuery || row.title || "")
+            return
+        }
+        if (row.type === "localFolder") {
+            itemStack = itemStack.concat([{
+                title: currentCategoryTitle,
+                rows: items,
+                index: index
+            }])
+            currentCategoryTitle = row.title || "Local"
+            mode = "loading"
+            statusText = "LOADING " + currentCategoryTitle
+            usenetBackend.load_local_items(row.categoryId || "", row.path || "", row.sourceIndex || 0, currentCategoryTitle)
+            return
+        }
+        if (row.type === "localFile") {
+            playStream({ url: row.streamUrl || "", title: row.title || "LOCAL" }, row.title || "LOCAL")
+            return
+        }
         pendingRequestId = newRequestId()
-        pendingTitle = row.title || "USENET"
+        pendingTitle = row.title || "THE TUBE"
         mode = "loading"
         statusText = "TUNING " + pendingTitle
         usenetBackend.request_streams(pendingRequestId, row)
@@ -260,9 +267,9 @@ FocusScope {
         }
         playbackStarted = true
         mode = "playing"
-        statusText = "PLAYING " + (title || stream.title || "USENET")
+        statusText = "PLAYING " + (title || stream.title || "THE TUBE")
         mpvController.loadAndPlay(stream.url, 0.0, 0, -1, [], false, -1, 0.0,
-                                  "", false, "", false, title || stream.title || "USENET")
+                                  "", false, "", false, title || stream.title || "THE TUBE")
     }
 
     function stopPlayback() {
@@ -271,11 +278,23 @@ FocusScope {
         mode = items.length > 0 ? "items" : (subcategories.length > 0 ? "subcategories" : "categories")
     }
 
+    function returnFromItems() {
+        if (itemStack.length > 0) {
+            var previous = itemStack[itemStack.length - 1]
+            itemStack = itemStack.slice(0, itemStack.length - 1)
+            currentCategoryTitle = previous.title || currentCategoryTitle
+            items = previous.rows || []
+            mode = "items"
+            setListIndex(itemList, previous.index || 0)
+            return
+        }
+        returnToCategoryMenu()
+    }
+
     Keys.onPressed: function(event) {
         if (mode === "search") {
             if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
-                mode = "categories"
-                setListIndex(categoryList, currentCategoryIndex)
+                returnToCategoryMenu()
                 event.accepted = true
             }
             return
@@ -299,8 +318,17 @@ FocusScope {
                 event.accepted = true
             } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
                 if (mode === "subcategories") {
-                    mode = "categories"
-                    setListIndex(categoryList, currentCategoryIndex)
+                    if (categoryStack.length > 0) {
+                        var previous = categoryStack[categoryStack.length - 1]
+                        categoryStack = categoryStack.slice(0, categoryStack.length - 1)
+                        subcategories = previous.rows || []
+                        currentGroupTitle = previous.title || "CATEGORY"
+                        currentSubcategoryIndex = previous.index || 0
+                        setListIndex(categoryList, currentSubcategoryIndex)
+                    } else {
+                        mode = "categories"
+                        setListIndex(categoryList, currentCategoryIndex)
+                    }
                 } else {
                     goBack()
                 }
@@ -326,7 +354,7 @@ FocusScope {
                 selectItem(itemList.currentIndex)
                 event.accepted = true
             } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
-                returnToCategoryMenu()
+                returnFromItems()
                 event.accepted = true
             }
             return
@@ -453,9 +481,16 @@ FocusScope {
             setListIndex(streamList, 0)
         }
 
+        function onPairingSucceeded(serverUrl, token, playerName) {
+            appCore.save_setting(moduleId, "tater_server_url", serverUrl)
+            appCore.save_setting(moduleId, "tater_server_token", token)
+            statusText = "PAIRED " + (playerName || "PLAYER")
+            loadCategories()
+        }
+
         function onErrorOccurred(message) {
             mode = "message"
-            statusText = message || "USENET FAILED"
+            statusText = message || "THE TUBE FAILED"
         }
     }
 
@@ -464,9 +499,7 @@ FocusScope {
         function onModuleSettingChanged(mid, key, value) {
             if (mid !== usenetRoot.moduleId)
                 return
-            if (key !== "newznab_url" && key !== "newznab_api_key"
-                    && key !== "omg_username" && key !== "altmount_url"
-                    && key !== "altmount_api_key")
+            if (key !== "tater_server_url" && key !== "tater_server_token")
                 return
             if (mode === "setup" || mode === "message")
                 refresh()
@@ -487,7 +520,7 @@ FocusScope {
             if (mode === "playing") {
                 playbackStarted = false
                 mode = "message"
-                statusText = "USENET PLAYBACK FAILED"
+                statusText = "THE TUBE PLAYBACK FAILED"
             }
         }
     }
@@ -508,7 +541,7 @@ FocusScope {
         iconSource: moduleIcon
         iconHeight: root.sh * 0.075
         title: moduleName
-        subtitle: mode === "items" ? currentCategoryTitle : (mode === "subcategories" ? currentGroupTitle : "NEWZNAB")
+        subtitle: mode === "items" ? currentCategoryTitle : (mode === "subcategories" ? currentGroupTitle : "SERVER")
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: root.sh * 0.125
@@ -548,11 +581,8 @@ FocusScope {
             elide: Text.ElideRight
         }
 
-        SetupField { id: newznabUrlField; label: "NEWZNAB URL"; selected: setupRow === 0 }
-        SetupField { id: newznabKeyField; label: "NEWZNAB API KEY"; selected: setupRow === 1; password: true }
-        SetupField { id: omgUsernameField; label: "OMG USERNAME"; selected: setupRow === 2 }
-        SetupField { id: altmountUrlField; label: "ALTMOUNT URL"; selected: setupRow === 3 }
-        SetupField { id: altmountKeyField; label: "ALTMOUNT KEY OR STREMIO URL"; selected: setupRow === 4; password: true }
+        SetupField { id: serverUrlField; label: "TATER SERVER URL"; selected: setupRow === 0 }
+        SetupField { id: pairingPinField; label: "PAIRING PIN"; selected: setupRow === 1 }
 
         Rectangle {
             id: connectButton

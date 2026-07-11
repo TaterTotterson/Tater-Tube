@@ -14,6 +14,9 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QPointer>
 #include <QRegularExpression>
 #include <QSet>
@@ -90,6 +93,65 @@ QString safeCommercialFileName(const QString &value)
     name.replace(QRegularExpression(QStringLiteral("\\s+")), QStringLiteral(" "));
     name = name.left(140).trimmed();
     return name.isEmpty() ? QStringLiteral("commercial.mp4") : name;
+}
+
+QString trimmedBaseUrl(QString value)
+{
+    value = value.trimmed();
+    while (value.endsWith(QLatin1Char('/')))
+        value.chop(1);
+    return value;
+}
+
+QString compactApiMessage(QString value)
+{
+    value.replace(QRegularExpression(QStringLiteral("\\s+")), QStringLiteral(" "));
+    return value.trimmed();
+}
+
+QString jsonErrorMessage(const QJsonObject &obj, const QString &fallback)
+{
+    QString message = compactApiMessage(obj.value(QStringLiteral("message")).toString());
+    if (!message.isEmpty())
+        return message;
+
+    const QJsonObject error = obj.value(QStringLiteral("error")).toObject();
+    message = compactApiMessage(error.value(QStringLiteral("message")).toString());
+    if (!message.isEmpty())
+        return message;
+
+    message = compactApiMessage(error.value(QStringLiteral("detail")).toString());
+    return message.isEmpty() ? fallback : message;
+}
+
+QUrl taterApiUrlFromBase(const QString &baseUrl, const QString &path)
+{
+    const QString base = trimmedBaseUrl(baseUrl);
+    QUrl url(base.contains(QStringLiteral("://")) ? base : QStringLiteral("http://") + base);
+
+    QString urlPath = url.path();
+    while (urlPath.endsWith(QLatin1Char('/')))
+        urlPath.chop(1);
+    if (urlPath.endsWith(QStringLiteral("/api"), Qt::CaseInsensitive)
+        && path.startsWith(QStringLiteral("/api/"), Qt::CaseInsensitive)) {
+        urlPath.chop(4);
+    }
+    urlPath += path.startsWith(QLatin1Char('/')) ? path : QStringLiteral("/") + path;
+    url.setPath(urlPath);
+    url.setQuery(QString());
+    return url;
+}
+
+QString normalizedTaterServerBase(const QString &baseUrl)
+{
+    const QString base = trimmedBaseUrl(baseUrl);
+    QUrl url(base.contains(QStringLiteral("://")) ? base : QStringLiteral("http://") + base);
+    QString urlPath = url.path();
+    while (urlPath.endsWith(QLatin1Char('/')))
+        urlPath.chop(1);
+    url.setPath(urlPath);
+    url.setQuery(QString());
+    return url.toString(QUrl::StripTrailingSlash);
 }
 
 QString uniqueFilePath(const QDir &dir, const QString &fileName)
@@ -589,6 +651,10 @@ bool ControlApiServer::handleSetupApiRequest(QTcpSocket *socket,
         handleSetupMoonlightStatusRequest(socket);
         return true;
     }
+    if (request.path == QStringLiteral("/api/v1/setup/tube/pair")) {
+        handleSetupTubePairRequest(socket, request);
+        return true;
+    }
     if (request.path == QStringLiteral("/api/v1/setup/commercials/category")) {
         handleSetupCommercialCategoryRequest(socket, request);
         return true;
@@ -764,8 +830,13 @@ QJsonObject ControlApiServer::setupData() const {
             moduleObject[QStringLiteral("setup")] = QJsonObject::fromVariantMap(
                 redactedSettingsMap(m_moonlightBackend->get_setup_status()));
         } else if (id == QStringLiteral("com.240mp.usenet")) {
-            moduleObject[QStringLiteral("setup")] = QJsonObject::fromVariantMap(
-                redactedSettingsMap(moduleValues));
+            const QString serverUrl = moduleValues.value(QStringLiteral("tater_server_url")).toString();
+            const QString playerToken = moduleValues.value(QStringLiteral("tater_server_token")).toString();
+            moduleObject[QStringLiteral("setup")] = QJsonObject{
+                {"serverUrl", serverUrl},
+                {"paired", !playerToken.trimmed().isEmpty()},
+                {"configured", !serverUrl.trimmed().isEmpty() && !playerToken.trimmed().isEmpty()}
+            };
         }
 
         modules.append(moduleObject);
@@ -1188,6 +1259,152 @@ void ControlApiServer::handleSetupMoonlightStatusRequest(QTcpSocket *socket) {
         {"code", m_moonlightPairCode},
         {"message", m_moonlightPairMessage},
         {"auth_state", m_appCore ? m_appCore->get_module_auth_state(QStringLiteral("com.240mp.moonlight")) : QString()}
+    });
+}
+
+void ControlApiServer::handleSetupTubePairRequest(QTcpSocket *socket,
+                                                  const HttpRequest &request)
+{
+    bool ok = false;
+    const QJsonObject body = parseBodyObject(request, ok);
+    if (!ok) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_json"}});
+        return;
+    }
+
+    const QString serverUrl = body.value(QStringLiteral("server_url")).toString(
+        body.value(QStringLiteral("serverUrl")).toString()).trimmed();
+    const QString pin = body.value(QStringLiteral("pin")).toString(
+        body.value(QStringLiteral("pairing_pin")).toString()).trimmed();
+    if (serverUrl.isEmpty() || pin.isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "missing_pairing_details"},
+                                {"message", "Enter the server URL and pairing PIN."}});
+        return;
+    }
+
+    const QUrl pairUrl = taterApiUrlFromBase(serverUrl, QStringLiteral("/api/tater/players/pair"));
+    if (!pairUrl.isValid() || pairUrl.host().isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_server_url"},
+                                {"message", "Enter a valid Tater Tube Server URL."}});
+        return;
+    }
+
+    auto *manager = new QNetworkAccessManager(socket);
+    QNetworkRequest pairRequest(pairUrl);
+    pairRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+
+    QJsonObject payload{
+        {"pin", pin},
+        {"name", "Tater Tube Player"}
+    };
+    QNetworkReply *reply = manager->post(
+        pairRequest, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+
+    QPointer<QTcpSocket> safeSocket(socket);
+    QPointer<QNetworkReply> safeReply(reply);
+    auto done = std::make_shared<bool>(false);
+    auto finish = [this, safeSocket, safeReply, manager, done](
+                      int statusCode, const QJsonObject &response) {
+        if (*done || !safeSocket)
+            return;
+        *done = true;
+        if (safeReply) {
+            if (safeReply->isRunning())
+                safeReply->abort();
+            safeReply->deleteLater();
+        }
+        manager->deleteLater();
+        writeJson(safeSocket, statusCode, response);
+    };
+
+    connect(reply, &QNetworkReply::finished, socket, [=]() {
+        if (*done)
+            return;
+
+        const QByteArray responseBody = reply->readAll();
+        const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (httpStatus >= 300 && httpStatus < 400) {
+            finish(409, QJsonObject{
+                {"ok", false},
+                {"error", "pair_redirect"},
+                {"message", "Server URL needs HTTPS."}
+            });
+            return;
+        }
+
+        QJsonParseError parseError;
+        const QJsonDocument doc = QJsonDocument::fromJson(responseBody, &parseError);
+        const QJsonObject obj = doc.isObject() ? doc.object() : QJsonObject{};
+        if (reply->error() != QNetworkReply::NoError || httpStatus >= 400) {
+            finish(409, QJsonObject{
+                {"ok", false},
+                {"error", "pair_failed"},
+                {"message", jsonErrorMessage(obj, QStringLiteral("Pairing failed."))}
+            });
+            return;
+        }
+        if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+            finish(409, QJsonObject{
+                {"ok", false},
+                {"error", "pair_response_invalid"},
+                {"message", "Pairing response was not valid JSON."}
+            });
+            return;
+        }
+
+        if ((obj.value(QStringLiteral("success")).isBool()
+             && !obj.value(QStringLiteral("success")).toBool())
+            || (obj.value(QStringLiteral("ok")).isBool()
+                && !obj.value(QStringLiteral("ok")).toBool())) {
+            finish(409, QJsonObject{
+                {"ok", false},
+                {"error", "pair_failed"},
+                {"message", jsonErrorMessage(obj, QStringLiteral("Pairing failed."))}
+            });
+            return;
+        }
+
+        const QJsonObject data = obj.value(QStringLiteral("data")).toObject();
+        QString token = data.value(QStringLiteral("token")).toString().trimmed();
+        if (token.isEmpty())
+            token = obj.value(QStringLiteral("token")).toString().trimmed();
+        QString playerName = compactApiMessage(data.value(QStringLiteral("player_name")).toString());
+        if (playerName.isEmpty())
+            playerName = compactApiMessage(data.value(QStringLiteral("playerName")).toString());
+        if (playerName.isEmpty())
+            playerName = compactApiMessage(obj.value(QStringLiteral("player_name")).toString());
+        if (playerName.isEmpty())
+            playerName = compactApiMessage(obj.value(QStringLiteral("playerName")).toString());
+        if (token.isEmpty()) {
+            finish(409, QJsonObject{
+                {"ok", false},
+                {"error", "pair_token_missing"},
+                {"message", "Pairing token missing from server response."}
+            });
+            return;
+        }
+
+        const QString normalizedServerUrl = normalizedTaterServerBase(serverUrl);
+        m_appCore->save_setting(QStringLiteral("com.240mp.usenet"),
+                                QStringLiteral("tater_server_url"),
+                                normalizedServerUrl);
+        m_appCore->save_setting(QStringLiteral("com.240mp.usenet"),
+                                QStringLiteral("tater_server_token"),
+                                token);
+        finish(200, QJsonObject{
+            {"ok", true},
+            {"message", "paired"},
+            {"player_name", playerName},
+            {"settings", setupData()}
+        });
+    });
+
+    QTimer::singleShot(20000, socket, [=]() {
+        finish(504, QJsonObject{
+            {"ok", false},
+            {"error", "pair_timeout"},
+            {"message", "Tater Tube Server pairing timed out."}
+        });
     });
 }
 

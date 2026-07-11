@@ -733,7 +733,12 @@ void RetroBackend::clearGameCache() const
 
 QString RetroBackend::get_auth_state()
 {
-    return QDir(gamesRoot()).exists() ? QStringLiteral("authed") : QStringLiteral("none");
+    if (QDir(gamesRoot()).exists())
+        return QStringLiteral("authed");
+    if (!setting(QStringLiteral("local_path")).isEmpty()
+        || !setting(QStringLiteral("retronas_host")).isEmpty())
+        return QStringLiteral("authed");
+    return QStringLiteral("none");
 }
 
 QVariantMap RetroBackend::get_setup_status()

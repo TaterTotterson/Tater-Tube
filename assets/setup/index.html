@@ -533,9 +533,9 @@
     const tokenCard = document.getElementById("tokenCard");
     const tokenInput = document.getElementById("apiToken");
     const labelOverrides = {
+      tater_server_url: "Tater Server URL",
+      tater_server_token: "Tater Player Token",
       omg_username: "Indexer Username",
-      altmount_url: "Streamer URL",
-      altmount_api_key: "Streamer Key",
       newznab_url: "Newznab URL",
       newznab_api_key: "Newznab API Key"
     };
@@ -724,13 +724,18 @@
         "com.240mp.ota": "HDHomeRun address and over-the-air setup.",
         "com.240mp.emby_jellyfin": "Emby, Jellyfin, Plex, playback, and library settings.",
         "com.240mp.youtube_playlist": "Public Access playlists, quality, and cache refresh.",
-        "com.240mp.usenet": "Newznab indexer, streamer keys, browse limits, and trending.",
+        "com.240mp.usenet": "The Tube connection to Tater Tube Server.",
         "com.240mp.audio_tapes": "Tape Deck module visibility.",
         "com.240mp.retro": "RetroNAS share, local ROM path, core install, and game cache.",
         "com.240mp.local_files": "Local media folder, loop, shuffle, and resume behavior.",
         "com.240mp.moonlight": "Sunshine host pairing, stream preset, and app cache."
       };
       return summaries[entry.id] || "Module settings and setup actions.";
+    }
+
+    function modulePill(entry) {
+      if (entry && entry.id === "com.240mp.usenet") return "the tube";
+      return entry && entry.id ? entry.id.replace("com.240mp.", "") : "module";
     }
 
     function appEntry() {
@@ -1088,16 +1093,45 @@
         <div id="moonlightBox" class="message"></div>`;
     }
 
+    function renderTheTubePanel(module) {
+      const setup = module.setup || {};
+      const values = module.values || {};
+      const serverUrl = setup.serverUrl || values.tater_server_url || "";
+      const paired = !!setup.paired || !!setup.configured;
+      return `
+        <div class="section-label">Tater Tube Server Pairing</div>
+        <div class="note">Create a player PIN in Tater Tube Server, then enter the server URL and PIN here.</div>
+        <div class="field">
+          <label>Server URL</label>
+          <input data-tube-server-url value="${escapeAttr(serverUrl)}" autocapitalize="off" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label>Pairing PIN</label>
+          <input data-tube-pair-pin autocapitalize="off" autocomplete="one-time-code" spellcheck="false">
+        </div>
+        <div class="sub">
+          <span class="pill ${paired ? "ok" : "warn"}">${paired ? "Paired" : "Needs Pairing"}</span>
+        </div>
+        <div class="actions">
+          <button type="button" data-tube-pair>Pair The Tube</button>
+        </div>`;
+    }
+
     function renderModule(module) {
       const schema = module.schema || [];
-      const fieldItems = schema.filter(supportedField);
-      const unsupported = schema.filter(item => !supportedField(item) && item.type !== "action").map(unsupportedHtml).join("");
+      const hiddenKeys = module.id === "com.240mp.usenet"
+        ? new Set(["tater_server_url", "tater_server_token"])
+        : new Set();
+      const visibleSchema = schema.filter(item => !hiddenKeys.has(item.key));
+      const fieldItems = visibleSchema.filter(supportedField);
+      const unsupported = visibleSchema.filter(item => !supportedField(item) && item.type !== "action").map(unsupportedHtml).join("");
       const actions = schema.map(item => actionHtml(module.id, item)).filter(Boolean).join("");
       const fields = fieldItems.map(item => fieldHtml(module.id, module.values || {}, item)).join("");
       let special = "";
       if (module.id === "com.240mp.emby_jellyfin") special = renderVodPanel(module);
       if (module.id === "com.240mp.retro") special += renderRetroPanel(module);
       if (module.id === "com.240mp.moonlight") special += renderMoonlightPanel(module);
+      if (module.id === "com.240mp.usenet") special += renderTheTubePanel(module);
 
       return `
         <article class="card" data-module="${escapeAttr(module.id)}">
@@ -1107,7 +1141,7 @@
               <h2 class="title">${escapeHtml(module.name)}</h2>
               <div class="sub">
                 ${authPill(module.auth_state)}
-                <span class="pill">${escapeHtml(module.id.replace("com.240mp.", ""))}</span>
+                <span class="pill">${escapeHtml(modulePill(module))}</span>
               </div>
             </div>
           </div>
@@ -1309,6 +1343,28 @@
         box.className = "message show err";
         box.textContent = error.message;
       }
+    }
+
+    async function pairTheTube(card) {
+      const serverInput = card.querySelector("[data-tube-server-url]");
+      const pinInput = card.querySelector("[data-tube-pair-pin]");
+      const serverUrl = serverInput ? serverInput.value.trim() : "";
+      const pin = pinInput ? pinInput.value.trim() : "";
+      if (!serverUrl || !pin) {
+        cardMessage(card, "Enter the server URL and pairing PIN.", "err");
+        return;
+      }
+
+      cardMessage(card, "Pairing The Tube...");
+      const result = await api("/api/v1/setup/tube/pair", {
+        method: "POST",
+        body: JSON.stringify({ server_url: serverUrl, pin })
+      });
+      setupData = result.settings || setupData;
+      const name = result.player_name ? " " + result.player_name : "";
+      cardMessage(card, "Paired" + name + ".", "ok");
+      setStatus("The Tube paired.", "ok");
+      setTimeout(loadSetup, 650);
     }
 
     async function moduleAction(card, button) {
@@ -1556,6 +1612,11 @@
           const box = button.closest(".card").querySelector("#moonlightBox");
           box.className = "message show err";
           box.textContent = error.message;
+        });
+      });
+      document.querySelectorAll("[data-tube-pair]").forEach(button => {
+        button.onclick = () => pairTheTube(button.closest(".card")).catch(error => {
+          cardMessage(button.closest(".card"), error.message, "err");
         });
       });
       document.querySelectorAll("[data-commercial-create-category]").forEach(button => {

@@ -1,7 +1,7 @@
 {
   "id": "com.240mp.usenet",
-  "name": "Usenet",
-  "order": 27,
+  "name": "The Tube",
+  "order": 5,
   "icon": "assets/images/logo.svg",
   "entry_point_qml": "views/Root.qml",
   "settings": [
@@ -12,32 +12,14 @@
       "default": "ON"
     },
     {
-      "key": "newznab_url",
-      "label": "NEWZNAB URL",
+      "key": "tater_server_url",
+      "label": "TATER SERVER URL",
       "type": "text",
       "default": ""
     },
     {
-      "key": "newznab_api_key",
-      "label": "NEWZNAB API KEY",
-      "type": "text",
-      "default": ""
-    },
-    {
-      "key": "omg_username",
-      "label": "OMG USERNAME",
-      "type": "text",
-      "default": ""
-    },
-    {
-      "key": "altmount_url",
-      "label": "ALTMOUNT URL",
-      "type": "text",
-      "default": ""
-    },
-    {
-      "key": "altmount_api_key",
-      "label": "ALTMOUNT KEY OR STREMIO URL",
+      "key": "tater_server_token",
+      "label": "TATER PLAYER TOKEN",
       "type": "text",
       "default": ""
     },

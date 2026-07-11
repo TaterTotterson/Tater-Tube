@@ -82,6 +82,10 @@ QString LocalFilesBackend::mediaRoot() const {
     return m_mediaRoot;
 }
 
+QString LocalFilesBackend::get_auth_state() const {
+    return QDir(m_mediaRoot).exists() ? QStringLiteral("authed") : QStringLiteral("none");
+}
+
 void LocalFilesBackend::setMediaRoot(const QString &path) {
     m_mediaRoot = path;
     QDir().mkpath(path);
