@@ -74,7 +74,13 @@ FocusScope {
             return 0.10
 
         var level = Math.max(0, Math.min(1, mpvController.audioLevel || 0))
-        var driven = Math.pow(Math.min(1, level * 1.35), 0.78)
+        var fallbackDriven = 0
+        if (!fastForwarding && level < 0.012) {
+            fallbackDriven = 0.18
+                + Math.abs(Math.sin((visualTick * 0.22) + index * 0.51)) * 0.26
+                + Math.abs(Math.sin((visualTick * 0.09) + index * 1.31)) * 0.14
+        }
+        var driven = fallbackDriven > 0 ? fallbackDriven : Math.pow(Math.min(1, level * 1.35), 0.78)
         var bandShape = 0.48 + Math.abs(Math.sin(index * 0.42)) * 0.52
         var flicker = 0.88 + Math.abs(Math.sin((visualTick * 0.26) + index * 0.55)) * 0.12
         var floor = fastForwarding ? 0.28 : 0.07
