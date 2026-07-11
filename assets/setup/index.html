@@ -643,13 +643,18 @@
     let setupData = null;
     let commercialLibrary = null;
     let vodChannels = null;
+    let vodLibraries = null;
     let tubeChannels = null;
     let tubeLocalCatalog = null;
+    let vodDraftId = "";
     let vodDraftTitle = "";
     let vodDraftCommercialCategory = "";
     let vodSearchQuery = "";
     let vodDraftItems = [];
     let vodSearchResults = [];
+    let vodBrowser = null;
+    let vodStack = [];
+    let tubeDraftId = "";
     let tubeDraftTitle = "";
     let tubeDraftCommercialCategory = "";
     let tubeDraftItems = [];
@@ -752,6 +757,10 @@
 
     function text(value) {
       return value === undefined || value === null ? "" : String(value);
+    }
+
+    function cloneList(items) {
+      return JSON.parse(JSON.stringify(items || []));
     }
 
     function formatBytes(bytes) {
@@ -1325,7 +1334,19 @@
     function mediaKindLabel(item) {
       const kind = text(item.kind || item.type).toLowerCase();
       if (kind === "show") return "Series";
+      if (kind === "episode") return "Episode";
+      if (kind === "season") return "Season";
       if (kind === "video") return "Video";
+      return "Movie";
+    }
+
+    function vodSourceKindLabel(item) {
+      const kind = text(item.sectionType || item.type || item.kind).toLowerCase();
+      if (kind === "show" || kind === "tvshows") return "Series";
+      if (kind === "episode") return "Episode";
+      if (kind === "season") return "Season";
+      if (kind === "video" || kind === "other" || kind === "homevideos") return "Video";
+      if (kind === "mixed") return "Mixed Library";
       return "Movie";
     }
 
@@ -1341,7 +1362,10 @@
                 <span class="picker-title">${escapeHtml(channel.title || "Custom Channel")}</span>
                 <span class="picker-meta">${(channel.items || []).length} selections${channel.commercialCategory ? " / " + escapeHtml(channel.commercialCategory) : ""}</span>
               </span>
-              <button class="secondary tiny" type="button" data-vod-delete-channel="${escapeAttr(channel.id || "")}">Delete</button>
+              <span class="inline-actions">
+                <button class="tiny" type="button" data-vod-edit-channel="${escapeAttr(channel.id || "")}">Edit</button>
+                <button class="secondary tiny" type="button" data-vod-delete-channel="${escapeAttr(channel.id || "")}">Delete</button>
+              </span>
             </div>`).join("")}
         </div>`;
     }
@@ -1360,7 +1384,7 @@
 
     function renderVodDraftItems() {
       if (vodDraftItems.length === 0)
-        return `<div class="commercial-empty">Search and add movies or series.</div>`;
+        return `<div class="commercial-empty">Browse or search and add movies or series.</div>`;
       return `
         <div class="picker-list">
           ${vodDraftItems.map((item, index) => `
@@ -1390,6 +1414,53 @@
         </div>`;
     }
 
+    function renderVodLibrarySources() {
+      if (vodBrowser) {
+        const items = vodBrowser.items || [];
+        return `
+          <div class="actions compact">
+            <button class="secondary" type="button" data-vod-library-back>Back</button>
+            <button type="button" data-vod-add-current-library>Add This Library</button>
+          </div>
+          <div class="note">${escapeHtml(vodBrowser.title || "VoD Library")}</div>
+          ${items.length === 0 ? `<div class="commercial-empty">No VoD items found here.</div>` : `
+            <div class="picker-list">
+              ${items.map((item, index) => {
+                const type = text(item.type || item.kind).toLowerCase();
+                const canAdd = type === "movie" || type === "show" || type === "video";
+                return `
+                  <div class="picker-row">
+                    <span>
+                      <span class="picker-title">${escapeHtml(item.title || "Untitled")}</span>
+                      <span class="picker-meta">${escapeHtml(vodSourceKindLabel(item))}${item.year ? " / " + escapeHtml(item.year) : ""}</span>
+                    </span>
+                    <span class="inline-actions">
+                      ${canAdd ? `<button class="tiny" type="button" data-vod-add-browser-item="${index}">Add</button>` : ""}
+                    </span>
+                  </div>`;
+              }).join("")}
+            </div>`}`;
+      }
+
+      const libraries = (vodLibraries && vodLibraries.libraries) ? vodLibraries.libraries : [];
+      if (libraries.length === 0)
+        return `<div class="commercial-empty">No VoD libraries loaded.</div>`;
+      return `
+        <div class="picker-list">
+          ${libraries.map((item, index) => `
+            <div class="picker-row">
+              <span>
+                <span class="picker-title">${escapeHtml(item.title || "VoD Library")}</span>
+                <span class="picker-meta">${escapeHtml(vodSourceKindLabel(item))}</span>
+              </span>
+              <span class="inline-actions">
+                <button class="secondary tiny" type="button" data-vod-browse-library="${index}">Browse</button>
+                <button class="tiny" type="button" data-vod-add-library="${index}">Add</button>
+              </span>
+            </div>`).join("")}
+        </div>`;
+    }
+
     function renderVodChannelsCard() {
       return `
         <article class="card" data-module="__vod_channels">
@@ -1407,7 +1478,7 @@
             ${renderDetailMascot(vodChannelsEntry())}
             <div class="section-label">Saved Channels</div>
             ${renderVodSavedChannels()}
-            <div class="section-label">New Channel</div>
+            <div class="section-label">${vodDraftId ? "Edit Channel" : "New Channel"}</div>
             <div class="field">
               <label>Channel Name</label>
               <input data-vod-channel-name value="${escapeAttr(vodDraftTitle)}" autocapitalize="off" autocomplete="off" spellcheck="false">
@@ -1418,6 +1489,8 @@
                 ${renderVodCommercialCategoryOptions()}
               </select>
             </div>
+            <div class="section-label">VoD Libraries</div>
+            ${renderVodLibrarySources()}
             <div class="section-label">Search Movies / Series</div>
             <div class="field">
               <label>Search</label>
@@ -1430,8 +1503,9 @@
             <div class="section-label">Selected For Channel</div>
             ${renderVodDraftItems()}
             <div class="actions">
-              <button type="button" data-vod-save-channel>Save Channel</button>
+              <button type="button" data-vod-save-channel>${vodDraftId ? "Update Channel" : "Save Channel"}</button>
               <button class="secondary" type="button" data-vod-clear-draft>Clear Draft</button>
+              ${vodDraftId ? `<button class="secondary" type="button" data-vod-cancel-edit>Cancel Edit</button>` : ""}
             </div>
             <div class="message"></div>
           </div>
@@ -1450,7 +1524,10 @@
                 <span class="picker-title">${escapeHtml(channel.title || "Custom Channel")}</span>
                 <span class="picker-meta">${(channel.items || []).length} local sources${channel.commercialCategory ? " / " + escapeHtml(channel.commercialCategory) : ""}</span>
               </span>
-              <button class="secondary tiny" type="button" data-tube-delete-channel="${escapeAttr(channel.id || "")}">Delete</button>
+              <span class="inline-actions">
+                <button class="tiny" type="button" data-tube-edit-channel="${escapeAttr(channel.id || "")}">Edit</button>
+                <button class="secondary tiny" type="button" data-tube-delete-channel="${escapeAttr(channel.id || "")}">Delete</button>
+              </span>
             </div>`).join("")}
         </div>`;
     }
@@ -1548,7 +1625,7 @@
             ${renderDetailMascot(tubeChannelsEntry())}
             <div class="section-label">Saved Channels</div>
             ${renderTubeSavedChannels()}
-            <div class="section-label">New Channel</div>
+            <div class="section-label">${tubeDraftId ? "Edit Channel" : "New Channel"}</div>
             <div class="field">
               <label>Channel Name</label>
               <input data-tube-channel-name value="${escapeAttr(tubeDraftTitle)}" autocapitalize="off" autocomplete="off" spellcheck="false">
@@ -1564,8 +1641,9 @@
             <div class="section-label">Selected For Channel</div>
             ${renderTubeDraftItems()}
             <div class="actions">
-              <button type="button" data-tube-save-channel>Save Channel</button>
+              <button type="button" data-tube-save-channel>${tubeDraftId ? "Update Channel" : "Save Channel"}</button>
               <button class="secondary" type="button" data-tube-clear-draft>Clear Draft</button>
+              ${tubeDraftId ? `<button class="secondary" type="button" data-tube-cancel-edit>Cancel Edit</button>` : ""}
               <button class="secondary" type="button" data-tube-refresh-local>Refresh Local Sources</button>
             </div>
             <div class="message"></div>
@@ -2137,12 +2215,26 @@
     }
 
     function normalizeVodDraftItem(item) {
-      const kind = text(item.kind || item.type).toLowerCase() === "show" ? "show" : (text(item.kind || item.type).toLowerCase() === "video" ? "video" : "movie");
+      const rawKind = text(item.kind || item.type).toLowerCase();
+      const kind = rawKind === "show" || rawKind === "series" || rawKind === "tv" || rawKind === "tv_show"
+        ? "show"
+        : (rawKind === "video" ? "video" : "movie");
       return {
         ratingKey: item.ratingKey || item.rating_key || "",
         type: kind,
         title: item.title || "UNTITLED",
-        year: item.year || ""
+        year: item.year || "",
+        genres: item.genres || []
+      };
+    }
+
+    function normalizeVodSource(item) {
+      const fallback = vodBrowser || {};
+      return {
+        sectionId: item.sectionId || item.id || fallback.sectionId || "",
+        ratingKey: item.ratingKey || item.rating_key || "",
+        type: item.type || item.kind || item.sectionType || "",
+        title: item.title || "VoD Library"
       };
     }
 
@@ -2154,6 +2246,34 @@
       vodDraftTitle = titleInput ? titleInput.value.trim() : vodDraftTitle;
       vodDraftCommercialCategory = categoryInput ? categoryInput.value.trim() : vodDraftCommercialCategory;
       vodSearchQuery = queryInput ? queryInput.value.trim() : vodSearchQuery;
+    }
+
+    function clearVodDraft() {
+      vodDraftId = "";
+      vodDraftTitle = "";
+      vodDraftCommercialCategory = "";
+      vodSearchQuery = "";
+      vodDraftItems = [];
+      vodSearchResults = [];
+      vodBrowser = null;
+      vodStack = [];
+    }
+
+    function editVodChannel(id) {
+      const channels = (vodChannels && vodChannels.channels) ? vodChannels.channels : [];
+      const channel = channels.find(item => (item.id || "") === id);
+      if (!channel) return;
+      vodDraftId = channel.id || "";
+      vodDraftTitle = channel.title || "";
+      vodDraftCommercialCategory = channel.commercialCategory || "";
+      vodSearchQuery = "";
+      vodSearchResults = [];
+      vodBrowser = null;
+      vodStack = [];
+      vodDraftItems = cloneList(channel.items || []).map(normalizeVodDraftItem);
+      setStatus("Editing VoD channel.", "ok");
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     async function searchVodItems(card) {
@@ -2175,10 +2295,52 @@
       render();
     }
 
-    function addVodSearchResult(index) {
+    async function loadVodLibraries() {
+      try {
+        vodLibraries = await api("/api/v1/setup/vod-tv/libraries");
+      } catch (error) {
+        vodLibraries = { ok: false, libraries: [], message: error.message };
+      }
+      vodBrowser = null;
+      vodStack = [];
+      return vodLibraries;
+    }
+
+    async function fetchVodSourceItems(source) {
+      const normalized = normalizeVodSource(source || {});
+      if (!normalized.sectionId && !normalized.ratingKey)
+        throw new Error("Missing VoD source.");
+      const result = await api("/api/v1/setup/vod-tv/items", {
+        method: "POST",
+        body: JSON.stringify({
+          sectionId: normalized.sectionId,
+          ratingKey: normalized.ratingKey,
+          type: normalized.type,
+          title: normalized.title || "VoD Library"
+        })
+      });
+      return {
+        sectionId: result.sectionId || normalized.sectionId,
+        ratingKey: result.ratingKey || normalized.ratingKey,
+        type: normalized.type,
+        title: result.title || normalized.title || "VoD Library",
+        items: result.items || []
+      };
+    }
+
+    async function loadVodSourceItems(source, pushStack = true) {
       const card = document.querySelector('[data-module="__vod_channels"]');
       captureVodDraftForm(card);
-      const item = vodSearchResults[index];
+      if (pushStack && vodBrowser)
+        vodStack.push(vodBrowser);
+      vodBrowser = await fetchVodSourceItems(source);
+      render();
+      return vodBrowser;
+    }
+
+    function addVodItemToDraft(item, shouldRender = true) {
+      const card = document.querySelector('[data-module="__vod_channels"]');
+      captureVodDraftForm(card);
       if (!item) return;
       const normalized = normalizeVodDraftItem(item);
       if (!normalized.ratingKey) return;
@@ -2186,6 +2348,69 @@
       if (vodDraftItems.some(existing => (existing.type + ":" + existing.ratingKey) === key))
         return;
       vodDraftItems.push(normalized);
+      if (shouldRender)
+        render();
+    }
+
+    function addVodSearchResult(index) {
+      addVodItemToDraft(vodSearchResults[index]);
+    }
+
+    function addVodBrowserItem(index) {
+      const items = vodBrowser && vodBrowser.items ? vodBrowser.items : [];
+      addVodItemToDraft(items[index]);
+    }
+
+    async function addVodSourceToDraft(source) {
+      const card = document.querySelector('[data-module="__vod_channels"]');
+      captureVodDraftForm(card);
+      cardMessage(card, "Loading VoD library...");
+      const loaded = await fetchVodSourceItems(source);
+      const before = vodDraftItems.length;
+      (loaded.items || []).forEach(item => addVodItemToDraft(item, false));
+      const added = vodDraftItems.length - before;
+      cardMessage(card, added > 0 ? ("Added " + added + " item" + (added === 1 ? "" : "s") + ".") : "No new movies or series found.", added > 0 ? "ok" : "err");
+      setStatus(added > 0 ? "VoD library added to channel draft." : "No new VoD items added.", added > 0 ? "ok" : "err");
+      render();
+    }
+
+    function browseVodLibrary(index) {
+      const card = document.querySelector('[data-module="__vod_channels"]');
+      const libraries = (vodLibraries && vodLibraries.libraries) ? vodLibraries.libraries : [];
+      const item = libraries[index];
+      if (!item) return;
+      cardMessage(card, "Loading VoD library...");
+      loadVodSourceItems(item, false).then(() => {
+        cardMessage(card, "VoD library loaded.", "ok");
+      }).catch(error => cardMessage(card, error.message, "err"));
+    }
+
+    function addVodLibrary(index) {
+      const libraries = (vodLibraries && vodLibraries.libraries) ? vodLibraries.libraries : [];
+      const item = libraries[index];
+      if (!item) return;
+      addVodSourceToDraft(item).catch(error => {
+        const card = document.querySelector('[data-module="__vod_channels"]');
+        cardMessage(card, error.message, "err");
+      });
+    }
+
+    function addCurrentVodLibrary() {
+      if (!vodBrowser) return;
+      addVodSourceToDraft(vodBrowser).catch(error => {
+        const card = document.querySelector('[data-module="__vod_channels"]');
+        cardMessage(card, error.message, "err");
+      });
+    }
+
+    function backVodLibraryBrowser() {
+      const card = document.querySelector('[data-module="__vod_channels"]');
+      captureVodDraftForm(card);
+      if (vodStack.length > 0) {
+        vodBrowser = vodStack.pop();
+      } else {
+        vodBrowser = null;
+      }
       render();
     }
 
@@ -2200,6 +2425,7 @@
       captureVodDraftForm(card);
       const input = card.querySelector("[data-vod-channel-name]");
       const title = input ? input.value.trim() : "";
+      const editing = !!vodDraftId;
       if (!title) {
         cardMessage(card, "Enter a channel name.", "err");
         return;
@@ -2212,18 +2438,15 @@
       const result = await api("/api/v1/setup/vod-tv/custom-channels", {
         method: "POST",
         body: JSON.stringify({
+          id: vodDraftId,
           title,
           commercialCategory: vodDraftCommercialCategory,
           items: vodDraftItems
         })
       });
       vodChannels = { ok: true, channels: result.channels || [] };
-      vodDraftTitle = "";
-      vodDraftCommercialCategory = "";
-      vodSearchQuery = "";
-      vodDraftItems = [];
-      vodSearchResults = [];
-      setStatus("VoD channel saved.", "ok");
+      clearVodDraft();
+      setStatus(editing ? "VoD channel updated." : "VoD channel saved.", "ok");
       render();
     }
 
@@ -2236,6 +2459,8 @@
         body: JSON.stringify({ id })
       });
       vodChannels = { ok: true, channels: result.channels || [] };
+      if (vodDraftId === id)
+        clearVodDraft();
       setStatus("VoD channel deleted.", "ok");
       render();
     }
@@ -2311,6 +2536,30 @@
         duration: item.duration,
         durationSeconds: item.durationSeconds
       };
+    }
+
+    function clearTubeDraft() {
+      tubeDraftId = "";
+      tubeDraftTitle = "";
+      tubeDraftCommercialCategory = "";
+      tubeDraftItems = [];
+      tubeLocalBrowser = null;
+      tubeLocalStack = [];
+    }
+
+    function editTubeChannel(id) {
+      const channels = (tubeChannels && tubeChannels.channels) ? tubeChannels.channels : [];
+      const channel = channels.find(item => (item.id || "") === id);
+      if (!channel) return;
+      tubeDraftId = channel.id || "";
+      tubeDraftTitle = channel.title || "";
+      tubeDraftCommercialCategory = channel.commercialCategory || "";
+      tubeDraftItems = cloneList(channel.items || []).map(normalizeTubeSource);
+      tubeLocalBrowser = null;
+      tubeLocalStack = [];
+      setStatus("Editing The Tube channel.", "ok");
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function localKindLabel(item) {
@@ -2418,6 +2667,7 @@
       captureTubeDraftForm(card);
       const input = card.querySelector("[data-tube-channel-name]");
       const title = input ? input.value.trim() : "";
+      const editing = !!tubeDraftId;
       if (!title) {
         cardMessage(card, "Enter a channel name.", "err");
         return;
@@ -2430,16 +2680,15 @@
       const result = await api("/api/v1/setup/tube-tv/custom-channels", {
         method: "POST",
         body: JSON.stringify({
+          id: tubeDraftId,
           title,
           commercialCategory: tubeDraftCommercialCategory,
           items: tubeDraftItems
         })
       });
       tubeChannels = { ok: true, channels: result.channels || [] };
-      tubeDraftTitle = "";
-      tubeDraftCommercialCategory = "";
-      tubeDraftItems = [];
-      setStatus("The Tube channel saved.", "ok");
+      clearTubeDraft();
+      setStatus(editing ? "The Tube channel updated." : "The Tube channel saved.", "ok");
       render();
     }
 
@@ -2452,6 +2701,8 @@
         body: JSON.stringify({ id })
       });
       tubeChannels = { ok: true, channels: result.channels || [] };
+      if (tubeDraftId === id)
+        clearTubeDraft();
       setStatus("The Tube channel deleted.", "ok");
       render();
     }
@@ -2596,6 +2847,21 @@
           cardMessage(button.closest(".card"), error.message, "err");
         });
       });
+      document.querySelectorAll("[data-vod-browse-library]").forEach(button => {
+        button.onclick = () => browseVodLibrary(Number(button.dataset.vodBrowseLibrary || 0));
+      });
+      document.querySelectorAll("[data-vod-add-library]").forEach(button => {
+        button.onclick = () => addVodLibrary(Number(button.dataset.vodAddLibrary || 0));
+      });
+      document.querySelectorAll("[data-vod-library-back]").forEach(button => {
+        button.onclick = () => backVodLibraryBrowser();
+      });
+      document.querySelectorAll("[data-vod-add-current-library]").forEach(button => {
+        button.onclick = () => addCurrentVodLibrary();
+      });
+      document.querySelectorAll("[data-vod-add-browser-item]").forEach(button => {
+        button.onclick = () => addVodBrowserItem(Number(button.dataset.vodAddBrowserItem || 0));
+      });
       document.querySelectorAll("[data-vod-add-result]").forEach(button => {
         button.onclick = () => addVodSearchResult(Number(button.dataset.vodAddResult || 0));
       });
@@ -2607,13 +2873,18 @@
           cardMessage(button.closest(".card"), error.message, "err");
         });
       });
+      document.querySelectorAll("[data-vod-edit-channel]").forEach(button => {
+        button.onclick = () => editVodChannel(button.dataset.vodEditChannel || "");
+      });
       document.querySelectorAll("[data-vod-clear-draft]").forEach(button => {
         button.onclick = () => {
-          vodDraftTitle = "";
-          vodDraftCommercialCategory = "";
-          vodSearchQuery = "";
-          vodDraftItems = [];
-          vodSearchResults = [];
+          clearVodDraft();
+          render();
+        };
+      });
+      document.querySelectorAll("[data-vod-cancel-edit]").forEach(button => {
+        button.onclick = () => {
+          clearVodDraft();
           render();
         };
       });
@@ -2648,11 +2919,18 @@
           cardMessage(button.closest(".card"), error.message, "err");
         });
       });
+      document.querySelectorAll("[data-tube-edit-channel]").forEach(button => {
+        button.onclick = () => editTubeChannel(button.dataset.tubeEditChannel || "");
+      });
       document.querySelectorAll("[data-tube-clear-draft]").forEach(button => {
         button.onclick = () => {
-          tubeDraftTitle = "";
-          tubeDraftCommercialCategory = "";
-          tubeDraftItems = [];
+          clearTubeDraft();
+          render();
+        };
+      });
+      document.querySelectorAll("[data-tube-cancel-edit]").forEach(button => {
+        button.onclick = () => {
+          clearTubeDraft();
           render();
         };
       });
@@ -2681,6 +2959,7 @@
         api("/api/v1/setup/modules"),
         loadCommercialLibrary(),
         loadVodChannels(),
+        loadVodLibraries(),
         loadTubeChannels(),
         loadTubeLocalCatalog()
       ]);

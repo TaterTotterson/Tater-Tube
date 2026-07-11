@@ -639,6 +639,10 @@ bool ControlApiServer::handleSetupApiRequest(QTcpSocket *socket,
         handleSetupVodCustomChannelsListRequest(socket);
         return true;
     }
+    if (request.method == "GET" && request.path == QStringLiteral("/api/v1/setup/vod-tv/libraries")) {
+        handleSetupVodLibrariesRequest(socket);
+        return true;
+    }
     if (request.method == "GET" && request.path == QStringLiteral("/api/v1/setup/tube-tv/custom-channels")) {
         handleSetupTubeCustomChannelsListRequest(socket);
         return true;
@@ -719,6 +723,10 @@ bool ControlApiServer::handleSetupApiRequest(QTcpSocket *socket,
     }
     if (request.path == QStringLiteral("/api/v1/setup/vod-tv/search")) {
         handleSetupVodSearchRequest(socket, request);
+        return true;
+    }
+    if (request.path == QStringLiteral("/api/v1/setup/vod-tv/items")) {
+        handleSetupVodItemsRequest(socket, request);
         return true;
     }
     if (request.path == QStringLiteral("/api/v1/setup/tube-tv/custom-channels")) {
@@ -1980,6 +1988,160 @@ void ControlApiServer::handleSetupVodSearchRequest(QTcpSocket *socket,
     m_mediaBackend->api_search_media(requestId, query,
                                      QStringList{QStringLiteral("movie"), QStringLiteral("show")},
                                      limit);
+}
+
+void ControlApiServer::handleSetupVodLibrariesRequest(QTcpSocket *socket)
+{
+    if (!m_mediaBackend) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "media_backend_unavailable"}});
+        return;
+    }
+    if (m_mediaBackend->get_auth_state() != QStringLiteral("authed")) {
+        writeJson(socket, 409, {{"ok", false}, {"error", "media_provider_not_configured"}});
+        return;
+    }
+
+    QPointer<QTcpSocket> safeSocket(socket);
+    auto done = std::make_shared<bool>(false);
+    auto finish = [this, safeSocket, done](int statusCode, const QJsonObject &response) {
+        if (*done || !safeSocket)
+            return;
+        *done = true;
+        writeJson(safeSocket, statusCode, response);
+    };
+
+    connect(m_mediaBackend, &EmbyJellyfinBackend::librariesLoaded, socket,
+            [=](const QVariant &libraries) {
+        if (*done)
+            return;
+        QJsonArray rows;
+        const QVariantList raw = libraries.toList();
+        for (const QVariant &value : raw) {
+            QVariantMap row = value.toMap();
+            const QString sectionId = row.value(QStringLiteral("sectionId")).toString().trimmed();
+            if (sectionId.isEmpty())
+                continue;
+            if (row.value(QStringLiteral("title")).toString().trimmed().isEmpty())
+                row[QStringLiteral("title")] = sectionId;
+            row[QStringLiteral("id")] = sectionId;
+            rows.append(QJsonObject::fromVariantMap(row));
+        }
+        finish(200, QJsonObject{
+            {"ok", true},
+            {"libraries", rows}
+        });
+    });
+    connect(m_mediaBackend, &EmbyJellyfinBackend::errorOccurred, socket,
+            [=](const QString &message) {
+        if (*done)
+            return;
+        finish(409, QJsonObject{
+            {"ok", false},
+            {"error", "vod_libraries_failed"},
+            {"message", message}
+        });
+    });
+    QTimer::singleShot(15000, socket, [=]() {
+        if (*done)
+            return;
+        finish(504, QJsonObject{{"ok", false}, {"error", "vod_libraries_timeout"}});
+    });
+
+    m_mediaBackend->load_libraries();
+}
+
+void ControlApiServer::handleSetupVodItemsRequest(QTcpSocket *socket,
+                                                  const HttpRequest &request)
+{
+    if (!m_mediaBackend) {
+        writeJson(socket, 503, {{"ok", false}, {"error", "media_backend_unavailable"}});
+        return;
+    }
+    if (m_mediaBackend->get_auth_state() != QStringLiteral("authed")) {
+        writeJson(socket, 409, {{"ok", false}, {"error", "media_provider_not_configured"}});
+        return;
+    }
+
+    bool ok = false;
+    const QJsonObject body = parseBodyObject(request, ok);
+    if (!ok) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "invalid_json"}});
+        return;
+    }
+
+    const QString sectionId = body.value(QStringLiteral("sectionId")).toString(
+        body.value(QStringLiteral("id")).toString()).trimmed();
+    const QString ratingKey = body.value(QStringLiteral("ratingKey")).toString(
+        body.value(QStringLiteral("rating_key")).toString()).trimmed();
+    const QString title = body.value(QStringLiteral("title")).toString(QStringLiteral("VoD")).trimmed();
+    if (sectionId.isEmpty() && ratingKey.isEmpty()) {
+        writeJson(socket, 400, {{"ok", false}, {"error", "missing_vod_source"}});
+        return;
+    }
+
+    QPointer<QTcpSocket> safeSocket(socket);
+    auto done = std::make_shared<bool>(false);
+    auto finish = [this, safeSocket, done, title](int statusCode, const QJsonObject &response) {
+        if (*done || !safeSocket)
+            return;
+        *done = true;
+        QJsonObject body = response;
+        if (!body.contains(QStringLiteral("title")))
+            body[QStringLiteral("title")] = title.isEmpty() ? QStringLiteral("VoD") : title;
+        writeJson(safeSocket, statusCode, body);
+    };
+
+    auto writeItems = [=](const QVariant &items) {
+        if (*done)
+            return;
+        QJsonArray rows;
+        const QVariantList raw = items.toList();
+        for (const QVariant &value : raw) {
+            QVariantMap row = value.toMap();
+            const QString itemRatingKey = row.value(QStringLiteral("ratingKey")).toString().trimmed();
+            const QString type = row.value(QStringLiteral("type")).toString().trimmed().toLower();
+            if (itemRatingKey.isEmpty())
+                continue;
+            if (!(type == QStringLiteral("movie") ||
+                  type == QStringLiteral("show") ||
+                  type == QStringLiteral("video") ||
+                  type == QStringLiteral("season") ||
+                  type == QStringLiteral("episode"))) {
+                continue;
+            }
+            row[QStringLiteral("id")] = itemRatingKey;
+            rows.append(QJsonObject::fromVariantMap(row));
+        }
+        finish(200, QJsonObject{
+            {"ok", true},
+            {"sectionId", sectionId},
+            {"ratingKey", ratingKey},
+            {"items", rows}
+        });
+    };
+
+    connect(m_mediaBackend, &EmbyJellyfinBackend::itemsLoaded, socket, writeItems);
+    connect(m_mediaBackend, &EmbyJellyfinBackend::childrenLoaded, socket, writeItems);
+    connect(m_mediaBackend, &EmbyJellyfinBackend::errorOccurred, socket,
+            [=](const QString &message) {
+        if (*done)
+            return;
+        finish(409, QJsonObject{
+            {"ok", false},
+            {"error", "vod_items_failed"},
+            {"message", message}
+        });
+    });
+    QTimer::singleShot(20000, socket, [=]() {
+        if (*done)
+            return;
+        finish(504, QJsonObject{{"ok", false}, {"error", "vod_items_timeout"}});
+    });
+
+    if (!sectionId.isEmpty())
+        m_mediaBackend->load_library_all(sectionId);
+    else
+        m_mediaBackend->load_children(ratingKey);
 }
 
 QJsonArray ControlApiServer::tubeCustomChannels() const

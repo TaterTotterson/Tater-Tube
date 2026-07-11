@@ -84,6 +84,8 @@ private:
     void handleSetupVodCustomChannelSaveRequest(QTcpSocket *socket, const HttpRequest &request);
     void handleSetupVodCustomChannelDeleteRequest(QTcpSocket *socket, const HttpRequest &request);
     void handleSetupVodSearchRequest(QTcpSocket *socket, const HttpRequest &request);
+    void handleSetupVodLibrariesRequest(QTcpSocket *socket);
+    void handleSetupVodItemsRequest(QTcpSocket *socket, const HttpRequest &request);
     QJsonArray tubeCustomChannels() const;
     void saveTubeCustomChannels(const QJsonArray &channels);
     void handleSetupTubeCustomChannelsListRequest(QTcpSocket *socket);

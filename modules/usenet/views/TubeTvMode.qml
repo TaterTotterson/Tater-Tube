@@ -63,14 +63,27 @@ FocusScope {
         return settingEnabled(tubeModuleId, "tube_midroll_commercials", false)
     }
 
-    function durationSeconds(item, fallback) {
+    function rawDurationSeconds(item) {
         var raw = item ? item.duration : 0
+        if ((raw === undefined || raw === null || raw === "") && item)
+            raw = item.durationSeconds
         var value = typeof raw === "number" ? raw : parseFloat(raw)
         if (isNaN(value) || value <= 0)
-            value = fallback
+            return 0
         if (value > 10000)
             value = value / 1000.0
+        return value
+    }
+
+    function durationSeconds(item, fallback) {
+        var value = rawDurationSeconds(item)
+        if (value <= 0)
+            value = fallback
         return Math.max(5, value)
+    }
+
+    function hasKnownDuration(item) {
+        return rawDurationSeconds(item) > 0
     }
 
     function channelLabel(channel) {
@@ -407,6 +420,7 @@ FocusScope {
         }
 
         var fallback = kind === "commercial" ? 30 : (kind === "movie" ? 5400 : 1500)
+        var knownDuration = hasKnownDuration(source)
         var fullDuration = durationSeconds(source, fallback)
         var duration = segmentDuration === undefined || segmentDuration === null
                        ? fullDuration
@@ -414,6 +428,7 @@ FocusScope {
         var item = Object.assign({}, source)
         item.kind = kind
         item.duration = duration
+        item.durationKnown = knownDuration
         item.fullDuration = fullDuration
         item.mediaOffset = Math.max(0, mediaOffset || 0)
         item.forceAdvance = forceAdvance === true
@@ -885,6 +900,10 @@ FocusScope {
             ? resolved.item.url
             : resolved.item.streamUrl
         var offset = resolved.offset || 0.0
+        if (resolved.item.durationKnown !== true)
+            offset = 0.0
+        if (resolved.item.kind === "commercial" && resolved.item.local === true)
+            offset = 0.0
         if (resolved.item.kind !== "commercial" && usesServerSeek(resolved.item)) {
             url = urlWithStartOffset(url, offset)
             offset = 0.0
