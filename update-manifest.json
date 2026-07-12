@@ -1,15 +1,15 @@
 {
-  "version": "v1.4.1",
-  "app_version": "1.4.1",
+  "version": "v1.4.2",
+  "app_version": "1.4.2",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.1/Tater-Tube-v1.4.1-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.1.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.2/Tater-Tube-v1.4.2-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.2.tar.gz",
   "notes": [
-    "Fixes The Tube TV Mode channel changes so channels tune into the shared live timeline instead of restarting videos.",
-    "Improves The Tube and VOD TV Mode scheduling to avoid immediate repeat episodes, movies, and commercials when alternatives are available.",
-    "Keeps scheduled TV Mode transitions black and quiet between videos/commercials instead of showing static or channel overlays.",
-    "Consumes exact duration metadata from Tater Tube Server when available for more accurate The Tube TV Mode schedules."
+    "Uses The Tube TV Mode VCR overlay for regular The Tube local media and NZB stream playback.",
+    "Shows server playback details in The Tube overlay, including direct play, transcode profile, hardware engine, codec, status, and transfer rate when available.",
+    "Adds a The Tube playback overlay mode so normal playback keeps seek/menu controls instead of live channel controls.",
+    "Keeps The Tube volume overlay and playback menu from overlapping."
   ]
 }

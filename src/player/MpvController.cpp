@@ -274,8 +274,9 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
     }
 
     const bool isOtaMode = (oscMode == "ota" || oscMode == "ota-quiet");
+    const bool isOtaOverlayMode = isOtaMode || oscMode == "tube";
     const bool quietOtaLabel = (oscMode == "ota-quiet");
-    const QString oscScriptName = isOtaMode ? "ota-osc.lua"
+    const QString oscScriptName = isOtaOverlayMode ? "ota-osc.lua"
         : "mpv-osc.lua";
     const QString oscScript = m_appRoot + "/scripts/" + oscScriptName;
     const bool hasOscScript = !audioOnly && QFile::exists(oscScript);
@@ -343,13 +344,19 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
         scriptOpts << QString("transcode-offset=%1").arg(double(transcodeOffsetSec), 0, 'f', 3);
     scriptOpts << QString("vcr-input=%1").arg(isOtaMode ? QStringLiteral("AIR")
                                                         : QStringLiteral("VIDEO 1"));
-    if (isOtaMode)
+    if (isOtaOverlayMode)
         scriptOpts << QString("240mp-ota-show-label=%1").arg(quietOtaLabel
                                                              ? QStringLiteral("no")
                                                              : QStringLiteral("yes"))
                    << QString("240mp-ota-show_label=%1").arg(quietOtaLabel
                                                              ? QStringLiteral("no")
-                                                             : QStringLiteral("yes"));
+                                                             : QStringLiteral("yes"))
+                   << QString("240mp-ota-control-mode=%1").arg(isOtaMode
+                                                               ? QStringLiteral("ota")
+                                                               : QStringLiteral("playback"))
+                   << QString("240mp-ota-control_mode=%1").arg(isOtaMode
+                                                               ? QStringLiteral("ota")
+                                                               : QStringLiteral("playback"));
     args << QString("--script-opts=%1").arg(scriptOpts.join(","));
 
     if (loop)

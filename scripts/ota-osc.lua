@@ -3,6 +3,7 @@ local options = require 'mp.options'
 
 local opts = {
     show_label = "yes",
+    control_mode = "ota",
 }
 options.read_options(opts, "240mp-ota")
 
@@ -21,6 +22,10 @@ local C_ORANGE = "&H0078FF&"
 local function labels_enabled()
     local value = tostring(opts.show_label or "yes"):lower()
     return value ~= "no" and value ~= "false" and value ~= "0" and value ~= "off"
+end
+
+local function ota_controls_enabled()
+    return tostring(opts.control_mode or "ota"):lower() == "ota"
 end
 
 local function ass_escape(text)
@@ -132,9 +137,10 @@ local function draw_overlay(label, with_menu)
         local bx = inner_l
         local usable_w = menu_w - math.floor(menu_w * 0.06)
         btn_w = math.floor((usable_w - gap * 3) / 4)
-        draw_button(ass, bx, btn_y, btn_w, btn_h, "CH +", menu_fs)
+        local ota_controls = ota_controls_enabled()
+        draw_button(ass, bx, btn_y, btn_w, btn_h, ota_controls and "CH +" or "REW", menu_fs)
         bx = bx + btn_w + gap
-        draw_button(ass, bx, btn_y, btn_w, btn_h, "CH -", menu_fs)
+        draw_button(ass, bx, btn_y, btn_w, btn_h, ota_controls and "CH -" or "FF", menu_fs)
         bx = bx + btn_w + gap
         draw_button(ass, bx, btn_y, btn_w, btn_h, "MENU", menu_fs)
         bx = bx + btn_w + gap
@@ -221,6 +227,8 @@ local function toggle_menu()
 end
 
 mp.register_script_message("240mp-ota-channel", show_label)
+mp.register_script_message("240mp-osd-menu-show", show_menu)
+mp.register_script_message("240mp-osd-menu-hide", hide_menu)
 
 mp.register_script_message("240mp-ota-stream-info", function(info)
     latest_stream_info = tostring(info or ""):upper()
@@ -258,13 +266,25 @@ end
 local function consume_navigation()
 end
 
-mp.add_forced_key_binding("UP", "ota-channel-up", function() tune_relative(1) end)
-mp.add_forced_key_binding("DOWN", "ota-channel-down", function() tune_relative(-1) end)
-mp.add_forced_key_binding("LEFT", "ota-left-disabled", consume_navigation)
-mp.add_forced_key_binding("RIGHT", "ota-right-disabled", consume_navigation)
-mp.add_forced_key_binding("PREV", "ota-prev-disabled", consume_navigation)
+local function seek_with_overlay(seconds)
+    mp.command("no-osd seek " .. tostring(seconds))
+    show_menu()
+end
+
+if ota_controls_enabled() then
+    mp.add_forced_key_binding("UP", "ota-channel-up", function() tune_relative(1) end)
+    mp.add_forced_key_binding("DOWN", "ota-channel-down", function() tune_relative(-1) end)
+    mp.add_forced_key_binding("LEFT", "ota-left-disabled", consume_navigation)
+    mp.add_forced_key_binding("RIGHT", "ota-right-disabled", consume_navigation)
+    mp.add_forced_key_binding("PREV", "ota-prev-disabled", consume_navigation)
+else
+    mp.add_forced_key_binding("UP", "tube-up-disabled", consume_navigation)
+    mp.add_forced_key_binding("DOWN", "tube-down-disabled", consume_navigation)
+    mp.add_forced_key_binding("LEFT", "tube-seek-back", function() seek_with_overlay(-10) end)
+    mp.add_forced_key_binding("RIGHT", "tube-seek-forward", function() seek_with_overlay(30) end)
+end
 mp.add_forced_key_binding("MENU", "ota-menu", toggle_menu)
-mp.add_forced_key_binding("ENTER", "ota-enter-disabled", consume_navigation)
-mp.add_forced_key_binding("KP_ENTER", "ota-kp-enter-disabled", consume_navigation)
+mp.add_forced_key_binding("ENTER", "ota-enter-disabled", ota_controls_enabled() and consume_navigation or toggle_menu)
+mp.add_forced_key_binding("KP_ENTER", "ota-kp-enter-disabled", ota_controls_enabled() and consume_navigation or toggle_menu)
 mp.add_key_binding("ESC", "ota-esc", function() mp.command("quit") end)
 mp.add_key_binding("BS", "ota-bs", function() mp.command("quit") end)

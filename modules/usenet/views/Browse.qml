@@ -37,6 +37,8 @@ FocusScope {
     property string pendingRequestId: ""
     property string pendingTitle: ""
     property bool playbackStarted: false
+    property string streamInfoText: ""
+    property bool currentStreamUsesServer: false
 
     focus: true
 
@@ -153,6 +155,98 @@ FocusScope {
         mode = "loading"
         statusText = "SEARCHING " + query
         usenetBackend.search_items(query)
+    }
+
+    function cleanUpper(value) {
+        return String(value || "").trim().toUpperCase()
+    }
+
+    function queryValue(url, key) {
+        var escaped = String(key || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        var match = String(url || "").match(new RegExp("[?&]" + escaped + "=([^&]*)"))
+        if (!match)
+            return ""
+        return decodeURIComponent(String(match[1]).replace(/\+/g, " "))
+    }
+
+    function profileLabel(value) {
+        var profile = cleanUpper(value).replace(/_/g, " ")
+        if (profile === "CRT 480P")
+            return "CRT 480P"
+        if (profile === "HDMI 1080P")
+            return "HDMI 1080P"
+        if (profile === "HDMI 4K")
+            return "HDMI 4K"
+        return profile
+    }
+
+    function formatRate(bytesPerSecond) {
+        var value = Number(bytesPerSecond || 0)
+        if (!isFinite(value) || value <= 0)
+            return ""
+        if (value >= 1024 * 1024)
+            return (value / (1024 * 1024)).toFixed(1) + " MB/S"
+        if (value >= 1024)
+            return Math.round(value / 1024) + " KB/S"
+        return Math.round(value) + " B/S"
+    }
+
+    function plannedStreamInfo(playbackUrl) {
+        if (queryValue(playbackUrl, "transcode") === "0")
+            return "SERVER STREAM | DIRECT PLAY"
+
+        var profile = profileLabel(queryValue(playbackUrl, "profile"))
+        var parts = ["SERVER TRANSCODE", "HW AUTO"]
+        if (profile !== "")
+            parts.push(profile)
+        return parts.join(" | ")
+    }
+
+    function streamInfoFromActiveStream(row) {
+        if (!row)
+            return ""
+
+        var status = cleanUpper(row["status"])
+        var speed = formatRate(row["bytes_per_second"])
+        var profile = profileLabel(row["transcode_name"] || row["transcode_profile"])
+        var codec = cleanUpper(row["video_codec"])
+        var accel = cleanUpper(row["hardware_acceleration"])
+        var parts = []
+
+        if (row["transcoded"] === true) {
+            if (row["hardware_active"] === true && accel !== "")
+                parts.push("HW " + accel)
+            else
+                parts.push("SOFTWARE")
+            if (codec !== "")
+                parts.push(codec)
+            if (profile !== "")
+                parts.push(profile)
+        } else {
+            parts.push(status === "STARTING" || status === "BUFFERING"
+                       ? "SERVER STREAM" : "DIRECT PLAY")
+        }
+
+        if (speed !== "")
+            parts.push(speed)
+        if (status !== "" && status !== "TRANSCODING")
+            parts.push(status)
+        return parts.join(" | ")
+    }
+
+    function updateStreamOverlayInfo(info) {
+        var text = cleanUpper(info)
+        if (text === "")
+            return
+        streamInfoText = text
+        if (mpvController.running)
+            mpvController.sendScriptMessage("240mp-ota-stream-info", streamInfoText)
+    }
+
+    function refreshActiveStreamInfo() {
+        if (!currentStreamUsesServer || !playbackStarted || mode !== "playing" || !mpvController.running)
+            return
+        usenetBackend.load_active_streams()
     }
 
     function browseCategory(row) {
@@ -280,12 +374,15 @@ FocusScope {
         mode = "playing"
         statusText = "PLAYING " + (title || stream.title || "THE TUBE")
         var playbackUrl = usenetBackend.playback_url(stream.url, Math.round(root.sw), Math.round(root.sh))
+        currentStreamUsesServer = true
+        updateStreamOverlayInfo(plannedStreamInfo(playbackUrl))
         mpvController.loadAndPlay(playbackUrl, 0.0, 0, -1, [], false, -1, 0.0,
-                                  "", false, "", false, title || stream.title || "THE TUBE")
+                                  "", false, "tube", false, title || stream.title || "THE TUBE")
     }
 
     function stopPlayback() {
         playbackStarted = false
+        currentStreamUsesServer = false
         mpvController.stop()
         mode = items.length > 0 ? "items" : (subcategories.length > 0 ? "subcategories" : "categories")
     }
@@ -475,6 +572,15 @@ FocusScope {
         }
     }
 
+    Timer {
+        id: streamInfoPollTimer
+        interval: 3000
+        repeat: true
+        running: usenetRoot.currentStreamUsesServer && usenetRoot.playbackStarted
+                 && usenetRoot.mode === "playing"
+        onTriggered: usenetRoot.refreshActiveStreamInfo()
+    }
+
     Connections {
         target: usenetBackend
 
@@ -514,6 +620,15 @@ FocusScope {
             setListIndex(streamList, 0)
         }
 
+        function onActiveStreamsLoaded(streams) {
+            if (!usenetRoot.currentStreamUsesServer || usenetRoot.mode !== "playing")
+                return
+            var rows = streams || []
+            if (rows.length === 0)
+                return
+            usenetRoot.updateStreamOverlayInfo(usenetRoot.streamInfoFromActiveStream(rows[0]))
+        }
+
         function onPairingSucceeded(serverUrl, token, playerName) {
             appCore.save_setting(moduleId, "tater_server_url", serverUrl)
             appCore.save_setting(moduleId, "tater_server_token", token)
@@ -545,6 +660,7 @@ FocusScope {
         function onPlaybackFinished(finalPositionMs, finalDurationMs) {
             if (mode === "playing") {
                 playbackStarted = false
+                currentStreamUsesServer = false
                 mode = items.length > 0 ? "items" : (subcategories.length > 0 ? "subcategories" : "categories")
             }
         }
@@ -552,8 +668,18 @@ FocusScope {
         function onPlaybackFailed() {
             if (mode === "playing") {
                 playbackStarted = false
+                currentStreamUsesServer = false
                 mode = "message"
                 statusText = "THE TUBE PLAYBACK FAILED"
+            }
+        }
+
+        function onScriptMessageReceived(message, arg) {
+            if (mode !== "playing")
+                return
+            if (message === "240mp-ota-file-loaded") {
+                updateStreamOverlayInfo(streamInfoText)
+                refreshActiveStreamInfo()
             }
         }
     }
