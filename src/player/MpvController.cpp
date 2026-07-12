@@ -273,7 +273,8 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
         return;
     }
 
-    const bool isOtaMode = (oscMode == "ota");
+    const bool isOtaMode = (oscMode == "ota" || oscMode == "ota-quiet");
+    const bool quietOtaLabel = (oscMode == "ota-quiet");
     const QString oscScriptName = isOtaMode ? "ota-osc.lua"
         : "mpv-osc.lua";
     const QString oscScript = m_appRoot + "/scripts/" + oscScriptName;
@@ -340,8 +341,15 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
     QStringList scriptOpts;
     if (transcodeOffsetSec > 0.5f)
         scriptOpts << QString("transcode-offset=%1").arg(double(transcodeOffsetSec), 0, 'f', 3);
-    scriptOpts << QString("vcr-input=%1").arg(oscMode == "ota" ? QStringLiteral("AIR")
-                                                                : QStringLiteral("VIDEO 1"));
+    scriptOpts << QString("vcr-input=%1").arg(isOtaMode ? QStringLiteral("AIR")
+                                                        : QStringLiteral("VIDEO 1"));
+    if (isOtaMode)
+        scriptOpts << QString("240mp-ota-show-label=%1").arg(quietOtaLabel
+                                                             ? QStringLiteral("no")
+                                                             : QStringLiteral("yes"))
+                   << QString("240mp-ota-show_label=%1").arg(quietOtaLabel
+                                                             ? QStringLiteral("no")
+                                                             : QStringLiteral("yes"));
     args << QString("--script-opts=%1").arg(scriptOpts.join(","));
 
     if (loop)

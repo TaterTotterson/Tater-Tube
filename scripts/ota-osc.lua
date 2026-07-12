@@ -1,4 +1,10 @@
 local assdraw = require 'mp.assdraw'
+local options = require 'mp.options'
+
+local opts = {
+    show_label = "yes",
+}
+options.read_options(opts, "240mp-ota")
 
 local overlay = mp.create_osd_overlay("ass-events")
 local hide_timer = nil
@@ -11,6 +17,11 @@ local latest_stream_info = ""
 local menu_visible = false
 local C_WHITE = "&HFFFFFF&"
 local C_ORANGE = "&H0078FF&"
+
+local function labels_enabled()
+    local value = tostring(opts.show_label or "yes"):lower()
+    return value ~= "no" and value ~= "false" and value ~= "0" and value ~= "off"
+end
 
 local function ass_escape(text)
     return tostring(text):gsub("\\", "\\\\"):gsub("{", "\\{"):gsub("}", "\\}")
@@ -219,6 +230,9 @@ mp.register_script_message("240mp-ota-stream-info", function(info)
 end)
 
 mp.register_event("file-loaded", function()
+    if not labels_enabled() then
+        return
+    end
     local title = mp.get_property("media-title", "")
     if title ~= "" then
         show_label(title)

@@ -1,15 +1,15 @@
 {
-  "version": "v1.4.0",
-  "app_version": "1.4.0",
+  "version": "v1.4.1",
+  "app_version": "1.4.1",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.0/Tater-Tube-v1.4.0-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.0.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.1/Tater-Tube-v1.4.1-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.1.tar.gz",
   "notes": [
-    "Adds richer TV Mode behavior for The Tube, VOD, and Public Access with cleaner channel transitions.",
-    "Improves The Tube TV Mode generated channels, custom channel ordering, and timeline-aware channel switching.",
-    "Adds VCR-style playback details to The Tube overlays, including server stream and hardware transcode status.",
-    "Refines commercial playback handling so selected categories rotate without immediate repeats."
+    "Fixes The Tube TV Mode channel changes so channels tune into the shared live timeline instead of restarting videos.",
+    "Improves The Tube and VOD TV Mode scheduling to avoid immediate repeat episodes, movies, and commercials when alternatives are available.",
+    "Keeps scheduled TV Mode transitions black and quiet between videos/commercials instead of showing static or channel overlays.",
+    "Consumes exact duration metadata from Tater Tube Server when available for more accurate The Tube TV Mode schedules."
   ]
 }

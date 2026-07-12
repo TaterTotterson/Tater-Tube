@@ -83,6 +83,82 @@ FocusScope {
         return "CH " + (channel.number || "--") + (title !== "" ? " " + title : "")
     }
 
+    function mediaItemKey(item) {
+        if (!item)
+            return ""
+        return String(item.ratingKey || item.key || item.partKey || item.streamUrl ||
+                      item.url || item.path || item.title || "").trim()
+    }
+
+    function lastProgramKey(schedule) {
+        for (var i = (schedule || []).length - 1; i >= 0; i--) {
+            var item = schedule[i] || ({})
+            if (item.kind !== "commercial") {
+                var key = mediaItemKey(item)
+                if (key !== "")
+                    return key
+            }
+        }
+        return ""
+    }
+
+    function stateCanAvoidRepeat(state, previousKey) {
+        if (!state || previousKey === "")
+            return true
+        var episodes = state.episodes || []
+        if (episodes.length === 0)
+            return false
+        if (mediaItemKey(episodes[state.nextIndex % episodes.length]) !== previousKey)
+            return true
+        return episodes.length > 1
+    }
+
+    function chooseStateIndex(states, previousState, stickiness, previousKey) {
+        if (!states || states.length === 0)
+            return -1
+        var stateIndex = Math.floor(Math.random() * states.length)
+        if (previousState >= 0 && Math.random() < stickiness)
+            stateIndex = previousState
+        if (stateCanAvoidRepeat(states[stateIndex], previousKey))
+            return stateIndex
+        for (var i = 0; i < states.length; i++) {
+            if (stateCanAvoidRepeat(states[i], previousKey))
+                return i
+        }
+        return stateIndex
+    }
+
+    function nextEpisodeForState(state, previousKey) {
+        if (!state)
+            return null
+        var episodes = state.episodes || []
+        if (episodes.length === 0)
+            return null
+        for (var i = 0; i < episodes.length; i++) {
+            var episode = episodes[state.nextIndex % episodes.length]
+            state.nextIndex++
+            if (mediaItemKey(episode) !== previousKey || episodes.length === 1)
+                return episode
+        }
+        return episodes[(state.nextIndex - 1 + episodes.length) % episodes.length]
+    }
+
+    function takeNextMovie(movies, movieIndex, previousKey) {
+        if (!movies || movieIndex >= movies.length)
+            return null
+        if (previousKey !== "" && mediaItemKey(movies[movieIndex]) === previousKey) {
+            for (var i = movieIndex + 1; i < movies.length; i++) {
+                if (mediaItemKey(movies[i]) !== previousKey) {
+                    var tmp = movies[movieIndex]
+                    movies[movieIndex] = movies[i]
+                    movies[i] = tmp
+                    break
+                }
+            }
+        }
+        return movies[movieIndex]
+    }
+
     function commercialStatePool(state) {
         return state && state.pool ? state.pool : []
     }
@@ -94,9 +170,24 @@ FocusScope {
         var deck = state.deck || []
         if (deck.length === 0)
             deck = shuffleList(pool)
-        var commercial = deck.shift()
+        var previousKey = state.lastKey || ""
+        for (var attempt = 0; attempt < Math.max(2, pool.length + 1); attempt++) {
+            if (deck.length === 0)
+                deck = shuffleList(pool)
+            var commercial = deck.shift()
+            var key = mediaItemKey(commercial)
+            if (pool.length > 1 && key !== "" && key === previousKey) {
+                deck.push(commercial)
+                continue
+            }
+            state.deck = deck
+            state.lastKey = key
+            return commercial
+        }
+        var fallback = deck.length > 0 ? deck.shift() : pool[0]
         state.deck = deck
-        return commercial
+        state.lastKey = mediaItemKey(fallback)
+        return fallback
     }
 
     function commercialStateForChannel(channelSource, states) {
@@ -254,13 +345,13 @@ FocusScope {
 
         var previousState = -1
         for (var slot = 0; slot < totalEpisodes; slot++) {
-            var stateIndex = Math.floor(Math.random() * states.length)
-            if (previousState >= 0 && Math.random() < 0.28)
-                stateIndex = previousState
+            var stateIndex = chooseStateIndex(states, previousState, 0.28,
+                                             lastProgramKey(schedule))
 
             var state = states[stateIndex]
-            var episode = state.episodes[state.nextIndex % state.episodes.length]
-            state.nextIndex++
+            var episode = nextEpisodeForState(state, lastProgramKey(schedule))
+            if (!episode)
+                continue
             total = appendProgramWithMidroll(schedule, episode, "episode", total, commercialState)
             total = appendCommercialBreak(schedule, total, commercialState)
             previousState = stateIndex
@@ -301,17 +392,18 @@ FocusScope {
         for (var slot = 0; slot < totalSlots; slot++) {
             var useSeries = states.length > 0 && (movieIndex >= shuffledMovies.length || Math.random() < 0.55)
             if (useSeries) {
-                var stateIndex = Math.floor(Math.random() * states.length)
-                if (previousState >= 0 && Math.random() < 0.34)
-                    stateIndex = previousState
+                var stateIndex = chooseStateIndex(states, previousState, 0.34,
+                                                 lastProgramKey(schedule))
                 var state = states[stateIndex]
-                var episode = state.episodes[state.nextIndex % state.episodes.length]
-                state.nextIndex++
+                var episode = nextEpisodeForState(state, lastProgramKey(schedule))
+                if (!episode)
+                    continue
                 total = appendProgramWithMidroll(schedule, episode, "episode", total, commercialState)
                 total = appendCommercialBreak(schedule, total, commercialState)
                 previousState = stateIndex
             } else if (movieIndex < shuffledMovies.length) {
-                total = appendProgramWithMidroll(schedule, shuffledMovies[movieIndex], "movie", total, commercialState)
+                var movie = takeNextMovie(shuffledMovies, movieIndex, lastProgramKey(schedule))
+                total = appendProgramWithMidroll(schedule, movie, "movie", total, commercialState)
                 total = appendCommercialBreak(schedule, total, commercialState)
                 movieIndex++
                 previousState = -1
@@ -501,13 +593,13 @@ FocusScope {
         }
 
         streamStarted = true
-        transitionBlankVisible = false
         stoppingForTune = false
         stoppingForScheduleAdvance = false
         streamRequestActive = false
         noSignalVisible = false
+        var oscMode = transitionBlankVisible ? "ota-quiet" : "ota"
         mpvController.loadAndPlay(url, offset || 0.0, 0, -1, [], false, -1, 0.0,
-                                  httpHeaderFields || "", false, "ota", false, label || statusText,
+                                  httpHeaderFields || "", false, oscMode, false, label || statusText,
                                   false, !!allowYtdl, format || "")
 
         scheduleAdvanceTimer.stop()
