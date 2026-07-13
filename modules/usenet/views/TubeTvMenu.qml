@@ -13,32 +13,10 @@ FocusScope {
     property string tubeModuleId: "com.240mp.usenet"
     property var rows: []
 
-    function commercialsEnabled() {
-        var value = appCore.get_setting(tubeModuleId, "tube_tv_mode_commercials")
-        if (value === undefined || value === null || value === "")
-            return true
-        return value === true || value === "ON" || value === "true" || value === "1"
-    }
-
-    function midrollCommercialsEnabled() {
-        var value = appCore.get_setting(tubeModuleId, "tube_midroll_commercials")
-        return value === true || value === "ON" || value === "true" || value === "1"
-    }
-
-    function autoChannelsEnabled() {
-        var value = appCore.get_setting(tubeModuleId, "tube_auto_channels")
-        if (value === undefined || value === null || value === "")
-            return true
-        return value === true || value === "ON" || value === "true" || value === "1"
-    }
-
     function rebuildRows() {
         rows = [
             { key: "start", title: "START TV MODE" },
-            { key: "auto_channels", title: "AUTO CHANNELS " + (autoChannelsEnabled() ? "ON" : "OFF") },
-            { key: "commercials", title: "COMMERCIALS " + (commercialsEnabled() ? "ON" : "OFF") },
-            { key: "midroll", title: "MID-ROLL " + (midrollCommercialsEnabled() ? "ON" : "OFF") },
-            { key: "commercial_categories", title: "COMMERCIAL CATEGORIES" }
+            { key: "server", title: "SERVER TV SETTINGS" }
         ]
     }
 
@@ -50,24 +28,11 @@ FocusScope {
             navigateTo("TubeTvMode.qml", {
                 categories: navParams.categories || []
             }, { currentIndex: menuList.currentIndex })
-        } else if (row.key === "auto_channels") {
-            appCore.save_setting(tubeModuleId, "tube_auto_channels",
-                                 autoChannelsEnabled() ? "OFF" : "ON")
-            rebuildRows()
-        } else if (row.key === "commercials") {
-            appCore.save_setting(tubeModuleId, "tube_tv_mode_commercials",
-                                 commercialsEnabled() ? "OFF" : "ON")
-            rebuildRows()
-        } else if (row.key === "midroll") {
-            appCore.save_setting(tubeModuleId, "tube_midroll_commercials",
-                                 midrollCommercialsEnabled() ? "OFF" : "ON")
-            rebuildRows()
-        } else if (row.key === "commercial_categories") {
-            navigateTo("../../../views/MultiSelectSettings.qml", {
-                moduleId: tubeModuleId,
-                settingKey: "tube_commercial_categories",
-                settingLabel: "THE TUBE COMMERCIALS"
-            }, { currentIndex: menuList.currentIndex })
+        } else if (row.key === "server") {
+            rows = [
+                { key: "start", title: "START TV MODE" },
+                { key: "server", title: "USE SERVER WEB UI" }
+            ]
         }
     }
 
@@ -94,7 +59,7 @@ FocusScope {
         iconSource: moduleRoot.moduleIcon
         iconHeight: root.sh * 0.075
         title: moduleRoot.moduleName
-        subtitle: "LOCAL TV MODE"
+        subtitle: "SERVER TV MODE"
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: root.sh * 0.125

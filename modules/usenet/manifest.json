@@ -50,31 +50,6 @@
       "type": "list_single",
       "options": ["120", "300", "600", "900"],
       "default": "300"
-    },
-    {
-      "key": "tube_commercial_categories",
-      "label": "THE TUBE COMMERCIALS",
-      "type": "multiselect_submenu",
-      "options_source": "dynamic",
-      "options_slot": "load_tube_commercial_category_options"
-    },
-    {
-      "key": "tube_tv_mode_commercials",
-      "label": "THE TUBE TV COMMERCIALS",
-      "type": "toggle",
-      "default": "ON"
-    },
-    {
-      "key": "tube_auto_channels",
-      "label": "THE TUBE AUTO CHANNELS",
-      "type": "toggle",
-      "default": "ON"
-    },
-    {
-      "key": "tube_midroll_commercials",
-      "label": "THE TUBE MID-ROLL",
-      "type": "toggle",
-      "default": "OFF"
     }
   ]
 }

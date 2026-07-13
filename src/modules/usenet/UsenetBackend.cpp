@@ -638,6 +638,21 @@ void UsenetBackend::load_active_streams()
     });
 }
 
+void UsenetBackend::load_tube_tv_lineup()
+{
+    if (get_auth_state() != QStringLiteral("authed")) {
+        emit errorOccurred(QStringLiteral("PAIR TATER TUBE SERVER"));
+        return;
+    }
+
+    QNetworkRequest request(taterApiUrl(QStringLiteral("/api/tater/tv/lineup")));
+    addTaterAuthHeader(request);
+    QNetworkReply *reply = m_network.get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        handleTubeTvLineupReply(reply);
+    });
+}
+
 void UsenetBackend::request_streams(const QString &requestId, const QVariantMap &item)
 {
     const QString nzbUrl = item.value(QStringLiteral("nzbUrl")).toString().trimmed();
@@ -839,6 +854,31 @@ void UsenetBackend::handleActiveStreamsReply(QNetworkReply *reply)
             streams.append(value.toObject().toVariantMap());
     }
     emit activeStreamsLoaded(streams);
+}
+
+void UsenetBackend::handleTubeTvLineupReply(QNetworkReply *reply)
+{
+    reply->deleteLater();
+    const QByteArray body = reply->readAll();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (isRedirectStatus(status)) {
+        emit errorOccurred(QStringLiteral("SERVER URL NEEDS HTTPS"));
+        return;
+    }
+    if (reply->error() != QNetworkReply::NoError || status >= 400) {
+        QString error;
+        parseJsonRows(body, QStringLiteral("channels"), &error);
+        emit errorOccurred(error.isEmpty() ? QStringLiteral("TV LINEUP FAILED") : error);
+        return;
+    }
+
+    QString error;
+    const QVariantList channels = parseJsonRows(body, QStringLiteral("channels"), &error);
+    if (!error.isEmpty()) {
+        emit errorOccurred(error);
+        return;
+    }
+    emit tubeTvLineupLoaded(channels);
 }
 
 void UsenetBackend::handleStreamsReply(QNetworkReply *reply, const QString &requestId,

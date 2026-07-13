@@ -21,6 +21,7 @@ FocusScope {
     property int currentScheduleIndex: -1
     property double startedAtMs: 0
     property bool loading: true
+    property bool loadingServerLineup: false
     property bool leaving: false
     property bool tuningStaticVisible: true
     property bool noSignalVisible: false
@@ -32,6 +33,7 @@ FocusScope {
     property string statusText: "LOADING TV MODE"
     property string streamInfoText: ""
     property bool currentStreamUsesServer: false
+    property bool currentChannelLiveStream: false
     property double currentPlaybackOffsetSeconds: 0
     property bool currentPlaybackUsesServerSeek: false
 
@@ -197,7 +199,7 @@ FocusScope {
 
     function plannedStreamInfo(playbackUrl, item) {
         if (item && item.kind === "commercial")
-            return "LOCAL SPOT | DIRECT PLAY"
+            return "SERVER SPOT | DIRECT PLAY"
         if (queryValue(playbackUrl, "transcode") === "0")
             return "SERVER STREAM | DIRECT PLAY"
 
@@ -1018,6 +1020,42 @@ FocusScope {
         startLocalLoad()
     }
 
+    function startServerLineupLoad() {
+        loading = true
+        loadingServerLineup = true
+        noSignalVisible = false
+        tuningStaticVisible = true
+        transitionBlankVisible = false
+        stoppingForTune = false
+        stoppingForScheduleAdvance = false
+        streamStarted = false
+        currentChannelLiveStream = false
+        currentIndex = -1
+        previousIndex = -1
+        currentScheduleIndex = -1
+        channels = []
+        statusText = "LOADING SERVER TV"
+        usenetBackend.load_tube_tv_lineup()
+    }
+
+    function applyServerLineup(rows) {
+        channels = asList(rows)
+        loading = false
+        loadingServerLineup = false
+        currentScheduleIndex = -1
+        previousIndex = -1
+        startedAtMs = Date.now()
+
+        if (channels.length === 0) {
+            tuningStaticVisible = false
+            noSignalVisible = true
+            statusText = "NO CHANNELS AVAILABLE"
+            return
+        }
+
+        tuneIndex(0, false)
+    }
+
     function selectedChannel() {
         if (currentIndex < 0 || currentIndex >= channels.length)
             return null
@@ -1123,6 +1161,7 @@ FocusScope {
         tuningStaticVisible = true
         noSignalVisible = false
         streamStarted = false
+        currentChannelLiveStream = false
         stoppingForScheduleAdvance = false
         statusText = channelLabel(channel)
 
@@ -1169,6 +1208,11 @@ FocusScope {
             return
 
         var channel = selectedChannel()
+        if (channel && channel.streamUrl) {
+            launchChannelStream(channel)
+            return
+        }
+
         var resolved = findScheduleItem(channel)
         if (!resolved) {
             requestScheduleItem(channel, null, -1, 0.0, 0.0)
@@ -1177,6 +1221,33 @@ FocusScope {
         requestScheduleItem(channel, resolved.item, resolved.index,
                             resolved.offset || 0.0,
                             resolved.segmentRemaining || 0.0)
+    }
+
+    function launchChannelStream(channel) {
+        if (!channel || !channel.streamUrl) {
+            transitionBlankVisible = false
+            noSignalVisible = true
+            tuningStaticVisible = false
+            statusText = "LOCAL TV PLAYBACK FAILED"
+            return
+        }
+
+        currentScheduleIndex = -1
+        streamStarted = true
+        stoppingForTune = false
+        stoppingForScheduleAdvance = false
+        noSignalVisible = false
+        currentStreamUsesServer = true
+        currentChannelLiveStream = true
+        currentPlaybackOffsetSeconds = 0
+        currentPlaybackUsesServerSeek = false
+        var label = channelLabel(channel)
+        statusText = label
+        var playbackUrl = usenetBackend.playback_url(channel.streamUrl, Math.round(root.sw), Math.round(root.sh))
+        updateStreamOverlayInfo("SERVER CHANNEL | LIVE")
+        mpvController.loadAndPlay(playbackUrl, 0.0, 0, -1, [], false, -1, 0.0,
+                                  "", false, "ota-tv", false, label)
+        scheduleAdvanceTimer.stop()
     }
 
     function launchPlayback(url, offset, label, segmentRemaining, item, timelineOffset, useServerSeek) {
@@ -1192,6 +1263,7 @@ FocusScope {
         stoppingForTune = false
         stoppingForScheduleAdvance = false
         noSignalVisible = false
+        currentChannelLiveStream = false
         var playbackUrl = item && item.kind !== "commercial"
             ? usenetBackend.playback_url(url, Math.round(root.sw), Math.round(root.sh))
             : url
@@ -1352,11 +1424,26 @@ FocusScope {
         function onErrorOccurred(message) {
             if (!tvRoot.loading)
                 return
+            if (tvRoot.loadingServerLineup) {
+                tvRoot.loading = false
+                tvRoot.loadingServerLineup = false
+                tvRoot.transitionBlankVisible = false
+                tvRoot.tuningStaticVisible = false
+                tvRoot.noSignalVisible = true
+                tvRoot.statusText = String(message || "TV LINEUP FAILED").toUpperCase()
+                return
+            }
             if (tvRoot.tvLoadQueue.length > 0) {
                 tvRoot.loadNextLocalBatch()
                 return
             }
             tvRoot.buildReadyChannels()
+        }
+
+        function onTubeTvLineupLoaded(rows) {
+            if (!tvRoot.loadingServerLineup)
+                return
+            tvRoot.applyServerLineup(rows || [])
         }
 
         function onActiveStreamsLoaded(streams) {
@@ -1381,6 +1468,15 @@ FocusScope {
             if (tvRoot.leaving)
                 return
             scheduleAdvanceTimer.stop()
+            if (tvRoot.currentChannelLiveStream) {
+                tvRoot.currentChannelLiveStream = false
+                tvRoot.streamStarted = false
+                tvRoot.transitionBlankVisible = false
+                tvRoot.tuningStaticVisible = false
+                tvRoot.noSignalVisible = true
+                tvRoot.statusText = "CHANNEL STREAM ENDED"
+                return
+            }
             tvRoot.learnCurrentPlaybackDuration(finalPositionMs, finalDurationMs)
             tvRoot.playNextScheduleItem()
         }
@@ -1395,6 +1491,17 @@ FocusScope {
                 tvRoot.stoppingForTune = false
                 return
             }
+            if (tvRoot.currentChannelLiveStream) {
+                tvRoot.currentChannelLiveStream = false
+                tvRoot.streamStarted = false
+                if (!tvRoot.leaving) {
+                    tvRoot.transitionBlankVisible = false
+                    tvRoot.tuningStaticVisible = false
+                    tvRoot.noSignalVisible = true
+                    tvRoot.statusText = "CHANNEL STREAM ENDED"
+                }
+                return
+            }
             if (!tvRoot.leaving && tvRoot.streamStarted)
                 tvRoot.exitTvMode()
         }
@@ -1405,10 +1512,12 @@ FocusScope {
                 return
             }
             scheduleAdvanceTimer.stop()
+            var wasLiveChannel = tvRoot.currentChannelLiveStream
+            tvRoot.currentChannelLiveStream = false
             tvRoot.transitionBlankVisible = false
             tvRoot.tuningStaticVisible = false
             tvRoot.noSignalVisible = true
-            tvRoot.statusText = "LOCAL TV PLAYBACK FAILED"
+            tvRoot.statusText = wasLiveChannel ? "CHANNEL STREAM FAILED" : "LOCAL TV PLAYBACK FAILED"
         }
 
         function onScriptMessageReceived(message, arg) {
@@ -1441,7 +1550,7 @@ FocusScope {
         }
     }
 
-    Component.onCompleted: startCommercialLoad()
+    Component.onCompleted: startServerLineupLoad()
 
     Component.onDestruction: {
         if (!leaving && mpvController.running)

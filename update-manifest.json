@@ -1,15 +1,15 @@
 {
-  "version": "v1.4.5",
-  "app_version": "1.4.5",
+  "version": "v1.4.6",
+  "app_version": "1.4.6",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.5/Tater-Tube-v1.4.5-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.5.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.6/Tater-Tube-v1.4.6-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.6.tar.gz",
   "notes": [
-    "Keeps The Tube TV Mode inside mpv during video and commercial transitions so the app/static screen does not flash between items.",
-    "Quietly replaces TV Mode media in the existing mpv session and suppresses transition overlays.",
-    "Improves The Tube TV Mode timing by learning real playback duration from mpv and correcting schedules when server duration metadata is missing.",
-    "Bumps server-backed episode fallback timing to avoid stale offsets replaying the same short after commercial breaks."
+    "Moves The Tube TV Mode to server-side continuous channel streams for smoother video and commercial transitions.",
+    "Keeps The Tube channel timing on the server so channel changes behave more like live TV.",
+    "Adds server-backed Tube TV channel URLs while keeping the older local schedule playback as a fallback.",
+    "Improves The Tube local browsing, custom channel handling, and server-backed TV Mode setup."
   ]
 }

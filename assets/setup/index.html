@@ -1084,12 +1084,11 @@
       if (!entry || entry.id === "__app") return "Theme, sleep timer, and global appliance settings.";
       if (entry.id === "__commercials") return "Local commercial categories for Public Access and VoD TV Mode.";
       if (entry.id === "__vod_channels") return "Custom movie and TV series channels for VoD TV Mode.";
-      if (entry.id === "__tube_channels") return "Custom Local TV Mode channels for The Tube.";
       const summaries = {
         "com.240mp.ota": "HDHomeRun address and over-the-air setup.",
         "com.240mp.emby_jellyfin": "Emby, Jellyfin, Plex, playback, and library settings.",
         "com.240mp.youtube_playlist": "Public Access playlists, quality, and cache refresh.",
-        "com.240mp.usenet": "The Tube server pairing, playback quality, and TV Mode settings.",
+        "com.240mp.usenet": "The Tube server pairing, playback quality, and stream browsing.",
         "com.240mp.audio_tapes": "Tape Deck provider, visibility, and music playback setup.",
         "com.240mp.retro": "RetroNAS share, local ROM path, core install, and game cache.",
         "com.240mp.local_files": "Local media folder, loop, shuffle, and resume behavior.",
@@ -1143,7 +1142,7 @@
       const modules = setupData.modules || [];
       const tube = modules.find(module => module.id === "com.240mp.usenet");
       const rest = modules.filter(module => module.id !== "com.240mp.usenet");
-      const top = tube ? [tube, tubeChannelsEntry(), appEntry()] : [appEntry(), tubeChannelsEntry()];
+      const top = tube ? [tube, appEntry()] : [appEntry()];
       return top.concat([commercialsEntry(), vodChannelsEntry()], rest);
     }
 
@@ -1151,7 +1150,6 @@
       if (id === "__app") return appEntry();
       if (id === "__commercials") return commercialsEntry();
       if (id === "__vod_channels") return vodChannelsEntry();
-      if (id === "__tube_channels") return tubeChannelsEntry();
       return (setupData.modules || []).find(module => module.id === id) || null;
     }
 
@@ -1778,7 +1776,7 @@
             ? renderCommercialsCard()
             : (currentModuleId === "__vod_channels"
               ? renderVodChannelsCard()
-              : (currentModuleId === "__tube_channels" ? renderTubeChannelsCard() : renderModule(entry)))));
+              : renderModule(entry))));
       bindCards();
       bindDetailNav();
     }
@@ -2927,9 +2925,7 @@
         api("/api/v1/setup/modules"),
         loadCommercialLibrary(),
         loadVodChannels(),
-        loadVodLibraries(),
-        loadTubeChannels(),
-        loadTubeLocalCatalog()
+        loadVodLibraries()
       ]);
       setupData = results[0];
       render();

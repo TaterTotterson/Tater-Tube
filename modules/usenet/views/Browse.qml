@@ -356,6 +356,10 @@ FocusScope {
             statusText = "LOADING " + currentCategoryTitle
             itemStack = []
             usenetBackend.load_local_items(row.id || "", "", -1, currentCategoryTitle)
+        } else if (row.type === "localDiscover") {
+            statusText = "LOADING " + currentCategoryTitle
+            itemStack = []
+            usenetBackend.load_items(row.id || "", currentCategoryTitle)
         } else {
             statusText = "BROWSING " + currentCategoryTitle
             usenetBackend.load_items(row.id || "", currentCategoryTitle)
@@ -437,6 +441,21 @@ FocusScope {
             return
         }
         if (row.type === "localFolder") {
+            if ((row.mediaType || "") === "show") {
+                navigateTo("LocalShow.qml", {
+                    item: row,
+                    libraryName: currentCategoryTitle
+                }, { currentIndex: itemList.currentIndex })
+                return
+            }
+            if ((row.mediaType || "") === "season") {
+                navigateTo("LocalSeason.qml", {
+                    item: row,
+                    showTitle: currentCategoryTitle,
+                    libraryName: currentCategoryTitle
+                }, { currentIndex: itemList.currentIndex })
+                return
+            }
             itemStack = itemStack.concat([{
                 title: currentCategoryTitle,
                 rows: items,
