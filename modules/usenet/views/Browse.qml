@@ -337,7 +337,7 @@ FocusScope {
 
     function browseCategory(row) {
         if (!row) return
-        if (row.type === "localTvMenu") {
+        if (row.type === "tubeTv" || row.type === "localTvMenu") {
             navigateTo("TubeTvMenu.qml", { categories: categories }, { currentIndex: categoryList.currentIndex })
             return
         }
@@ -369,7 +369,7 @@ FocusScope {
     function selectCategory(index) {
         if (index < 0 || index >= categoryRows.length) return
         var row = categoryRows[index] || ({})
-        if (row.type === "localTvMenu") {
+        if (row.type === "tubeTv" || row.type === "localTvMenu") {
             if (mode === "subcategories") currentSubcategoryIndex = index
             else currentCategoryIndex = index
             browseCategory(row)
@@ -528,19 +528,12 @@ FocusScope {
         returnToCategoryMenu()
     }
 
-    function rowsWithLocalTvMode(rows) {
+    function rowsWithLocalContinueWatching(rows) {
         var next = []
         for (var i = 0; i < (rows || []).length; i++) {
             var row = Object.assign({}, rows[i] || ({}))
             if (row.type === "localRoot") {
                 var children = (row.children || []).slice()
-                if (children.length > 0 && (!children[0] || children[0].type !== "localTvMenu")) {
-                    children.unshift({
-                        type: "localTvMenu",
-                        title: "TV MODE",
-                        detail: "LOCAL"
-                    })
-                }
                 var hasContinue = false
                 for (var c = 0; c < children.length; c++) {
                     if ((children[c] || ({})).type === "continue") {
@@ -549,8 +542,7 @@ FocusScope {
                     }
                 }
                 if (!hasContinue) {
-                    var continueIndex = children.length > 0 && children[0].type === "localTvMenu" ? 1 : 0
-                    children.splice(continueIndex, 0, {
+                    children.unshift({
                         type: "continue",
                         title: "CONTINUE WATCHING",
                         detail: "LOCAL",
@@ -740,7 +732,7 @@ FocusScope {
         target: usenetBackend
 
         function onCategoriesLoaded(rows) {
-            categories = rowsWithLocalTvMode(rows || [])
+            categories = rowsWithLocalContinueWatching(rows || [])
             shortcutRows = []
             resetCategoryDrilldown()
             if (categories.length === 0 && shortcutRows.length === 0) {

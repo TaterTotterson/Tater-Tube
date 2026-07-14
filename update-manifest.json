@@ -1,15 +1,14 @@
 {
-  "version": "v1.4.6",
-  "app_version": "1.4.6",
+  "version": "v1.4.7",
+  "app_version": "1.4.7",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.6/Tater-Tube-v1.4.6-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.6.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.7/Tater-Tube-v1.4.7-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.7.tar.gz",
   "notes": [
-    "Moves The Tube TV Mode to server-side continuous channel streams for smoother video and commercial transitions.",
-    "Keeps The Tube channel timing on the server so channel changes behave more like live TV.",
-    "Adds server-backed Tube TV channel URLs while keeping the older local schedule playback as a fallback.",
-    "Improves The Tube local browsing, custom channel handling, and server-backed TV Mode setup."
+    "Shows Tube TV as a server-provided top-level The Tube menu item instead of injecting it under Local.",
+    "Keeps The Tube catalog order aligned with the server: Tube TV, Stream, then Local.",
+    "Updates the Tube TV menu labels to match the server configuration naming."
   ]
 }

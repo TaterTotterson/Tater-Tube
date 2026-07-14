@@ -16,7 +16,7 @@ FocusScope {
     function rebuildRows() {
         rows = [
             { key: "start", title: "START TV MODE" },
-            { key: "server", title: "SERVER TV SETTINGS" }
+            { key: "server", title: "TUBE TV SETTINGS" }
         ]
     }
 
@@ -59,7 +59,7 @@ FocusScope {
         iconSource: moduleRoot.moduleIcon
         iconHeight: root.sh * 0.075
         title: moduleRoot.moduleName
-        subtitle: "SERVER TV MODE"
+        subtitle: "TUBE TV"
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: root.sh * 0.125
