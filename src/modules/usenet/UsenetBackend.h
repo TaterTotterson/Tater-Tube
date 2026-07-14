@@ -48,7 +48,7 @@ signals:
     void musicAlbumsLoaded(const QVariant &albums);
     void musicTracksLoaded(const QVariant &tracks);
     void activeStreamsLoaded(const QVariantList &streams);
-    void tubeTvLineupLoaded(const QVariantList &channels);
+    void tubeTvLineupLoaded(const QVariantList &channels, const QVariantMap &metadata);
     void streamsReady(const QString &requestId, const QString &title, const QVariantList &streams);
     void pairingSucceeded(const QString &serverUrl, const QString &token, const QString &playerName);
     void errorOccurred(const QString &message);

@@ -872,13 +872,36 @@ void UsenetBackend::handleTubeTvLineupReply(QNetworkReply *reply)
         return;
     }
 
-    QString error;
-    const QVariantList channels = parseJsonRows(body, QStringLiteral("channels"), &error);
-    if (!error.isEmpty()) {
-        emit errorOccurred(error);
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(body, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        emit errorOccurred(QStringLiteral("SERVER RESPONSE INVALID"));
         return;
     }
-    emit tubeTvLineupLoaded(channels);
+
+    QJsonObject obj = doc.object();
+    if (obj.value(QStringLiteral("success")).isBool() && !obj.value(QStringLiteral("success")).toBool()) {
+        const QJsonObject err = obj.value(QStringLiteral("error")).toObject();
+        QString message = err.value(QStringLiteral("message")).toString();
+        if (message.isEmpty())
+            message = obj.value(QStringLiteral("message")).toString();
+        emit errorOccurred(message.isEmpty() ? QStringLiteral("TV LINEUP FAILED") : message.toUpper());
+        return;
+    }
+
+    if (obj.value(QStringLiteral("data")).isObject())
+        obj = obj.value(QStringLiteral("data")).toObject();
+
+    QVariantList channels;
+    const QJsonArray values = obj.value(QStringLiteral("channels")).toArray();
+    for (const QJsonValue &value : values) {
+        if (value.isObject())
+            channels.append(value.toObject().toVariantMap());
+    }
+
+    QVariantMap metadata = obj.toVariantMap();
+    metadata.remove(QStringLiteral("channels"));
+    emit tubeTvLineupLoaded(channels, metadata);
 }
 
 void UsenetBackend::handleStreamsReply(QNetworkReply *reply, const QString &requestId,

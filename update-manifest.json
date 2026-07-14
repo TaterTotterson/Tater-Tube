@@ -1,14 +1,14 @@
 {
-  "version": "v1.4.8",
-  "app_version": "1.4.8",
+  "version": "v1.4.9",
+  "app_version": "1.4.9",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.8/Tater-Tube-v1.4.8-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.8.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.9/Tater-Tube-v1.4.9-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.9.tar.gz",
   "notes": [
-    "Cleans up The Tube Local series browsing so shows open as browse-only series views.",
-    "Fixes season selection so clicking a season opens episodes instead of trying to play the season folder.",
-    "Keeps only season and episode views playable while preserving the VCR-style list presentation."
+    "Adds CH 01 Tater Guide to The Tube TV Mode as a passive scrolling guide channel.",
+    "Uses the server lineup timing so the guide shows what each channel is airing now and what comes next.",
+    "Keeps guide movement automatic only, while normal channel up/down tuning still works."
   ]
 }

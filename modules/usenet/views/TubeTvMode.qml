@@ -36,6 +36,11 @@ FocusScope {
     property bool currentChannelLiveStream: false
     property double currentPlaybackOffsetSeconds: 0
     property bool currentPlaybackUsesServerSeek: false
+    property bool guideChannelVisible: false
+    property var guideDisplayChannels: []
+    property var guideLineupMetadata: ({})
+    property double guideNowMs: Date.now()
+    property string guideMascotSource: Qt.resolvedUrl("../../../assets/images/mascots/usenet.png")
 
     focus: true
 
@@ -97,6 +102,69 @@ FocusScope {
         if (!channel) return "CH --"
         var title = String(channel.title || "").trim()
         return "CH " + (channel.number || "--") + (title !== "" ? " " + title : "")
+    }
+
+    function isGuideChannel(channel) {
+        return channel && channel.guideChannel === true
+    }
+
+    function guideChannel() {
+        return {
+            number: "01",
+            title: "TATER GUIDE",
+            guideChannel: true,
+            schedule: [],
+            totalDuration: 3600
+        }
+    }
+
+    function dateMs(value) {
+        var parsed = Date.parse(String(value || ""))
+        return isNaN(parsed) ? 0 : parsed
+    }
+
+    function formatShortDuration(seconds) {
+        var total = Math.max(0, Math.round(Number(seconds || 0)))
+        var minutes = Math.floor(total / 60)
+        if (minutes <= 0)
+            return total + "S"
+        if (minutes < 60)
+            return minutes + "M"
+        var hours = Math.floor(minutes / 60)
+        var remaining = minutes % 60
+        return hours + "H" + (remaining > 0 ? " " + remaining + "M" : "")
+    }
+
+    function scheduleTitle(row) {
+        if (!row)
+            return "STAND BY"
+        var title = String(row.title || "").trim()
+        if (title !== "")
+            return title.toUpperCase()
+        var path = String(row.path || "").split(/[\\/]/)
+        return path.length > 0 ? String(path[path.length - 1]).toUpperCase() : "UNTITLED"
+    }
+
+    function scheduleKindLabel(row) {
+        var kind = String((row && (row.kind || row.mediaType || row.type)) || "MEDIA").toUpperCase()
+        if (kind === "COMMERCIAL")
+            return "SPOT"
+        if (kind === "EPISODE")
+            return "TV"
+        if (kind === "MOVIE")
+            return "MOVIE"
+        return kind
+    }
+
+    function guideNextRows(channel, currentIndex, count) {
+        if (!channel || !channel.schedule || channel.schedule.length === 0)
+            return []
+        var rows = []
+        var start = currentIndex >= 0 ? currentIndex + 1 : 0
+        var limit = Math.min(count, channel.schedule.length)
+        for (var i = 0; i < limit; i++)
+            rows.push(channel.schedule[(start + i) % channel.schedule.length])
+        return rows
     }
 
     function mediaKind(row) {
@@ -1038,13 +1106,19 @@ FocusScope {
         usenetBackend.load_tube_tv_lineup()
     }
 
-    function applyServerLineup(rows) {
-        channels = asList(rows)
+    function applyServerLineup(rows, metadata) {
+        var realChannels = asList(rows).filter(function(channel) {
+            return String((channel && channel.number) || "") !== "01"
+        })
+        guideDisplayChannels = realChannels
+        guideLineupMetadata = metadata || ({})
+        channels = [guideChannel()].concat(realChannels)
         loading = false
         loadingServerLineup = false
         currentScheduleIndex = -1
         previousIndex = -1
-        startedAtMs = Date.now()
+        var serverStartMs = dateMs(guideLineupMetadata.startedAt)
+        startedAtMs = serverStartMs > 0 ? serverStartMs : Date.now()
 
         if (channels.length === 0) {
             tuningStaticVisible = false
@@ -1068,7 +1142,8 @@ FocusScope {
             return null
         }
 
-        var elapsed = Math.max(0, (Date.now() - startedAtMs) / 1000.0)
+        var nowMs = arguments.length > 1 && arguments[1] > 0 ? arguments[1] : Date.now()
+        var elapsed = Math.max(0, (nowMs - startedAtMs) / 1000.0)
         var position = elapsed % channel.totalDuration
         for (var i = 0; i < channel.schedule.length; i++) {
             var item = channel.schedule[i]
@@ -1158,6 +1233,9 @@ FocusScope {
     function showStaticForChannel(channel) {
         scheduleAdvanceTimer.stop()
         transitionBlankVisible = false
+        if (guideChannelVisible)
+            guideCrawlAnimation.stop()
+        guideChannelVisible = false
         tuningStaticVisible = true
         noSignalVisible = false
         streamStarted = false
@@ -1208,6 +1286,10 @@ FocusScope {
             return
 
         var channel = selectedChannel()
+        if (isGuideChannel(channel)) {
+            showGuideChannel()
+            return
+        }
         if (channel && channel.streamUrl) {
             launchChannelStream(channel)
             return
@@ -1248,6 +1330,36 @@ FocusScope {
         mpvController.loadAndPlay(playbackUrl, 0.0, 0, -1, [], false, -1, 0.0,
                                   "", false, "ota-tv", false, label)
         scheduleAdvanceTimer.stop()
+    }
+
+    function restartGuideScroll() {
+        if (!guideChannelVisible)
+            return
+        guideCrawlAnimation.stop()
+        guideRowsColumn.y = guideViewport.height
+        guideCrawlAnimation.from = guideViewport.height
+        guideCrawlAnimation.to = -Math.max(guideRowsColumn.height, guideViewport.height)
+        guideCrawlAnimation.duration = Math.max(50000, Math.round((guideViewport.height + guideRowsColumn.height) * 115))
+        guideCrawlAnimation.start()
+    }
+
+    function showGuideChannel() {
+        scheduleAdvanceTimer.stop()
+        transitionBlankVisible = false
+        tuningStaticVisible = false
+        noSignalVisible = false
+        streamStarted = false
+        currentChannelLiveStream = false
+        currentStreamUsesServer = false
+        currentScheduleIndex = -1
+        statusText = "CH 01 TATER GUIDE"
+        if (mpvController.running) {
+            stoppingForTune = true
+            mpvController.stop()
+        }
+        guideChannelVisible = true
+        guideNowMs = Date.now()
+        Qt.callLater(restartGuideScroll)
     }
 
     function launchPlayback(url, offset, label, segmentRemaining, item, timelineOffset, useServerSeek) {
@@ -1356,6 +1468,7 @@ FocusScope {
         leaving = true
         tuneTimer.stop()
         scheduleAdvanceTimer.stop()
+        guideCrawlAnimation.stop()
         if (mpvController.running)
             mpvController.stop()
         goBack()
@@ -1411,6 +1524,14 @@ FocusScope {
         onTriggered: tvRoot.refreshActiveStreamInfo()
     }
 
+    Timer {
+        id: guideClockTimer
+        interval: 1000
+        repeat: true
+        running: tvRoot.guideChannelVisible && !tvRoot.leaving
+        onTriggered: tvRoot.guideNowMs = Date.now()
+    }
+
     Connections {
         target: usenetBackend
 
@@ -1440,10 +1561,10 @@ FocusScope {
             tvRoot.buildReadyChannels()
         }
 
-        function onTubeTvLineupLoaded(rows) {
+        function onTubeTvLineupLoaded(rows, metadata) {
             if (!tvRoot.loadingServerLineup)
                 return
-            tvRoot.applyServerLineup(rows || [])
+            tvRoot.applyServerLineup(rows || [], metadata || ({}))
         }
 
         function onActiveStreamsLoaded(streams) {
@@ -1566,6 +1687,230 @@ FocusScope {
     Rectangle {
         anchors.fill: parent
         color: tvRoot.tuningStaticVisible ? "transparent" : "black"
+    }
+
+    Rectangle {
+        id: guideScreen
+        anchors.fill: parent
+        visible: tvRoot.guideChannelVisible && !tvRoot.loading
+        color: "#050403"
+        z: 4
+
+        Rectangle {
+            id: guideHeader
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: root.sh * 0.19
+            color: "#14100c"
+            border.color: root.primaryColor
+            border.width: Math.max(1, root.sh * 0.003)
+
+            Image {
+                id: guideMascot
+                source: tvRoot.guideMascotSource
+                anchors.left: parent.left
+                anchors.leftMargin: root.sw * 0.035
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.sw * 0.13
+                height: parent.height * 0.88
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                mipmap: true
+            }
+
+            Text {
+                anchors.left: guideMascot.right
+                anchors.leftMargin: root.sw * 0.025
+                anchors.verticalCenter: parent.verticalCenter
+                text: "TATER GUIDE"
+                color: root.primaryColor
+                font.family: root.globalFont
+                font.capitalization: Font.AllUppercase
+                font.pixelSize: root.sh * 0.078
+                horizontalAlignment: Text.AlignLeft
+            }
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: root.sw * 0.045
+                anchors.verticalCenter: parent.verticalCenter
+                text: "CH 01"
+                color: root.secondaryColor
+                font.family: root.globalFont
+                font.capitalization: Font.AllUppercase
+                font.pixelSize: root.sh * 0.055
+            }
+        }
+
+        Rectangle {
+            id: guideColumnHeader
+            anchors.top: guideHeader.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: root.sh * 0.072
+            color: "#0b0806"
+            border.color: "#55ff7a00"
+            border.width: Math.max(1, root.sh * 0.002)
+
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: root.sw * 0.055
+                anchors.verticalCenter: parent.verticalCenter
+                text: "CHANNEL"
+                color: root.secondaryColor
+                font.family: root.globalFont
+                font.pixelSize: root.sh * 0.032
+            }
+
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: root.sw * 0.28
+                anchors.verticalCenter: parent.verticalCenter
+                text: "NOW SHOWING"
+                color: root.secondaryColor
+                font.family: root.globalFont
+                font.pixelSize: root.sh * 0.032
+            }
+
+            Text {
+                anchors.right: parent.right
+                anchors.rightMargin: root.sw * 0.065
+                anchors.verticalCenter: parent.verticalCenter
+                text: "UP NEXT"
+                color: root.secondaryColor
+                font.family: root.globalFont
+                font.pixelSize: root.sh * 0.032
+            }
+        }
+
+        Item {
+            id: guideViewport
+            anchors.top: guideColumnHeader.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            clip: true
+
+            Column {
+                id: guideRowsColumn
+                width: guideViewport.width
+                spacing: Math.max(1, root.sh * 0.006)
+
+                Repeater {
+                    model: tvRoot.guideDisplayChannels
+
+                    Rectangle {
+                        width: guideViewport.width
+                        height: root.sh * 0.14
+                        color: index % 2 === 0 ? "#15110d" : "#0d0a07"
+                        border.color: "#33ff7a00"
+                        border.width: Math.max(1, root.sh * 0.0018)
+
+                        property var channel: modelData || ({})
+                        property var resolved: tvRoot.findScheduleItem(channel, tvRoot.guideNowMs)
+                        property var currentItem: resolved ? resolved.item : ({})
+                        property var nextRows: tvRoot.guideNextRows(channel, resolved ? resolved.index : -1, 2)
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: root.sw * 0.045
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: root.sw * 0.18
+                            text: "CH " + (channel.number || "--") + "\n" + String(channel.title || "").toUpperCase()
+                            color: root.primaryColor
+                            font.family: root.globalFont
+                            font.pixelSize: root.sh * 0.034
+                            lineHeight: 0.9
+                            elide: Text.ElideRight
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 2
+                        }
+
+                        Column {
+                            anchors.left: parent.left
+                            anchors.leftMargin: root.sw * 0.28
+                            anchors.right: parent.right
+                            anchors.rightMargin: root.sw * 0.36
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: root.sh * 0.008
+
+                            Text {
+                                width: parent.width
+                                text: tvRoot.scheduleTitle(currentItem)
+                                color: "#f4efe7"
+                                font.family: root.globalFont
+                                font.pixelSize: root.sh * 0.04
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                width: parent.width
+                                text: tvRoot.scheduleKindLabel(currentItem) + " / " + tvRoot.formatShortDuration(currentItem.duration || 0)
+                                color: "#9f9488"
+                                font.family: root.globalFont
+                                font.pixelSize: root.sh * 0.026
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Column {
+                            anchors.right: parent.right
+                            anchors.rightMargin: root.sw * 0.045
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: root.sw * 0.29
+                            spacing: root.sh * 0.007
+
+                            Repeater {
+                                model: nextRows
+
+                                Text {
+                                    width: parent.width
+                                    text: tvRoot.scheduleTitle(modelData)
+                                    color: index === 0 ? root.secondaryColor : "#8f8377"
+                                    font.family: root.globalFont
+                                    font.pixelSize: index === 0 ? root.sh * 0.032 : root.sh * 0.026
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: guideViewport.width
+                    height: root.sh * 0.22
+                    color: "transparent"
+                    visible: tvRoot.guideDisplayChannels.length === 0
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "NO CHANNEL DATA AVAILABLE"
+                        color: root.primaryColor
+                        font.family: root.globalFont
+                        font.pixelSize: root.sh * 0.045
+                    }
+                }
+            }
+
+            NumberAnimation {
+                id: guideCrawlAnimation
+                target: guideRowsColumn
+                property: "y"
+                from: guideViewport.height
+                to: -guideRowsColumn.height
+                duration: 60000
+                loops: Animation.Infinite
+                easing.type: Easing.Linear
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: "transparent"
+            border.color: "#22ffffff"
+            border.width: Math.max(1, root.sh * 0.002)
+        }
     }
 
     NoSignalScreen {
