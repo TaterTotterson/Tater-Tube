@@ -1,14 +1,14 @@
 {
-  "version": "v1.5.1",
-  "app_version": "1.5.1",
+  "version": "v1.5.2",
+  "app_version": "1.5.2",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.5.1/Tater-Tube-v1.5.1-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.5.1.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.5.2/Tater-Tube-v1.5.2-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.5.2.tar.gz",
   "notes": [
-    "Moves Pi 4 composite and Pi 5 HDMI playback to zero-copy DRM Prime hardware decoding to reduce stutter and CPU use.",
-    "Restores automatic full-resolution Pi 5 HDMI transcoding, including 4K HEVC with a 1080p fallback.",
-    "Speeds Tube TV channel tuning with a shorter tune delay, lower-latency HLS buffering, and a closer live edge."
+    "Stops the Qt interface from rendering behind mpv while video owns the Raspberry Pi display.",
+    "Fixes runaway DRM page-flip errors, CPU use, and memory growth during playback on Pi 4 and Pi 5.",
+    "Works with Tater Tube Server v1.2.9 for stable, independently decodable Tube TV transitions."
   ]
 }

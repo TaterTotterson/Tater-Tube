@@ -4,9 +4,12 @@
 #include <QLocalSocket>
 #include <QTimer>
 #include <QJsonArray>
+#include <QList>
+#include <QPointer>
 #include <QStringList>
 
 class AppCore;
+class QWindow;
 
 #ifdef Q_OS_LINUX
 #include <xf86drm.h>
@@ -151,6 +154,8 @@ private:
     int  findFreeVt() const;
     int  findQtDrmFd() const;
     void switchToVt(int vt);
+    void suspendQtWindows();
+    void resumeQtWindows();
 #ifdef Q_OS_LINUX
     void saveDrmCrtcState(int fd);
     void restoreDrmCrtcState(int fd);
@@ -186,6 +191,7 @@ private:
     bool          m_pi3SoftwareFallback = false;
     bool          m_currentAudioOnly = false;
     bool          m_currentStayIdle = false;
+    QList<QPointer<QWindow>> m_suspendedQtWindows;
 #ifdef Q_OS_LINUX
     DrmSavedState m_savedDrm     = {};
 #endif

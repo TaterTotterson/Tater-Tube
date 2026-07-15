@@ -2,12 +2,14 @@
 #include "../AppCore.h"
 #include <QDir>
 #include <QFile>
+#include <QGuiApplication>
 #include <QProcessEnvironment>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
 #include <QDateTime>
 #include <QDebug>
+#include <QWindow>
 #include <QtGlobal>
 
 #ifdef Q_OS_LINUX
@@ -508,6 +510,14 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
             // without this restore, Qt EGLFS gets EINVAL on its next page flip.
             saveDrmCrtcState(m_qtDrmFd);
         }
+
+        // A VT switch does not stop Qt EGLFS from submitting frames on every
+        // Raspberry Pi/KMS combination. Once mpv owns DRM master those submits
+        // fail continuously, consuming CPU and retaining a new render buffer on
+        // some vc4/v3d builds. Hide the Qt window for the lifetime of playback;
+        // posted input events still reach QML and mpv continues to receive the
+        // mapped remote/gamepad actions over IPC.
+        suspendQtWindows();
 #endif
 
         args << QString("--input-conf=%1").arg(m_inputConfPath)
@@ -840,6 +850,7 @@ void MpvController::doHeadlessRestore(int pos, int dur, bool naturalEof, bool pl
         m_previousVt = -1;
         switchToVt(prevVt);
     }
+    resumeQtWindows();
     m_headlessMode = false;
     if (playbackError)
         emit playbackFailed();
@@ -847,6 +858,27 @@ void MpvController::doHeadlessRestore(int pos, int dur, bool naturalEof, bool pl
         emit playbackFinishedNaturally(pos, dur);
     else
         emit playbackFinished(pos, dur);
+}
+
+void MpvController::suspendQtWindows() {
+    if (!m_suspendedQtWindows.isEmpty())
+        return;
+
+    const auto windows = QGuiApplication::allWindows();
+    for (QWindow *window : windows) {
+        if (!window || !window->isVisible())
+            continue;
+        m_suspendedQtWindows.append(QPointer<QWindow>(window));
+        window->setVisible(false);
+    }
+}
+
+void MpvController::resumeQtWindows() {
+    for (const QPointer<QWindow> &window : m_suspendedQtWindows) {
+        if (window)
+            window->setVisible(true);
+    }
+    m_suspendedQtWindows.clear();
 }
 
 void MpvController::setAudioLevel(double level) {
