@@ -1684,12 +1684,6 @@ FocusScope {
         scheduleAdvanceTimer.stop()
     }
 
-    function restartGuideScroll() {
-        if (!guideChannelVisible)
-            return
-        guideNowMs = Date.now()
-    }
-
     function showGuideChannel() {
         scheduleAdvanceTimer.stop()
         transitionBlankVisible = false
@@ -1706,8 +1700,6 @@ FocusScope {
         }
         guideChannelVisible = true
         teletextVisible = false
-        guideNowMs = Date.now()
-        Qt.callLater(restartGuideScroll)
     }
 
     function showTeletextChannel(channel) {
@@ -1896,7 +1888,7 @@ FocusScope {
         id: guideClockTimer
         interval: 100
         repeat: true
-        running: tvRoot.guideChannelVisible && !tvRoot.leaving
+        running: !tvRoot.loading && !tvRoot.leaving
         onTriggered: tvRoot.guideNowMs = Date.now()
     }
 
@@ -2177,7 +2169,15 @@ FocusScope {
             Column {
                 id: guideRowsColumn
                 width: guideViewport.width
-                y: tvRoot.guideScrollY()
+                y: {
+                    var cycleHeight = tvRoot.guideCycleHeight()
+                    var guideY = 0
+                    if (cycleHeight > 0) {
+                        var elapsed = Math.max(0, (tvRoot.guideNowMs - tvRoot.guideScrollBaseMs()) / 1000.0)
+                        guideY = -((elapsed * tvRoot.guideScrollSpeed()) % cycleHeight)
+                    }
+                    guideY
+                }
                 spacing: Math.max(1, root.sh * 0.006)
 
                 Repeater {

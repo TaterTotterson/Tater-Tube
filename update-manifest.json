@@ -1,14 +1,14 @@
 {
-  "version": "v1.4.12",
-  "app_version": "1.4.12",
+  "version": "v1.4.13",
+  "app_version": "1.4.13",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.12/Tater-Tube-v1.4.12-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.12.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.13/Tater-Tube-v1.4.13-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.13.tar.gz",
   "notes": [
-    "Adds player-side toggles for the Tube TV channel 01 guide and TaterText service channels.",
-    "Removes the dead Tube TV settings entry from the player menu.",
-    "Restyles TaterText pages with blocky teletext headers, color bars, boxes, and Tater-themed ASCII art."
+    "Improves Tube TV HLS playback by tuning mpv for live-edge startup, smaller back-buffering, and segment retry.",
+    "Keeps the channel 01 Tater Guide scrolling against the live TV timeline even when you tune away and come back.",
+    "Prevents Tube TV guide scroll position from resetting when the guide channel is selected."
   ]
 }

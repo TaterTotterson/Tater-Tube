@@ -278,6 +278,9 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
     }
 
     const bool isOtaTvMode = (oscMode == "ota-tv" || oscMode == "ota-tv-quiet");
+    const bool isTubeTvHls = url.contains(QStringLiteral("/api/tater/tv/channel/"),
+                                          Qt::CaseInsensitive)
+        && url.contains(QStringLiteral("/playlist.m3u8"), Qt::CaseInsensitive);
     const bool isOtaMode = (oscMode == "ota" || oscMode == "ota-quiet" || isOtaTvMode);
     const bool isOtaOverlayMode = isOtaMode || oscMode == "tube";
     const bool quietOtaLabel = (oscMode == "ota-quiet" || oscMode == "ota-tv-quiet");
@@ -313,10 +316,21 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
         args << QStringLiteral("--idle=yes")
              << QStringLiteral("--cache=yes")
              << QStringLiteral("--cache-pause=no")
-             << QStringLiteral("--demuxer-readahead-secs=24")
-             << QStringLiteral("--demuxer-max-bytes=64MiB")
-             << QStringLiteral("--demuxer-max-back-bytes=16MiB")
              << QStringLiteral("--network-timeout=15");
+        if (isTubeTvHls) {
+            args << QStringLiteral("--cache-pause-initial=no")
+                 << QStringLiteral("--cache-secs=18")
+                 << QStringLiteral("--demuxer-readahead-secs=8")
+                 << QStringLiteral("--demuxer-max-bytes=24MiB")
+                 << QStringLiteral("--demuxer-max-back-bytes=4MiB")
+                 << QStringLiteral("--demuxer-seekable-cache=no")
+                 << QStringLiteral("--demuxer-lavf-o=live_start_index=-2,prefer_x_start=1,seg_max_retry=3")
+                 << QStringLiteral("--stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_delay_max=2,reconnect_delay_total_max=8");
+        } else {
+            args << QStringLiteral("--demuxer-readahead-secs=24")
+                 << QStringLiteral("--demuxer-max-bytes=64MiB")
+                 << QStringLiteral("--demuxer-max-back-bytes=16MiB");
+        }
     }
     m_currentStayIdle = isOtaTvMode;
 
