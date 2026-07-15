@@ -3,6 +3,7 @@
 #include "../../media/CommercialLibrary.h"
 
 #include <QFile>
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -297,6 +298,8 @@ QString UsenetBackend::playbackTranscodeProfile(int screenWidth, int screenHeigh
                                     QStringLiteral("Auto")).trimmed().toLower();
     if (quality == QStringLiteral("crt 480p") || quality == QStringLiteral("crt_480p"))
         return QStringLiteral("crt_480p");
+    if (quality == QStringLiteral("hdmi 720p") || quality == QStringLiteral("hdmi_720p"))
+        return QStringLiteral("hdmi_720p");
     if (quality == QStringLiteral("hdmi 1080p") || quality == QStringLiteral("hdmi_1080p"))
         return QStringLiteral("hdmi_1080p");
     if (quality == QStringLiteral("hdmi 4k") || quality == QStringLiteral("hdmi_4k"))
@@ -309,6 +312,19 @@ QString UsenetBackend::playbackTranscodeProfile(int screenWidth, int screenHeigh
     if (longEdge >= 1280 || shortEdge >= 720)
         return QStringLiteral("hdmi_1080p");
     return QStringLiteral("crt_480p");
+}
+
+bool UsenetBackend::isRaspberryPi5() const
+{
+#ifdef Q_OS_LINUX
+    QFile f(QStringLiteral("/proc/device-tree/model"));
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+    const QString model = QString::fromLatin1(f.readAll()).remove(QChar('\0')).trimmed();
+    return model.startsWith(QStringLiteral("Raspberry Pi 5"));
+#else
+    return false;
+#endif
 }
 
 QString UsenetBackend::playback_url(const QString &rawUrl, int screenWidth, int screenHeight) const
@@ -324,6 +340,9 @@ QString UsenetBackend::playback_url(const QString &rawUrl, int screenWidth, int 
     query.removeAllQueryItems(QStringLiteral("transcode"));
     query.removeAllQueryItems(QStringLiteral("profile"));
     query.removeAllQueryItems(QStringLiteral("hwaccel"));
+    query.removeAllQueryItems(QStringLiteral("codec"));
+    query.removeAllQueryItems(QStringLiteral("video_codec"));
+    query.removeAllQueryItems(QStringLiteral("fallback_profile"));
 
     if (mode == QStringLiteral("off")) {
         query.addQueryItem(QStringLiteral("transcode"), QStringLiteral("0"));
@@ -332,8 +351,16 @@ QString UsenetBackend::playback_url(const QString &rawUrl, int screenWidth, int 
         const QString path = url.path();
         const bool isTubeTVChannel = path.contains(QStringLiteral("/api/tater/tv/channel/"))
             && path.endsWith(QStringLiteral("/playlist.m3u8"));
-        if (isTubeTVChannel && profile == QStringLiteral("hdmi_4k"))
+        if (isTubeTVChannel && isRaspberryPi5()) {
+            if (profile == QStringLiteral("hdmi_4k"))
+                profile = QStringLiteral("hdmi_1080p");
+            if (profile == QStringLiteral("hdmi_1080p")) {
+                query.addQueryItem(QStringLiteral("codec"), QStringLiteral("hevc"));
+                query.addQueryItem(QStringLiteral("fallback_profile"), QStringLiteral("hdmi_720p"));
+            }
+        } else if (isTubeTVChannel && profile == QStringLiteral("hdmi_4k")) {
             profile = QStringLiteral("hdmi_1080p");
+        }
         query.addQueryItem(QStringLiteral("profile"), profile);
         query.addQueryItem(QStringLiteral("transcode"), QStringLiteral("1"));
         query.addQueryItem(QStringLiteral("hwaccel"), QStringLiteral("auto"));
@@ -906,6 +933,12 @@ void UsenetBackend::handleTubeTvLineupReply(QNetworkReply *reply)
 
     QVariantMap metadata = obj.toVariantMap();
     metadata.remove(QStringLiteral("channels"));
+    if (!metadata.contains(QStringLiteral("serverNow"))) {
+        const QString dateHeader = QString::fromLatin1(reply->rawHeader("Date")).trimmed();
+        const QDateTime serverNow = QDateTime::fromString(dateHeader, Qt::RFC2822Date);
+        if (serverNow.isValid())
+            metadata.insert(QStringLiteral("serverNow"), serverNow.toUTC().toString(Qt::ISODateWithMs));
+    }
     emit tubeTvLineupLoaded(channels, metadata);
 }
 

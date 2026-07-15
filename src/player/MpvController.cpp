@@ -319,12 +319,13 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
              << QStringLiteral("--network-timeout=15");
         if (isTubeTvHls) {
             args << QStringLiteral("--cache-pause-initial=no")
-                 << QStringLiteral("--cache-secs=18")
-                 << QStringLiteral("--demuxer-readahead-secs=8")
-                 << QStringLiteral("--demuxer-max-bytes=24MiB")
-                 << QStringLiteral("--demuxer-max-back-bytes=4MiB")
+                 << QStringLiteral("--cache-secs=24")
+                 << QStringLiteral("--demuxer-readahead-secs=12")
+                 << QStringLiteral("--demuxer-max-bytes=32MiB")
+                 << QStringLiteral("--demuxer-max-back-bytes=2MiB")
                  << QStringLiteral("--demuxer-seekable-cache=no")
-                 << QStringLiteral("--demuxer-lavf-o=live_start_index=-2,prefer_x_start=1,seg_max_retry=3");
+                 << QStringLiteral("--audio-buffer=0.5")
+                 << QStringLiteral("--demuxer-lavf-o=live_start_index=-3,prefer_x_start=1,seg_max_retry=5");
         } else {
             args << QStringLiteral("--demuxer-readahead-secs=24")
                  << QStringLiteral("--demuxer-max-bytes=64MiB")

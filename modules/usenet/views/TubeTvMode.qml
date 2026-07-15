@@ -40,6 +40,7 @@ FocusScope {
     property var guideDisplayChannels: []
     property var guideLineupMetadata: ({})
     property double guideNowMs: Date.now()
+    property double guideServerClockOffsetMs: 0
     property string guideMascotSource: Qt.resolvedUrl("../../../assets/images/mascots/usenet.png")
     property bool teletextVisible: false
     property string teletextPage: "100"
@@ -202,11 +203,23 @@ FocusScope {
         return startedAtMs > 0 ? startedAtMs : Date.now()
     }
 
+    function timelineNowMs() {
+        return Date.now() + guideServerClockOffsetMs
+    }
+
+    function guideTimelineNowMs() {
+        return guideNowMs + guideServerClockOffsetMs
+    }
+
+    function teletextTimelineNowMs() {
+        return teletextNowMs + guideServerClockOffsetMs
+    }
+
     function guideScrollY() {
         var cycleHeight = guideCycleHeight()
         if (cycleHeight <= 0)
             return 0
-        var elapsed = Math.max(0, (guideNowMs - guideScrollBaseMs()) / 1000.0)
+        var elapsed = Math.max(0, (guideTimelineNowMs() - guideScrollBaseMs()) / 1000.0)
         var offset = (elapsed * guideScrollSpeed()) % cycleHeight
         return -offset
     }
@@ -407,7 +420,7 @@ FocusScope {
             rows.push(teletextLine(" CH   NOW SHOWING                 NEXT", "#000000", "#00ffff"))
             for (var i = 0; i < Math.min(7, list.length); i++) {
                 var channel = list[i]
-                var resolved = findScheduleItem(channel, teletextNowMs)
+                var resolved = findScheduleItem(channel, teletextTimelineNowMs())
                 var current = resolved ? resolved.item : null
                 var next = guideNextRows(channel, resolved ? resolved.index : -1, 1)
                 var label = String(channel.number || "--") + "  " + teletextShort(scheduleTitle(current), 24)
@@ -1461,6 +1474,12 @@ FocusScope {
         })
         guideDisplayChannels = realChannels
         guideLineupMetadata = metadata || ({})
+        var serverNowMs = dateMs(guideLineupMetadata.serverNow)
+        if (serverNowMs <= 0)
+            serverNowMs = dateMs(guideLineupMetadata.updatedAt)
+        if (serverNowMs <= 0)
+            serverNowMs = dateMs(guideLineupMetadata.generatedAt)
+        guideServerClockOffsetMs = serverNowMs > 0 ? (serverNowMs - Date.now()) : 0
         channels = serviceChannels(realChannels)
         loading = false
         loadingServerLineup = false
@@ -1491,7 +1510,7 @@ FocusScope {
             return null
         }
 
-        var nowMs = arguments.length > 1 && arguments[1] > 0 ? arguments[1] : Date.now()
+        var nowMs = arguments.length > 1 && arguments[1] > 0 ? arguments[1] : timelineNowMs()
         var elapsed = Math.max(0, (nowMs - startedAtMs) / 1000.0)
         var position = elapsed % channel.totalDuration
         for (var i = 0; i < channel.schedule.length; i++) {
@@ -2174,7 +2193,7 @@ FocusScope {
                     var cycleHeight = tvRoot.guideCycleHeight()
                     var guideY = 0
                     if (cycleHeight > 0) {
-                        var elapsed = Math.max(0, (tvRoot.guideNowMs - tvRoot.guideScrollBaseMs()) / 1000.0)
+                        var elapsed = Math.max(0, (tvRoot.guideTimelineNowMs() - tvRoot.guideScrollBaseMs()) / 1000.0)
                         guideY = -((elapsed * tvRoot.guideScrollSpeed()) % cycleHeight)
                     }
                     guideY
@@ -2192,7 +2211,7 @@ FocusScope {
                         border.width: Math.max(1, root.sh * 0.0018)
 
                         property var channel: modelData || ({})
-                        property var resolved: tvRoot.findScheduleItem(channel, tvRoot.guideNowMs)
+                        property var resolved: tvRoot.findScheduleItem(channel, tvRoot.guideTimelineNowMs())
                         property var currentItem: resolved ? resolved.item : ({})
                         property var nextRows: tvRoot.guideNextRows(channel, resolved ? resolved.index : -1, 2)
 

@@ -76,6 +76,7 @@ private:
     int browseLimit() const;
     int streamTimeout() const;
     QString playbackTranscodeProfile(int screenWidth, int screenHeight) const;
+    bool isRaspberryPi5() const;
 
     void handleCategoriesReply(QNetworkReply *reply);
     void handleItemsReply(QNetworkReply *reply, const QString &categoryTitle);

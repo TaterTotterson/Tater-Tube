@@ -34,7 +34,7 @@
       "key": "tube_transcode_quality",
       "label": "TRANSCODE QUALITY",
       "type": "list_single",
-      "options": ["Auto", "CRT 480p", "HDMI 1080p", "HDMI 4K"],
+      "options": ["Auto", "CRT 480p", "HDMI 720p", "HDMI 1080p", "HDMI 4K"],
       "default": "Auto"
     },
     {

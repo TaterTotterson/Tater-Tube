@@ -1,14 +1,14 @@
 {
-  "version": "v1.4.14",
-  "app_version": "1.4.14",
+  "version": "v1.5.0",
+  "app_version": "1.5.0",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.4.14/Tater-Tube-v1.4.14-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.4.14.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.5.0/Tater-Tube-v1.5.0-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.5.0.tar.gz",
   "notes": [
-    "Fixes Tube TV HLS playback stalls by removing FFmpeg reconnect behavior that retried normal playlist EOFs.",
-    "Keeps the channel 01 Tater Guide synced to live time without running its scroll timer behind video playback.",
-    "Reduces hidden Tube TV UI work while mpv is playing server channels."
+    "Adds HDMI 720p as a Tube transcode target for smoother Pi playback.",
+    "Tunes Tube TV playback for Pi 5 HDMI by preferring HEVC at 1080p with a 720p fallback when needed.",
+    "Keeps the channel 01 Tater Guide synced to the server timeline while the guide is tuned."
   ]
 }
