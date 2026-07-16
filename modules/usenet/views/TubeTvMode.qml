@@ -1728,17 +1728,9 @@ FocusScope {
         currentPlaybackOffsetSeconds = Math.max(0, Number(timelineOffset || offset || 0))
         currentPlaybackUsesServerSeek = useServerSeek === true
         updateStreamOverlayInfo(plannedStreamInfo(playbackUrl, item))
-        var oscMode = transitionBlankVisible ? "ota-tv-quiet" : "ota-tv"
-        if (transitionBlankVisible && mpvController.running) {
-            mpvController.sendScriptMessage("240mp-ota-quiet-next-file")
-            if (!mpvController.replaceCurrentFile(playbackUrl, offset || 0.0, "", label || statusText)) {
-                mpvController.loadAndPlay(playbackUrl, offset || 0.0, 0, -1, [], false, -1, 0.0,
-                                          "", false, oscMode, false, label || statusText)
-            }
-        } else {
-            mpvController.loadAndPlay(playbackUrl, offset || 0.0, 0, -1, [], false, -1, 0.0,
-                                      "", false, oscMode, false, label || statusText)
-        }
+        var oscMode = transitionBlankVisible ? "ota-quiet" : "ota"
+        mpvController.loadAndPlay(playbackUrl, offset || 0.0, 0, -1, [], false, -1, 0.0,
+                                  "", false, oscMode, false, label || statusText)
 
         scheduleAdvanceTimer.stop()
         if (item && item.forceAdvance === true && (segmentRemaining || 0) > 1.0) {
@@ -1987,11 +1979,12 @@ FocusScope {
                 tvRoot.transitionBlankVisible = false
                 tvRoot.tuningStaticVisible = false
                 tvRoot.streamStarted = true
+                tvRoot.updateStreamOverlayInfo(tvRoot.streamInfoText)
                 if (tvRoot.showChannelLabelAfterTransition) {
                     tvRoot.showChannelLabelAfterTransition = false
-                    mpvController.sendScriptMessage("240mp-ota-channel", tvRoot.statusText)
+                    mpvController.sendScriptMessage("240mp-osd-menu-show")
+                    mpvController.sendScriptMessage("240mp-ota-tuned-channel", tvRoot.statusText)
                 }
-                tvRoot.updateStreamOverlayInfo(tvRoot.streamInfoText)
                 tvRoot.refreshActiveStreamInfo()
                 return
             }

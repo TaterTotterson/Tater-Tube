@@ -124,13 +124,13 @@ local function draw_button(ass, x, y, w, h, label, fs)
     draw_text(ass, x + math.floor(w / 2), y + math.floor(h / 2), 5, label, fs)
 end
 
-local function draw_overlay(label, with_menu)
+local function draw_overlay(label, with_menu, force_top_label)
     if not label or label == "" then return false end
 
     local ww, wh = mp.get_osd_size()
     if ww == 0 or wh == 0 then return false end
 
-    local show_top_label = top_label_enabled()
+    local show_top_label = force_top_label or top_label_enabled()
     if not show_top_label and not with_menu then
         overlay:remove()
         return false
@@ -235,6 +235,20 @@ local function show_label(label)
     end
 end
 
+local function show_tuned_channel(label)
+    if not label or label == "" then return end
+    latest_label = label
+    draw_overlay(label, menu_visible, true)
+    start_label_timeout()
+    for _, delay in ipairs({0.2, 0.7, 1.4}) do
+        mp.add_timeout(delay, function()
+            if latest_label == label then
+                draw_overlay(label, menu_visible, true)
+            end
+        end)
+    end
+end
+
 local function hide_menu()
     if menu_timer then
         menu_timer:kill()
@@ -279,6 +293,7 @@ local function toggle_menu()
 end
 
 mp.register_script_message("240mp-ota-channel", show_label)
+mp.register_script_message("240mp-ota-tuned-channel", show_tuned_channel)
 mp.register_script_message("240mp-ota-quiet-next-file", function()
     quiet_next_file = true
     hide()
