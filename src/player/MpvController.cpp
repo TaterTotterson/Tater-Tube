@@ -1211,6 +1211,17 @@ bool MpvController::hasPiHeadphonesAudioDevice() const {
 #endif
 }
 
+QStringList MpvController::narrationAudioArgs() const {
+    QStringList args{
+        QStringLiteral("--volume-max=200"),
+        QStringLiteral("--volume=%1").arg(m_volume, 0, 'f', 3),
+    };
+    if (m_muted)
+        args << QStringLiteral("--mute=yes");
+    appendAudioArgs(args);
+    return args;
+}
+
 void MpvController::appendVideoArgs(QStringList &args) const {
     // App-level "mpv_video_args" override replaces the auto-detected vo/hwdec
     // flags verbatim. Read here (not cached) so edits to config.json take effect
@@ -1293,7 +1304,9 @@ void MpvController::appendAudioArgs(QStringList &args) const {
         }
     }
 
-    if (!m_headlessMode)
+    // Narration can start while the app is still on the main menu, before a
+    // regular playback session has populated m_headlessMode.
+    if (!m_headlessMode && !detectHeadlessMode())
         return;
 
     if (hasCompositeDrmConnector() && hasPiHeadphonesAudioDevice()) {

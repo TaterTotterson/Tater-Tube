@@ -10,6 +10,7 @@ class QQmlContext;
 class QNetworkAccessManager;
 class QProcess;
 class QTimer;
+class MpvController;
 
 struct ModuleEntry {
     QString id;
@@ -36,6 +37,7 @@ public:
     QVariantList taterRecommendations() const { return m_taterRecommendations; }
     QVariantMap taterRecommendationBatch() const { return m_taterRecommendationBatch; }
     bool taterNarrating() const { return m_taterNarrating; }
+    void setMpvController(MpvController *controller) { m_mpvController = controller; }
 
     // True when launched by the autostart systemd service (which injects MP240_AUTOSTART=1).
     // Gates the quit overlay's "Exit to Terminal" option, which only makes sense on a
@@ -129,6 +131,7 @@ private:
     QList<ModuleEntry> m_modules;
     QMap<QString, QObject*> m_backends;
     QNetworkAccessManager *m_updateNetwork = nullptr;
+    MpvController *m_mpvController = nullptr;
     QTimer *m_taterRecommendationsTimer = nullptr;
     QTimer *m_taterNarrationPollTimer = nullptr;
     QProcess *m_taterNarrationProcess = nullptr;

@@ -1,16 +1,14 @@
 {
-  "version": "v1.5.12",
-  "app_version": "1.5.12",
+  "version": "v1.5.13",
+  "app_version": "1.5.13",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.5.12/Tater-Tube-v1.5.12-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.5.12.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.5.13/Tater-Tube-v1.5.13-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.5.13.tar.gz",
   "notes": [
-    "Expands Tater's Picks into a mixed-source recommendation page informed by viewing history from every reporting player module.",
-    "Adds safe, launchable over-the-air channel recommendations without storing or exposing live stream URLs.",
-    "Replaces per-item narration with one personalized morning, afternoon, or evening briefing that continues while recommendations are browsed.",
-    "Refreshes the VCR-style page with a collection overview, clear source labels, and a written Why This Pick summary for each recommendation.",
-    "Returns directly to the prior selection without replaying the same briefing after opening a recommendation."
+    "Moves the Why This Pick card above the recommending mascot so the artwork and Tater's face remain unobstructed.",
+    "Routes Tater's Picks narration through the Player's active volume, mute, custom mpv audio, and Raspberry Pi HDMI or headphone output settings.",
+    "Shows Tater Is Talking only after narration audio playback actually starts instead of while the TTS request is still being prepared."
   ]
 }

@@ -1,4 +1,5 @@
 #include "AppCore.h"
+#include "player/MpvController.h"
 #include <algorithm>
 #include <QDir>
 #include <QFile>
@@ -827,7 +828,6 @@ void AppCore::requestTaterNarration(const QJsonObject &identity) {
         return;
 
     const quint64 generation = ++m_taterNarrationGeneration;
-    setTaterNarrating(true);
     QNetworkRequest request{QUrl(endpoint)};
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Accept", "application/json");
@@ -948,6 +948,13 @@ void AppCore::playTaterNarrationAudio(const QString &requestId, quint64 generati
     QProcess *process = new QProcess(this);
     m_taterNarrationProcess = process;
     process->setProcessChannelMode(QProcess::MergedChannels);
+    connect(process, &QProcess::started, this, [this, process, generation]() {
+        if (generation != m_taterNarrationGeneration ||
+            m_taterNarrationProcess != process)
+            return;
+        setTaterNarrating(true);
+        qInfo("[AppCore] Tater narration audio started");
+    });
     connect(process,
             QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this,
@@ -974,8 +981,7 @@ void AppCore::playTaterNarrationAudio(const QString &requestId, quint64 generati
         qWarning("[AppCore] Could not start mpv for Tater narration");
         stopTaterNarration();
     });
-    const QStringList args{
-        endpoint,
+    QStringList args{
         QStringLiteral("--no-video"),
         QStringLiteral("--audio-display=no"),
         QStringLiteral("--force-window=no"),
@@ -985,6 +991,9 @@ void AppCore::playTaterNarrationAudio(const QString &requestId, quint64 generati
         QStringLiteral("--ytdl=no"),
         QStringLiteral("--http-header-fields=Authorization: Bearer %1").arg(token),
     };
+    if (m_mpvController)
+        args.append(m_mpvController->narrationAudioArgs());
+    args.append(endpoint);
     process->start(mpv, args);
 }
 

@@ -167,12 +167,15 @@ FocusScope {
     }
 
     Image {
+        id: picksMascot
         source: "../assets/images/mascots/tater-picks.png"
         anchors.right: parent.right
         anchors.rightMargin: root.sw * 0.035
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.top: narrationStatus.bottom
+        anchors.topMargin: root.sh * 0.012
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.sh * 0.035
         width: root.sw * 0.38
-        height: root.sh * 0.62
         fillMode: Image.PreserveAspectFit
         smooth: true
         mipmap: true
@@ -183,7 +186,7 @@ FocusScope {
         anchors.right: parent.right
         anchors.rightMargin: root.sw * 0.055
         anchors.top: parent.top
-        anchors.topMargin: root.sh * 0.19
+        anchors.topMargin: root.sh * 0.125
         width: root.sw * 0.36
         height: root.sh * 0.16
         color: root.surfaceColor
@@ -219,6 +222,7 @@ FocusScope {
     }
 
     Text {
+        id: narrationStatus
         anchors.right: summaryBubble.right
         anchors.top: summaryBubble.bottom
         anchors.topMargin: root.sh * 0.012

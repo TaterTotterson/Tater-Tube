@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
     UsenetBackend       usenetBackend(appRoot, dataRoot);
     MpvController       mpvController(appRoot, &appCore);
     InputManager        inputManager(dataRoot);
+    appCore.setMpvController(&mpvController);
     ControlApiServer    controlApi(&mpvController, &appCore, &embyBackend,
                                     &retroBackend, &moonlightBackend);
 
