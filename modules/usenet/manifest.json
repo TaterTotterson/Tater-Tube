@@ -25,7 +25,7 @@
     },
     {
       "key": "tater_picks_narration",
-      "label": "TATER PICKS NARRATION",
+      "label": "TATER PICKS WELCOME",
       "type": "toggle",
       "default": "ON"
     },

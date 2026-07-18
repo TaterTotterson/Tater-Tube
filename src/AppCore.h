@@ -25,6 +25,7 @@ class AppCore : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString appVersion READ appVersion CONSTANT)
     Q_PROPERTY(QVariantList taterRecommendations READ taterRecommendations NOTIFY taterRecommendationsChanged)
+    Q_PROPERTY(QVariantMap taterRecommendationBatch READ taterRecommendationBatch NOTIFY taterRecommendationsChanged)
     Q_PROPERTY(bool taterNarrating READ taterNarrating NOTIFY taterNarratingChanged)
 public:
     explicit AppCore(const QString &appRoot, const QString &dataRoot, QObject *parent = nullptr);
@@ -33,6 +34,7 @@ public:
     QString appRoot() const { return m_appRoot; }
     QString dataRoot() const { return m_dataRoot; }
     QVariantList taterRecommendations() const { return m_taterRecommendations; }
+    QVariantMap taterRecommendationBatch() const { return m_taterRecommendationBatch; }
     bool taterNarrating() const { return m_taterNarrating; }
 
     // True when launched by the autostart systemd service (which injects MP240_AUTOSTART=1).
@@ -76,6 +78,7 @@ public:
     Q_INVOKABLE void sendTaterRecommendationFeedback(const QString &recommendationId,
                                                      const QString &feedback);
     Q_INVOKABLE void speakTaterRecommendation(const QString &recommendationId);
+    Q_INVOKABLE void speakTaterBriefing(const QString &batchId);
     Q_INVOKABLE void stopTaterNarration();
 
     // Registers a module backend: stores it for action routing, exposes it to QML under
@@ -115,6 +118,7 @@ private:
     QString taterServerApiUrl(const QString &path) const;
     QString taterServerToken() const;
     bool taterPicksNarrationEnabled() const;
+    void requestTaterNarration(const QJsonObject &identity);
     void pollTaterNarrationRequest();
     void playTaterNarrationAudio(const QString &requestId, quint64 generation);
     void cancelTaterNarrationRequest(const QString &requestId);
@@ -129,6 +133,7 @@ private:
     QTimer *m_taterNarrationPollTimer = nullptr;
     QProcess *m_taterNarrationProcess = nullptr;
     QVariantList m_taterRecommendations;
+    QVariantMap m_taterRecommendationBatch;
     QString m_taterNarrationRequestId;
     quint64 m_taterNarrationGeneration = 0;
     int m_taterNarrationPollAttempts = 0;

@@ -83,6 +83,31 @@ FocusScope {
         return channels[currentIndex]
     }
 
+    function recommendedChannelIndex() {
+        var recommendation = navParams.recommendation || ({})
+        var launch = recommendation.launch || ({})
+        var wantedNumber = (launch.channelNumber || "").toString()
+        var wantedName = (launch.channelName || "").toString().toLowerCase()
+        if (wantedNumber === "" && wantedName === "")
+            return -1
+
+        var numberMatch = -1
+        var nameMatch = -1
+        for (var i = 0; i < channels.length; i++) {
+            var channel = channels[i] || {}
+            var number = (channel.number || "").toString()
+            var name = (channel.name || "").toString().toLowerCase()
+            if (wantedNumber !== "" && wantedName !== ""
+                    && number === wantedNumber && name === wantedName)
+                return i
+            if (numberMatch < 0 && wantedNumber !== "" && number === wantedNumber)
+                numberMatch = i
+            if (nameMatch < 0 && wantedName !== "" && name === wantedName)
+                nameMatch = i
+        }
+        return numberMatch >= 0 ? numberMatch : nameMatch
+    }
+
     function showStaticForChannel(channel) {
         if (!channel || !channel.id) return
 
@@ -130,6 +155,18 @@ FocusScope {
         tuningStaticVisible = false
         noSignalVisible = false
         streamRequestActive = false
+        var channelNumber = (channel.number || "").toString()
+        var channelName = (channel.name || "").toString()
+        var channelIdentity = "ota:" + channelNumber + ":" + channelName
+        mpvController.setViewingContext({
+            source: "over_the_air",
+            media_id: channelIdentity,
+            media_type: "live",
+            title: label,
+            module_id: moduleId,
+            channel_number: channelNumber,
+            channel_name: channelName
+        })
         mpvController.loadAndPlay(url, 0.0, 0, -1, [], false, -1, 0.0,
                                   httpHeaderFields || "", false, "ota", false, label)
     }
@@ -263,12 +300,15 @@ FocusScope {
                 return
             }
 
-            var restoreId = appCore.get_setting(moduleId, "last_hdhomerun_channel_id") || ""
-            var restoreIndex = 0
-            for (var j = 0; j < channels.length; j++) {
-                if (channels[j].id === restoreId) {
-                    restoreIndex = j
-                    break
+            var restoreIndex = recommendedChannelIndex()
+            if (restoreIndex < 0) {
+                var restoreId = appCore.get_setting(moduleId, "last_hdhomerun_channel_id") || ""
+                restoreIndex = 0
+                for (var j = 0; j < channels.length; j++) {
+                    if (channels[j].id === restoreId) {
+                        restoreIndex = j
+                        break
+                    }
                 }
             }
             tuneIndex(restoreIndex, false)

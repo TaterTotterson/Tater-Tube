@@ -17,6 +17,7 @@
 #include <QVariantMap>
 #include <QDebug>
 #include <QRegularExpression>
+#include <QTime>
 #include <QTimer>
 #include <QQmlContext>
 #include <QtConcurrent/QtConcurrent>
@@ -667,8 +668,9 @@ void AppCore::refreshTaterRecommendations() {
     const QString endpoint =
         taterServerApiUrl(QStringLiteral("tater/recommendations?profile_id=household"));
     if (token.isEmpty() || endpoint.isEmpty()) {
-        if (!m_taterRecommendations.isEmpty()) {
+        if (!m_taterRecommendations.isEmpty() || !m_taterRecommendationBatch.isEmpty()) {
             m_taterRecommendations.clear();
+            m_taterRecommendationBatch.clear();
             emit taterRecommendationsChanged();
         }
         return;
@@ -686,8 +688,10 @@ void AppCore::refreshTaterRecommendations() {
         reply->deleteLater();
         if (!ok) {
             qWarning("[AppCore] Tater recommendations request failed");
-            if (status == 401 && !m_taterRecommendations.isEmpty()) {
+            if (status == 401 &&
+                (!m_taterRecommendations.isEmpty() || !m_taterRecommendationBatch.isEmpty())) {
                 m_taterRecommendations.clear();
+                m_taterRecommendationBatch.clear();
                 emit taterRecommendationsChanged();
             }
             return;
@@ -695,8 +699,10 @@ void AppCore::refreshTaterRecommendations() {
         const QJsonObject envelope = QJsonDocument::fromJson(body).object();
         const QJsonObject data = envelope.value("data").toObject();
         const QVariantList items = data.value("items").toArray().toVariantList();
-        if (items != m_taterRecommendations) {
+        const QVariantMap batch = data.value("batch").toObject().toVariantMap();
+        if (items != m_taterRecommendations || batch != m_taterRecommendationBatch) {
             m_taterRecommendations = items;
+            m_taterRecommendationBatch = batch;
             emit taterRecommendationsChanged();
         }
     });
@@ -792,14 +798,32 @@ void AppCore::stopTaterNarration() {
 }
 
 void AppCore::speakTaterRecommendation(const QString &recommendationId) {
+    const QString cleanId = recommendationId.trimmed();
+    if (cleanId.isEmpty())
+        return;
+    requestTaterNarration(QJsonObject{
+        {QStringLiteral("recommendation_id"), cleanId},
+    });
+}
+
+void AppCore::speakTaterBriefing(const QString &batchId) {
+    const QString cleanId = batchId.trimmed();
+    if (cleanId.isEmpty())
+        return;
+    requestTaterNarration(QJsonObject{
+        {QStringLiteral("batch_id"), cleanId},
+        {QStringLiteral("local_hour"), QTime::currentTime().hour()},
+    });
+}
+
+void AppCore::requestTaterNarration(const QJsonObject &identity) {
     stopTaterNarration();
     if (!taterPicksNarrationEnabled())
         return;
 
-    const QString cleanId = recommendationId.trimmed();
     const QString token = taterServerToken();
     const QString endpoint = taterServerApiUrl(QStringLiteral("tater/tts/requests"));
-    if (cleanId.isEmpty() || token.isEmpty() || endpoint.isEmpty())
+    if (identity.isEmpty() || token.isEmpty() || endpoint.isEmpty())
         return;
 
     const quint64 generation = ++m_taterNarrationGeneration;
@@ -808,10 +832,10 @@ void AppCore::speakTaterRecommendation(const QString &recommendationId) {
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Accept", "application/json");
     request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
-    const QByteArray payload = QJsonDocument(QJsonObject{
-        {QStringLiteral("profile_id"), QStringLiteral("household")},
-        {QStringLiteral("recommendation_id"), cleanId},
-    }).toJson(QJsonDocument::Compact);
+    QJsonObject payloadObject = identity;
+    payloadObject[QStringLiteral("profile_id")] = QStringLiteral("household");
+    const QByteArray payload =
+        QJsonDocument(payloadObject).toJson(QJsonDocument::Compact);
     QNetworkReply *reply = m_updateNetwork->post(request, payload);
     connect(reply, &QNetworkReply::finished, this, [this, reply, generation]() {
         const QByteArray body = reply->readAll();

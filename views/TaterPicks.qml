@@ -10,7 +10,10 @@ FocusScope {
     signal goBack()
 
     property var navParams: ({})
+    property var navListState: ({})
     property var picks: []
+    property var batch: ({})
+    property string narratedBatchId: ""
 
     focus: true
 
@@ -25,22 +28,36 @@ FocusScope {
                 && normalized !== "0" && normalized !== "NO"
     }
 
-    function scheduleNarration() {
-        appCore.stopTaterNarration()
-        narrationTimer.stop()
-        var recommendation = selectedPick()
-        if (!narrationEnabled() || !recommendation.id || !recommendation.reason)
+    function sourceLabel(source) {
+        var value = (source || "").toString().toLowerCase()
+        if (value === "over_the_air")
+            return "LIVE TV"
+        if (value === "local_media")
+            return "TATER TUBE"
+        if (value === "public_access")
+            return "PUBLIC ACCESS"
+        if (value === "tape_deck")
+            return "TAPE DECK"
+        return value === "" ? "TATER" : value.replace(/_/g, " ")
+    }
+
+    function scheduleBriefing() {
+        briefingTimer.stop()
+        var batchId = (batch.id || "").toString()
+        if (!narrationEnabled() || batchId === "" || batchId === narratedBatchId)
             return
-        narrationTimer.restart()
+        narratedBatchId = batchId
+        briefingTimer.restart()
     }
 
     function reloadPicks() {
         picks = (appCore.taterRecommendations || []).slice()
+        batch = appCore.taterRecommendationBatch || ({})
         if (pickList.count > 0) {
             pickList.currentIndex = Math.max(0, Math.min(pickList.currentIndex, pickList.count - 1))
             pickList.positionViewAtIndex(pickList.currentIndex, ListView.Contain)
         }
-        Qt.callLater(scheduleNarration)
+        Qt.callLater(scheduleBriefing)
     }
 
     function selectedPick() {
@@ -55,9 +72,22 @@ FocusScope {
             return
         appCore.stopTaterNarration()
         appCore.sendTaterRecommendationFeedback(recommendation.id, "played")
-        navigateTo("modules/usenet/views/Root.qml",
-                   { recommendation: recommendation },
-                   { currentIndex: pickList.currentIndex })
+        var launch = recommendation.launch || ({})
+        if (launch.type === "module" && launch.moduleId === "com.240mp.ota") {
+            navigateTo("modules/ota/views/Root.qml",
+                       { recommendation: recommendation },
+                       {
+                           currentIndex: pickList.currentIndex,
+                           narratedBatchId: batch.id || narratedBatchId
+                       })
+        } else {
+            navigateTo("modules/usenet/views/Root.qml",
+                       { recommendation: recommendation },
+                       {
+                           currentIndex: pickList.currentIndex,
+                           narratedBatchId: batch.id || narratedBatchId
+                       })
+        }
     }
 
     function dismissSelected() {
@@ -74,7 +104,6 @@ FocusScope {
             return
         }
         pickList.currentIndex = Math.min(pickList.currentIndex, picks.length - 1)
-        Qt.callLater(scheduleNarration)
     }
 
     function returnToMenu() {
@@ -83,19 +112,23 @@ FocusScope {
     }
 
     Component.onCompleted: {
+        narratedBatchId = navListState.narratedBatchId || ""
         reloadPicks()
+        if (pickList.count > 0 && navListState.currentIndex !== undefined)
+            pickList.currentIndex = Math.max(
+                        0, Math.min(navListState.currentIndex, pickList.count - 1))
         appCore.refreshTaterRecommendations()
     }
     Component.onDestruction: appCore.stopTaterNarration()
 
     Timer {
-        id: narrationTimer
-        interval: 550
+        id: briefingTimer
+        interval: 700
         repeat: false
         onTriggered: {
-            var recommendation = picksRoot.selectedPick()
-            if (recommendation.id && recommendation.reason)
-                appCore.speakTaterRecommendation(recommendation.id)
+            var batchId = (picksRoot.batch.id || "").toString()
+            if (batchId !== "")
+                appCore.speakTaterBriefing(batchId)
         }
     }
 
@@ -112,6 +145,25 @@ FocusScope {
         anchors.left: parent.left
         anchors.topMargin: root.sh * 0.125
         anchors.leftMargin: root.sw * 0.125
+    }
+
+    Text {
+        id: collectionSummary
+        anchors.left: parent.left
+        anchors.leftMargin: root.sw * 0.115625
+        anchors.top: parent.top
+        anchors.topMargin: root.sh * 0.195
+        width: root.sw * 0.45
+        height: root.sh * 0.065
+        text: picksRoot.batch.summary
+              || "A HAND-PICKED MIX FROM ACROSS YOUR WATCH HISTORY."
+        color: root.secondaryColor
+        font.family: root.globalFont
+        font.pixelSize: root.sh * 0.021
+        font.capitalization: Font.AllUppercase
+        wrapMode: Text.WordWrap
+        elide: Text.ElideRight
+        maximumLineCount: 2
     }
 
     Image {
@@ -131,22 +183,38 @@ FocusScope {
         anchors.right: parent.right
         anchors.rightMargin: root.sw * 0.055
         anchors.top: parent.top
-        anchors.topMargin: root.sh * 0.18
+        anchors.topMargin: root.sh * 0.19
         width: root.sw * 0.36
-        height: root.sh * 0.13
+        height: root.sh * 0.16
         color: root.surfaceColor
         border.color: root.accentColor
         border.width: Math.max(2, root.sh * 0.005)
 
-        Text {
+        Column {
             anchors.fill: parent
             anchors.margins: root.sh * 0.022
-            text: picksRoot.selectedPick().reason || "I FOUND A FEW THINGS FOR MOVIE NIGHT."
-            color: root.primaryColor
-            font.family: root.globalFont
-            font.pixelSize: root.sh * 0.027
-            wrapMode: Text.WordWrap
-            verticalAlignment: Text.AlignVCenter
+            spacing: root.sh * 0.008
+
+            Text {
+                width: parent.width
+                text: "WHY THIS PICK"
+                color: root.accentColor
+                font.family: root.globalFont
+                font.pixelSize: root.sh * 0.018
+                font.bold: true
+            }
+
+            Text {
+                width: parent.width
+                text: picksRoot.selectedPick().reason
+                      || "I FOUND A FEW THINGS WORTH PUTTING ON."
+                color: root.primaryColor
+                font.family: root.globalFont
+                font.pixelSize: root.sh * 0.024
+                wrapMode: Text.WordWrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
+            }
         }
     }
 
@@ -165,13 +233,13 @@ FocusScope {
         model: picksRoot.picks
         anchors.left: parent.left
         anchors.leftMargin: root.sw * 0.115625
-        anchors.verticalCenter: parent.verticalCenter
-        width: root.sw * 0.51
-        height: root.sh * 0.48
+        anchors.top: collectionSummary.bottom
+        anchors.topMargin: root.sh * 0.022
+        width: root.sw * 0.47
+        height: root.sh * 0.43
         clip: true
         focus: true
         currentIndex: 0
-        onCurrentIndexChanged: picksRoot.scheduleNarration()
 
         delegate: Item {
             id: pickDelegate
@@ -206,7 +274,7 @@ FocusScope {
                 Text {
                     width: parent.width
                     text: ((pickDelegate.modelData.media_type || "VIDEO") + "  •  "
-                           + (pickDelegate.modelData.source || "TATER TUBE"))
+                           + picksRoot.sourceLabel(pickDelegate.modelData.source))
                     color: pickList.currentIndex === pickDelegate.index ? root.surfaceColor : root.secondaryColor
                     font.family: root.globalFont
                     font.capitalization: Font.AllUppercase

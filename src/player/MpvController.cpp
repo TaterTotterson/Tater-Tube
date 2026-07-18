@@ -844,6 +844,14 @@ void MpvController::sendViewingEvent(const QString &state, int positionMs, int d
         m_currentViewingContext.value(QStringLiteral("module_id")).toString().trimmed();
     if (!moduleId.isEmpty())
         metadata[QStringLiteral("module_id")] = moduleId;
+    const QString channelNumber =
+        m_currentViewingContext.value(QStringLiteral("channel_number")).toString().trimmed();
+    const QString channelName =
+        m_currentViewingContext.value(QStringLiteral("channel_name")).toString().trimmed();
+    if (!channelNumber.isEmpty())
+        metadata[QStringLiteral("channel_number")] = channelNumber;
+    if (!channelName.isEmpty())
+        metadata[QStringLiteral("channel_name")] = channelName;
 
     QJsonObject event{
         {QStringLiteral("event_id"), m_viewingEventId},
