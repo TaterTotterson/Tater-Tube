@@ -491,13 +491,28 @@ FocusScope {
                     font.pixelSize: root.sh * 0.05
                     clip: true
 
-                    Keys.onReturnPressed: moduleSettingsRoot.saveTextEdit()
-                    Keys.onEnterPressed: moduleSettingsRoot.saveTextEdit()
+                    function openInputKeyboard() {
+                        root.openTaterKeyboard(
+                                    textEditField, textOverlayLabel, false,
+                                    function() {
+                                        moduleSettingsRoot.saveTextEdit()
+                                    },
+                                    function() {
+                                        textEditField.forceActiveFocus()
+                                    })
+                    }
+
+                    Keys.onReturnPressed: textEditField.openInputKeyboard()
+                    Keys.onEnterPressed: textEditField.openInputKeyboard()
+
+                    TapHandler {
+                        onTapped: textEditField.openInputKeyboard()
+                    }
                 }
             }
 
             Text {
-                text: "ENTER:SAVE  " + root.hints.back + ":CANCEL"
+                text: "A:KEYBOARD  DONE:SAVE  " + root.hints.back + ":CANCEL"
                 color: root.tertiaryColor
                 font.family: root.globalFont
                 font.pixelSize: root.sh * 0.0333333

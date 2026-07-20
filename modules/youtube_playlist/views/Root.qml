@@ -1449,19 +1449,28 @@ FocusScope {
                 font.pixelSize: root.sh * 0.045
                 clip: true
 
-                Keys.onReturnPressed: function(event) {
-                    mixRoot.addPlaylist(playlistField.text)
-                    event.accepted = true
+                function openInputKeyboard() {
+                    root.openTaterKeyboard(
+                                playlistField, "YOUTUBE PLAYLIST", false,
+                                function() {
+                                    mixRoot.addPlaylist(playlistField.text)
+                                },
+                                function() {
+                                    playlistField.forceActiveFocus()
+                                })
                 }
-                Keys.onEnterPressed: function(event) {
-                    mixRoot.addPlaylist(playlistField.text)
-                    event.accepted = true
-                }
+
+                Keys.onReturnPressed: playlistField.openInputKeyboard()
+                Keys.onEnterPressed: playlistField.openInputKeyboard()
                 Keys.onPressed: function(event) {
                     if (event.key === Qt.Key_Escape || event.key === Qt.Key_Back) {
                         mixRoot.cancelAdd()
                         event.accepted = true
                     }
+                }
+
+                TapHandler {
+                    onTapped: playlistField.openInputKeyboard()
                 }
             }
         }

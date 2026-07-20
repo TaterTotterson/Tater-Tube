@@ -523,13 +523,26 @@ FocusScope {
                 font.pixelSize: root.sh * 0.05
                 clip: true
 
-                Keys.onReturnPressed: otaRoot.saveHdhomerunSetup()
-                Keys.onEnterPressed: otaRoot.saveHdhomerunSetup()
+                function openInputKeyboard() {
+                    root.openTaterKeyboard(
+                                hdhomerunHostField, "HDHOMERUN ADDRESS", false,
+                                function() { otaRoot.saveHdhomerunSetup() },
+                                function() {
+                                    hdhomerunHostField.forceActiveFocus()
+                                })
+                }
+
+                Keys.onReturnPressed: hdhomerunHostField.openInputKeyboard()
+                Keys.onEnterPressed: hdhomerunHostField.openInputKeyboard()
                 Keys.onPressed: function(event) {
                     if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
                         otaRoot.exitOta()
                         event.accepted = true
                     }
+                }
+
+                TapHandler {
+                    onTapped: hdhomerunHostField.openInputKeyboard()
                 }
             }
         }

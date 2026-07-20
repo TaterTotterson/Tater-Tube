@@ -144,6 +144,7 @@ FocusScope {
     }
 
     component LoginField: Item {
+        id: loginFieldControl
         property alias text: fieldInput.text
         property string label: ""
         property bool selected: false
@@ -151,6 +152,13 @@ FocusScope {
 
         function forceInputFocus() {
             fieldInput.forceActiveFocus()
+        }
+
+        function openInputKeyboard() {
+            root.openTaterKeyboard(
+                        fieldInput, label, password,
+                        function() { loginRoot.focusNext() },
+                        function() { loginFieldControl.forceInputFocus() })
         }
 
         width: form.width
@@ -192,8 +200,13 @@ FocusScope {
 
             Keys.onUpPressed: loginRoot.focusPrevious()
             Keys.onDownPressed: loginRoot.focusNext()
-            Keys.onReturnPressed: loginRoot.focusNext()
-            Keys.onEnterPressed: loginRoot.focusNext()
+            Keys.onReturnPressed: loginFieldControl.openInputKeyboard()
+            Keys.onEnterPressed: loginFieldControl.openInputKeyboard()
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: loginFieldControl.openInputKeyboard()
         }
     }
 }
