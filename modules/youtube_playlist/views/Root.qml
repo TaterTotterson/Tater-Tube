@@ -47,6 +47,7 @@ FocusScope {
     property bool tvLoading: false
     property bool tvTuningStaticVisible: false
     property bool tvTransitionBlankVisible: false
+    property bool tvChannelTunePending: false
     property bool tvStoppingForTune: false
     property bool tvStreamStarted: false
     property bool backgroundStaticVisible: (root.staticBackgroundEnabled && mode !== "playing" && mode !== "tv")
@@ -557,6 +558,7 @@ FocusScope {
     }
 
     function showTvStaticForChannel(channel) {
+        tvChannelTunePending = true
         tvTransitionBlankVisible = mpvController.running
         tvTuningStaticVisible = !mpvController.running
         tvStreamStarted = false
@@ -578,7 +580,7 @@ FocusScope {
     function launchTvPlayback(url, offset, label, allowYtdl, format, item) {
         tvStreamStarted = true
         tvStoppingForTune = false
-        var oscMode = tvTransitionBlankVisible ? "ota-quiet" : "ota"
+        var oscMode = tvChannelTunePending ? "ota-tune" : "ota-quiet"
         mpvController.setViewingContext(
             isTvInterstitialItem(item)
                 ? ({ suppress_viewing_event: true })
@@ -663,6 +665,7 @@ FocusScope {
             nextIndex = 0
         var nextItem = channel.schedule[nextIndex]
         tvStartedAtMs = Date.now() - Math.max(0, nextItem.start) * 1000.0
+        tvChannelTunePending = false
         tvTransitionBlankVisible = true
         tvTuningStaticVisible = false
         tvStreamStarted = false
@@ -802,6 +805,7 @@ FocusScope {
         tvLoading = true
         tvTuningStaticVisible = true
         tvTransitionBlankVisible = false
+        tvChannelTunePending = false
         tvStoppingForTune = false
         tvStreamStarted = false
         tvCurrentChannelIndex = 0
@@ -851,6 +855,7 @@ FocusScope {
         tvLoading = false
         tvTuningStaticVisible = false
         tvTransitionBlankVisible = false
+        tvChannelTunePending = false
         tvStreamStarted = false
         tvCurrentScheduleIndex = -1
         if (mpvController.running)
@@ -1325,9 +1330,13 @@ FocusScope {
             if (!tvModeActive)
                 return
             if (message === "240mp-ota-file-loaded") {
+                var showTunedChannel = tvChannelTunePending
+                tvChannelTunePending = false
                 tvTransitionBlankVisible = false
                 tvTuningStaticVisible = false
                 tvStreamStarted = true
+                if (showTunedChannel)
+                    mpvController.sendScriptMessage("240mp-ota-tuned-channel", statusText)
                 return
             }
             if (message === "240mp-ota-tune-now") {
@@ -1391,7 +1400,8 @@ FocusScope {
     }
 
     Rectangle {
-        visible: mode === "tv" && tvTuningStaticVisible && !tvLoading && !tvTransitionBlankVisible
+        visible: mode === "tv" && tvChannelTunePending && tvTuningStaticVisible
+                 && !tvLoading && !tvTransitionBlankVisible
         z: 5
         anchors.top: parent.top
         anchors.right: parent.right

@@ -78,8 +78,8 @@ FocusScope {
             statusText = "MOONLIGHT IS NOT INSTALLED"
             return
         }
-        if (!status.host || status.host.length === 0) {
-            showSetup("ENTER SUNSHINE HOST")
+        if (!status.host || status.host.length === 0 || status.pairingRequired) {
+            showSetup(status.host ? "PAIR SUNSHINE" : "ENTER SUNSHINE HOST")
             return
         }
         loadApps()
@@ -182,7 +182,7 @@ FocusScope {
             appList.currentIndex = currentAppIndex
             return
         }
-        goBack()
+        showSetup("PAIR SUNSHINE")
     }
 
     Keys.onPressed: function(event) {
@@ -239,7 +239,10 @@ FocusScope {
 
         if (mode === "message") {
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                refresh()
+                if (apps.length > 0)
+                    refresh()
+                else
+                    showSetup("PAIR SUNSHINE")
                 event.accepted = true
             } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
                 returnFromMessage()
@@ -340,9 +343,11 @@ FocusScope {
         }
 
         function onErrorOccurred(message) {
+            var wasLoadingApps = loadingApps
             loadingApps = false
             var lower = (message || "").toLowerCase()
-            if (lower.indexOf("pair") >= 0 || lower.indexOf("pin") >= 0) {
+            if (lower.indexOf("pair") >= 0 || lower.indexOf("pin") >= 0
+                    || (wasLoadingApps && apps.length === 0)) {
                 showSetup(message || "PAIR SUNSHINE")
                 return
             }

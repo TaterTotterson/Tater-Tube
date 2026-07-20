@@ -30,6 +30,7 @@ FocusScope {
     property bool streamStarted: false
     property bool streamRequestActive: false
     property bool transitionBlankVisible: false
+    property bool channelTunePending: false
     property string pendingRequestId: ""
     property var pendingPlayback: ({})
     property int requestSerial: 0
@@ -569,6 +570,7 @@ FocusScope {
 
     function showStaticForChannel(channel) {
         scheduleAdvanceTimer.stop()
+        channelTunePending = true
         transitionBlankVisible = mpvController.running
         tuningStaticVisible = !mpvController.running
         noSignalVisible = false
@@ -669,7 +671,7 @@ FocusScope {
         stoppingForScheduleAdvance = false
         streamRequestActive = false
         noSignalVisible = false
-        var oscMode = transitionBlankVisible ? "ota-quiet" : "ota"
+        var oscMode = channelTunePending ? "ota-tune" : "ota-quiet"
         mpvController.setViewingContext(
             isInterstitialKind(item ? item.kind : "")
                 ? ({ suppress_viewing_event: true })
@@ -702,6 +704,7 @@ FocusScope {
 
         var nextItem = channel.schedule[nextIndex]
         startedAtMs = Date.now() - Math.max(0, nextItem.start) * 1000.0
+        channelTunePending = false
         transitionBlankVisible = true
         tuningStaticVisible = false
         noSignalVisible = false
@@ -753,6 +756,7 @@ FocusScope {
 
     function exitTvMode() {
         leaving = true
+        channelTunePending = false
         tuneTimer.stop()
         scheduleAdvanceTimer.stop()
         pendingRequestId = ""
@@ -909,9 +913,13 @@ FocusScope {
 
         function onScriptMessageReceived(message, arg) {
             if (message === "240mp-ota-file-loaded") {
+                var showTunedChannel = tvRoot.channelTunePending
+                tvRoot.channelTunePending = false
                 tvRoot.transitionBlankVisible = false
                 tvRoot.tuningStaticVisible = false
                 tvRoot.streamStarted = true
+                if (showTunedChannel)
+                    mpvController.sendScriptMessage("240mp-ota-tuned-channel", tvRoot.statusText)
                 return
             }
 
@@ -980,7 +988,8 @@ FocusScope {
     }
 
     Rectangle {
-        visible: tvRoot.tuningStaticVisible && !tvRoot.loading && !tvRoot.transitionBlankVisible
+        visible: tvRoot.channelTunePending && tvRoot.tuningStaticVisible
+                 && !tvRoot.loading && !tvRoot.transitionBlankVisible
         z: 5
         anchors.top: parent.top
         anchors.right: parent.right

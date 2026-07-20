@@ -74,6 +74,7 @@ FocusScope {
         var items = []
 
         items.push({ type: "settings_category", label: "Appearance", sectionKey: "appearance" })
+        items.push({ type: "settings_category", label: "Menu Sounds", sectionKey: "menu_sounds" })
         items.push({ type: "settings_category", label: "Features", sectionKey: "features" })
         items.push({ type: "settings_category", label: "Tater Bumpers", sectionKey: "tater_bumpers" })
         items.push({ type: "settings_category", label: "Gamepad", sectionKey: "bluetooth" })
@@ -85,6 +86,7 @@ FocusScope {
 
     function sectionTitle(sectionKey) {
         if (sectionKey === "appearance") return "Appearance"
+        if (sectionKey === "menu_sounds") return "Menu Sounds"
         if (sectionKey === "system") return "System"
         if (sectionKey === "features") return "Features"
         if (sectionKey === "tater_bumpers") return "Tater Bumpers"
@@ -102,6 +104,8 @@ FocusScope {
 
         if (sectionKey === "appearance") {
             buildAppearanceItems(items)
+        } else if (sectionKey === "menu_sounds") {
+            buildMenuSoundItems(items)
         } else if (sectionKey === "system") {
             buildSystemItems(items)
         } else if (sectionKey === "features") {
@@ -156,6 +160,36 @@ FocusScope {
                 moduleId: ""
             })
         }
+    }
+
+    function buildMenuSoundItems(items) {
+        var enabledValue = appSettings["menu_sounds_enabled"]
+        var enabled = enabledValue === undefined || enabledValue === null || enabledValue === ""
+            ? true
+            : !(enabledValue === false || enabledValue === 0 || enabledValue === "0"
+                || String(enabledValue).trim().toLowerCase() === "off"
+                || String(enabledValue).trim().toLowerCase() === "false")
+        var packs = ["Soft Touch", "Rental Night", "Haunted Tape"]
+        var selectedPack = appSettings["menu_sound_pack"] || "Soft Touch"
+        if (packs.indexOf(selectedPack) < 0)
+            selectedPack = "Soft Touch"
+
+        items.push({
+            type: "toggle",
+            key: "menu_sounds_enabled",
+            label: "Menu Sounds",
+            value: enabled ? "ON" : "OFF",
+            enabled: enabled,
+            moduleId: ""
+        })
+        items.push({
+            type: "list_single",
+            key: "menu_sound_pack",
+            label: "Sound Pack",
+            options: packs,
+            value: selectedPack,
+            moduleId: ""
+        })
     }
 
     function buildSystemItems(items) {

@@ -18,6 +18,7 @@
 #include "modules/youtube_playlist/YouTubePlaylistBackend.h"
 #include "modules/moonlight/MoonlightBackend.h"
 #include "modules/usenet/UsenetBackend.h"
+#include "audio/MenuSoundPlayer.h"
 #include "player/MpvController.h"
 #include "input/InputManager.h"
 #include "api/ControlApiServer.h"
@@ -98,6 +99,7 @@ int main(int argc, char *argv[]) {
     UsenetBackend       usenetBackend(appRoot, dataRoot);
     MpvController       mpvController(appRoot, &appCore);
     InputManager        inputManager(dataRoot);
+    MenuSoundPlayer     menuSoundPlayer(appRoot, &appCore);
     appCore.setMpvController(&mpvController);
     ControlApiServer    controlApi(&mpvController, &appCore, &embyBackend,
                                     &retroBackend, &moonlightBackend);
@@ -108,6 +110,8 @@ int main(int argc, char *argv[]) {
     // gamepad actions bypass QML and drive mpv directly over IPC.
     QObject::connect(&inputManager, &InputManager::mpvKeyRequested,
                      &mpvController, &MpvController::sendKey);
+    QObject::connect(&mpvController, &MpvController::runningChanged,
+                     &menuSoundPlayer, &MenuSoundPlayer::setPlaybackActive);
 
     // Each module backend is wired in one call: stored for action routing, exposed to QML
     // under its context-property name, and its optional signals/slots connected by

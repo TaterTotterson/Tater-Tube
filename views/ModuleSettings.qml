@@ -191,7 +191,7 @@ FocusScope {
         }
         function onModuleAuthStateChanged(mid) {
             if (mid !== moduleSettingsRoot.moduleId) return
-            buildModel()
+            loadSettings()
             for (var i = 0; i < schemaItems.length; i++) {
                 var item = schemaItems[i]
                 if (item.options_source === "dynamic" && item.options_slot) {

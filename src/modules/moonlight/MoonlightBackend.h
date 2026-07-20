@@ -71,8 +71,14 @@ private:
     QVariantList loadAppCache() const;
     bool saveAppCache(const QVariantList &apps) const;
     void clearAppCache() const;
+    QString pairingRequiredPath() const;
+    bool pairingRequired() const;
+    bool setPairingRequired(bool required) const;
     void unpairMoonlightHost(const QString &hostValue) const;
     void removeMoonlightPairingState() const;
+    void resetPairingState(const QString &hostValue);
+    void cancelAppList();
+    void handlePairOutput(const QString &chunk);
     void startAppList(bool forceRefresh);
     QVariantList parseAppList(const QString &output) const;
     QString bundledMoonlightPath() const;
@@ -102,6 +108,7 @@ private:
     QProcess *m_listProcess = nullptr;
     QProcess *m_streamProcess = nullptr;
     QString m_pairOutput;
+    QString m_pairPin;
     bool m_pairTimedOut = false;
     int m_pairSessionId = 0;
     QString m_listOutput;
