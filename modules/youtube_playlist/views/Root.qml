@@ -1044,10 +1044,10 @@ FocusScope {
                 commercialCategoryList.currentIndex = Math.min(commercialCategoryList.count - 1,
                                                                commercialCategoryList.currentIndex + 1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Left) {
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
                 pageCommercialCategories(-1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Right) {
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
                 pageCommercialCategories(1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
@@ -1106,10 +1106,10 @@ FocusScope {
             } else if (event.key === Qt.Key_Down) {
                 setVideoRowIndex(videoList.currentIndex + 1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Left) {
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
                 pageVideoList(-1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Right) {
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
                 pageVideoList(1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {

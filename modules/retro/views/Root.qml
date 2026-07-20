@@ -325,10 +325,10 @@ FocusScope {
             } else if (event.key === Qt.Key_Down) {
                 setGameRowIndex(gameList.currentIndex + 1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Left) {
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
                 pageGameList(-1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Right) {
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
                 pageGameList(1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {

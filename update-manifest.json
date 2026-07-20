@@ -1,14 +1,14 @@
 {
-  "version": "v1.6.2",
-  "app_version": "1.6.2",
+  "version": "v1.6.3",
+  "app_version": "1.6.3",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.6.2/Tater-Tube-v1.6.2-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.6.2.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.6.3/Tater-Tube-v1.6.3-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.6.3.tar.gz",
   "notes": [
-    "Adds the app-wide Tater on-screen keyboard to every text field, including PC Link, with the orange-red Tater color treatment.",
-    "Adds a controller-friendly Series Archive for browsing and opening local series folders.",
-    "Makes linked Tater Picks use the configured Tater Assistant first name and accept supported current and legacy recommendation response layouts."
+    "Makes the universal on-screen keyboard highlight follow the active Tater Tube theme.",
+    "Standardizes list navigation across modules: Left and Right jump pages while Back returns to the previous screen.",
+    "Maps L2 and R2 to fast Page Up and Page Down navigation, including Tape Deck, Game Center, PC Link, The Tube, and Public Access lists."
   ]
 }

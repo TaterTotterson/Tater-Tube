@@ -335,6 +335,12 @@ FocusScope {
             } else if (event.key === Qt.Key_Down) {
                 libraryList.currentIndex = Math.min(libraryList.count - 1, libraryList.currentIndex + 1)
                 event.accepted = true
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
+                root.pageView(libraryList, -1)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
+                root.pageView(libraryList, 1)
+                event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 selectLibrary(libraryList.currentIndex)
                 event.accepted = true
@@ -349,11 +355,11 @@ FocusScope {
             } else if (event.key === Qt.Key_Down) {
                 albumList.currentIndex = Math.min(albumList.count - 1, albumList.currentIndex + 1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Left) {
-                if (skippedLibraryPicker)
-                    goBack()
-                else
-                    mode = "libraries"
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
+                root.pageView(albumList, -1)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
+                root.pageView(albumList, 1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 selectAlbum(albumList.currentIndex)
@@ -369,9 +375,11 @@ FocusScope {
             } else if (event.key === Qt.Key_Down) {
                 trackList.currentIndex = Math.min(trackList.count - 1, trackList.currentIndex + 1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Left) {
-                mode = "albums"
-                albumList.currentIndex = currentAlbumIndex
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
+                root.pageView(trackList, -1)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
+                root.pageView(trackList, 1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
                 playTrack(trackList.currentIndex)

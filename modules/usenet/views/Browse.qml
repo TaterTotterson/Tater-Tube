@@ -731,10 +731,10 @@ FocusScope {
             } else if (event.key === Qt.Key_Down) {
                 setListIndex(categoryList, categoryList.currentIndex + 1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Left) {
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
                 pageList(categoryList, -1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Right) {
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
                 pageList(categoryList, 1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -769,10 +769,10 @@ FocusScope {
             } else if (event.key === Qt.Key_Down) {
                 setListIndex(activeList, activeList.currentIndex + 1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Left) {
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
                 pageList(activeList, -1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Right) {
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
                 pageList(activeList, 1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {

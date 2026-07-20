@@ -179,6 +179,41 @@ Window {
         taterKeyboard.dismiss()
     }
 
+    function pageView(view, direction) {
+        if (!view || view.count === undefined || view.count <= 0
+                || view.currentIndex === undefined
+                || typeof view.positionViewAtIndex !== "function")
+            return false
+
+        var itemHeight = view.currentItem && view.currentItem.height > 0
+                ? view.currentItem.height : root.sh * 0.0583333
+        var visibleRows = Math.max(1, Math.floor(view.height / itemHeight))
+        var step = Math.max(1, visibleRows - 1)
+        var isGrid = view.cellWidth !== undefined && view.cellWidth > 0
+                && view.cellHeight !== undefined && view.cellHeight > 0
+        if (isGrid) {
+            visibleRows = Math.max(1, Math.floor(view.height / view.cellHeight))
+            var visibleColumns = Math.max(1, Math.floor(view.width / view.cellWidth))
+            step = Math.max(1, visibleRows - 1) * visibleColumns
+        }
+
+        var next = Math.max(0, Math.min(view.count - 1,
+                                        view.currentIndex + direction * step))
+        view.currentIndex = next
+        view.positionViewAtIndex(next, isGrid ? GridView.Contain : ListView.Contain)
+        return true
+    }
+
+    function pageFocusedView(direction) {
+        var item = root.activeFocusItem
+        while (item && item !== moduleNavigationScope) {
+            if (root.pageView(item, direction))
+                return true
+            item = item.parent
+        }
+        return false
+    }
+
     Connections {
         target: appCore
         function onAppSettingChanged(key, value) {
@@ -397,49 +432,66 @@ Window {
         running: visible
     }
 
-    Loader {
-        id: moduleLoader;
-        anchors.fill: parent;
-        focus: true;
-        source: "views/ModuleList.qml";
+    FocusScope {
+        id: moduleNavigationScope
+        anchors.fill: parent
+        focus: true
 
-        Keys.priority: Keys.BeforeItem
-        Keys.onPressed: (event) => {
-            if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_Q) {
-                Qt.quit()
-            } else if (event.key === Qt.Key_Home) {
-                root.goHome()
+        Keys.priority: Keys.AfterItem
+        Keys.onPressed: function(event) {
+            var direction = 0
+            if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp)
+                direction = -1
+            else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown)
+                direction = 1
+            if (direction !== 0 && root.pageFocusedView(direction))
                 event.accepted = true
-            } else if (root.consumeDuplicateBack(event)) {
-                // Some remotes emit a second Back-shaped event for one press.
-                // Consume it before a newly loaded view can pop another level.
-                event.accepted = true
-            }
         }
 
-        onLoaded: item.forceActiveFocus()
+        Loader {
+            id: moduleLoader;
+            anchors.fill: parent;
+            focus: true;
+            source: "views/ModuleList.qml";
 
-        Connections {
-            target: moduleLoader.item
-            ignoreUnknownSignals: true
-
-            function onNavigateTo(path, params, listState) {
-                root.appNavStack.push({ source: moduleLoader.source, params: root.appCurrentParams, listState: listState || {} })
-                root.appCurrentParams = params || {}
-                moduleLoader.setSource(path, { "navParams": params || {} })
+            Keys.priority: Keys.BeforeItem
+            Keys.onPressed: (event) => {
+                if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_Q) {
+                    Qt.quit()
+                } else if (event.key === Qt.Key_Home) {
+                    root.goHome()
+                    event.accepted = true
+                } else if (root.consumeDuplicateBack(event)) {
+                    // Some remotes emit a second Back-shaped event for one press.
+                    // Consume it before a newly loaded view can pop another level.
+                    event.accepted = true
+                }
             }
 
-            function onGoBack() {
-                var now = Date.now()
-                if (now - root.lastAppBackAtMs < 220)
-                    return
-                root.lastAppBackAtMs = now
-                if (root.appNavStack.length === 0) return
-                var prev = root.appNavStack.pop()
-                root.appCurrentParams = prev.params
-                moduleLoader.setSource(prev.source, { "navParams": prev.params, "navListState": prev.listState || {} })
-            }
+            onLoaded: item.forceActiveFocus()
 
+            Connections {
+                target: moduleLoader.item
+                ignoreUnknownSignals: true
+
+                function onNavigateTo(path, params, listState) {
+                    root.appNavStack.push({ source: moduleLoader.source, params: root.appCurrentParams, listState: listState || {} })
+                    root.appCurrentParams = params || {}
+                    moduleLoader.setSource(path, { "navParams": params || {} })
+                }
+
+                function onGoBack() {
+                    var now = Date.now()
+                    if (now - root.lastAppBackAtMs < 220)
+                        return
+                    root.lastAppBackAtMs = now
+                    if (root.appNavStack.length === 0) return
+                    var prev = root.appNavStack.pop()
+                    root.appCurrentParams = prev.params
+                    moduleLoader.setSource(prev.source, { "navParams": prev.params, "navListState": prev.listState || {} })
+                }
+
+            }
         }
     }
 
@@ -461,7 +513,7 @@ Window {
         primaryColor: root.primaryColor
         secondaryColor: root.secondaryColor
         surfaceColor: root.surfaceColor
-        accentColor: "#FF4A00"
+        accentColor: root.accentColor
         fontFamily: root.globalFont
         z: 20000
     }

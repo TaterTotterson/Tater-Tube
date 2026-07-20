@@ -18,7 +18,7 @@ class QSocketNotifier;
 #endif
 
 // Centralized gamepad input. SDL controller buttons/axes are mapped to a small
-// set of named actions (up/down/left/right/select/back/play_pause), and each
+// set of named actions (up/down/left/right/page_up/page_down/select/back/play_pause), and each
 // action is delivered to QML as an ordinary synthesized key event posted to the
 // root window — so every existing Keys.onPressed handler (including the Player
 // views that forward keys to mpv over IPC) works without gamepad-specific code.
@@ -65,7 +65,7 @@ private slots:
     void onDataDirChanged(const QString &path);
 
 private:
-    enum class Action { None, Up, Down, Left, Right, Select, Back, Menu, PlayPause, Home };
+    enum class Action { None, Up, Down, Left, Right, PageUp, PageDown, Select, Back, Menu, PlayPause, Home };
 
     void initSdl();
     void openController(int deviceIndex);

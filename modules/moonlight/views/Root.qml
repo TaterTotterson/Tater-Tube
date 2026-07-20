@@ -213,10 +213,10 @@ FocusScope {
                 appList.currentIndex = Math.min(appList.count - 1, appList.currentIndex + 1)
                 currentAppIndex = appList.currentIndex
                 event.accepted = true
-            } else if (event.key === Qt.Key_Left) {
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_PageUp) {
                 pageAppList(-1)
                 event.accepted = true
-            } else if (event.key === Qt.Key_Right) {
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_PageDown) {
                 pageAppList(1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {

@@ -174,6 +174,8 @@ bool InputManager::saveControllerMapping(const QVariantMap &mapping)
         {QStringLiteral("down"), QStringLiteral("down")},
         {QStringLiteral("left"), QStringLiteral("left")},
         {QStringLiteral("right"), QStringLiteral("right")},
+        {QStringLiteral("l2"), QStringLiteral("page_up")},
+        {QStringLiteral("r2"), QStringLiteral("page_down")},
         {QStringLiteral("b"), QStringLiteral("select")},
         {QStringLiteral("a"), QStringLiteral("back")},
         {QStringLiteral("menu"), QStringLiteral("menu")},
@@ -464,6 +466,8 @@ void InputManager::loadDefaultMapping() {
     m_buttonMap[SDL_CONTROLLER_BUTTON_RIGHTSHOULDER] = Action::Right;
     m_axisMap[SDL_CONTROLLER_AXIS_LEFTX] = { Action::Left, Action::Right };
     m_axisMap[SDL_CONTROLLER_AXIS_LEFTY] = { Action::Up,   Action::Down  };
+    m_axisMap[SDL_CONTROLLER_AXIS_TRIGGERLEFT]  = { Action::None, Action::PageUp };
+    m_axisMap[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] = { Action::None, Action::PageDown };
 
     // Raw Linux joystick fallback. DualSense reports D-pad as axes 6/7 on the
     // Pi, while many generic pads use a hat or left-stick axes 0/1.
@@ -476,6 +480,8 @@ void InputManager::loadDefaultMapping() {
     m_joystickButtonMap[10] = Action::Home;       // guide/home
     m_joystickAxisMap[0] = { Action::Left, Action::Right };
     m_joystickAxisMap[1] = { Action::Up,   Action::Down  };
+    m_joystickAxisMap[2] = { Action::None, Action::PageUp };
+    m_joystickAxisMap[5] = { Action::None, Action::PageDown };
     m_joystickAxisMap[6] = { Action::Left, Action::Right };
     m_joystickAxisMap[7] = { Action::Up,   Action::Down  };
     m_joystickHatMap[joystickHatConfigKey(0, SDL_HAT_UP)]    = Action::Up;
@@ -490,6 +496,8 @@ InputManager::Action InputManager::actionFromString(const QString &name, bool *o
     if (name == "down")       return Action::Down;
     if (name == "left")       return Action::Left;
     if (name == "right")      return Action::Right;
+    if (name == "page_up" || name == "pageup") return Action::PageUp;
+    if (name == "page_down" || name == "pagedown") return Action::PageDown;
     if (name == "select")     return Action::Select;
     if (name == "back")       return Action::Back;
     if (name == "menu")       return Action::Menu;
@@ -1669,6 +1677,8 @@ int InputManager::qtKeyForAction(Action a) {
     case Action::Down:      return Qt::Key_Down;
     case Action::Left:      return Qt::Key_Left;
     case Action::Right:     return Qt::Key_Right;
+    case Action::PageUp:    return Qt::Key_PageUp;
+    case Action::PageDown:  return Qt::Key_PageDown;
     case Action::Select:    return Qt::Key_Return;
     case Action::Back:      return Qt::Key_Escape;
     case Action::Menu:      return Qt::Key_Menu;
@@ -1686,6 +1696,8 @@ QString InputManager::mpvKeyForAction(Action a) {
     case Action::Down:      return QStringLiteral("DOWN");
     case Action::Left:      return QStringLiteral("LEFT");
     case Action::Right:     return QStringLiteral("RIGHT");
+    case Action::PageUp:
+    case Action::PageDown:  return QString();
     case Action::Select:    return QStringLiteral("ENTER");
     case Action::Back:      return QStringLiteral("ESC");
     case Action::Menu:      return QStringLiteral("MENU");
