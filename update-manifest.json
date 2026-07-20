@@ -1,14 +1,14 @@
 {
-  "version": "v1.6.1",
-  "app_version": "1.6.1",
+  "version": "v1.6.2",
+  "app_version": "1.6.2",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.6.1/Tater-Tube-v1.6.1-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.6.1.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.6.2/Tater-Tube-v1.6.2-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.6.2.tar.gz",
   "notes": [
-    "Makes video handoffs seamless by keeping the active mpv surface black between Tater bumpers, programs, episodes, streams, and channel changes until the next video is ready.",
-    "Prevents the Tater Tube menus, loading labels, stale frames, and player overlays from flashing between playback items across VOD, NZB streaming, local media, Public Access, OTA, and TV modes.",
-    "Makes Back consistently return one level at a time, including nested module screens and temporary error pages, while filtering duplicate remote-control Back events."
+    "Adds the app-wide Tater on-screen keyboard to every text field, including PC Link, with the orange-red Tater color treatment.",
+    "Adds a controller-friendly Series Archive for browsing and opening local series folders.",
+    "Makes linked Tater Picks use the configured Tater Assistant first name and accept supported current and legacy recommendation response layouts."
   ]
 }

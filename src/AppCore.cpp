@@ -94,6 +94,40 @@ bool truthyValue(const QString &value)
            normalized == "on";
 }
 
+QString cleanTaterAssistantFirstName(const QString &value)
+{
+    QString firstName = value.simplified().section(QLatin1Char(' '), 0, 0);
+    if (!firstName.isEmpty())
+        firstName[0] = firstName[0].toUpper();
+    return firstName;
+}
+
+QString taterAssistantNameFromObject(const QJsonObject &object)
+{
+    const QStringList directKeys{
+        QStringLiteral("assistant_name"),
+        QStringLiteral("assistantName"),
+    };
+    for (const QString &key : directKeys) {
+        const QString name = cleanTaterAssistantFirstName(object.value(key).toString());
+        if (!name.isEmpty())
+            return name;
+    }
+
+    const QJsonObject assistant = object.value(QStringLiteral("assistant")).toObject();
+    const QStringList assistantKeys{
+        QStringLiteral("first_name"),
+        QStringLiteral("firstName"),
+        QStringLiteral("name"),
+    };
+    for (const QString &key : assistantKeys) {
+        const QString name = cleanTaterAssistantFirstName(assistant.value(key).toString());
+        if (!name.isEmpty())
+            return name;
+    }
+    return {};
+}
+
 QVariantMap parseSshControlOutput(const QString &output)
 {
     QVariantMap result{
@@ -649,13 +683,10 @@ QVariant AppCore::get_setting(const QString &moduleId, const QString &key) {
 }
 
 QString AppCore::taterPicksTitle() const {
-    QString firstName =
-        m_taterRecommendationBatch.value(QStringLiteral("assistant_name"))
-            .toString()
-            .simplified()
-            .section(' ', 0, 0);
+    const QString firstName = cleanTaterAssistantFirstName(
+        m_taterRecommendationBatch.value(QStringLiteral("assistant_name")).toString());
     if (firstName.isEmpty())
-        firstName = QStringLiteral("Tater");
+        return QStringLiteral("Tater's Picks");
     return QStringLiteral("%1's Picks").arg(firstName);
 }
 
@@ -671,12 +702,14 @@ QString AppCore::taterServerApiUrl(const QString &path) const {
     const QJsonObject module =
         config["modules"].toObject()["com.240mp.usenet"].toObject();
     QString serverUrl = module["tater_server_url"].toString().trimmed();
+    if (serverUrl.isEmpty())
+        return {};
+    if (!serverUrl.contains(QStringLiteral("://")))
+        serverUrl.prepend(QStringLiteral("http://"));
     while (serverUrl.endsWith('/'))
         serverUrl.chop(1);
     if (serverUrl.endsWith(QStringLiteral("/api"), Qt::CaseInsensitive))
         serverUrl.chop(4);
-    if (serverUrl.isEmpty())
-        return {};
     return serverUrl + QStringLiteral("/api/") + path;
 }
 
@@ -716,13 +749,19 @@ void AppCore::refreshTaterRecommendations() {
     QNetworkReply *reply = m_updateNetwork->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         const QByteArray body = reply->readAll();
-        const bool ok = reply->error() == QNetworkReply::NoError;
+        const QNetworkReply::NetworkError networkError = reply->error();
+        const QString networkErrorText = reply->errorString();
         const int status =
             reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const bool ok = networkError == QNetworkReply::NoError
+            && status >= 200 && status < 300;
         m_taterRecommendationsRequestInFlight = false;
         reply->deleteLater();
         if (!ok) {
-            qWarning("[AppCore] Tater recommendations request failed");
+            qWarning("[AppCore] Tater recommendations request failed "
+                     "(HTTP %d, network %d: %s)",
+                     status, static_cast<int>(networkError),
+                     qPrintable(networkErrorText));
             if (status == 401 &&
                 (!m_taterRecommendations.isEmpty() || !m_taterRecommendationBatch.isEmpty())) {
                 m_taterRecommendations.clear();
@@ -745,8 +784,21 @@ void AppCore::refreshTaterRecommendations() {
         m_taterRecommendationsRetryAttempts = 0;
         const QJsonObject envelope = document.object();
         const QJsonObject data = envelope.value("data").toObject();
-        const QVariantList items = data.value("items").toArray().toVariantList();
-        const QVariantMap batch = data.value("batch").toObject().toVariantMap();
+        QJsonArray itemArray = data.value(QStringLiteral("items")).toArray();
+        if (itemArray.isEmpty())
+            itemArray = data.value(QStringLiteral("recommendations")).toArray();
+
+        QJsonObject batchObject = data.value(QStringLiteral("batch")).toObject();
+        QString assistantName = taterAssistantNameFromObject(batchObject);
+        if (assistantName.isEmpty())
+            assistantName = taterAssistantNameFromObject(data);
+        if (assistantName.isEmpty())
+            assistantName = taterAssistantNameFromObject(envelope);
+        if (!assistantName.isEmpty())
+            batchObject[QStringLiteral("assistant_name")] = assistantName;
+
+        const QVariantList items = itemArray.toVariantList();
+        const QVariantMap batch = batchObject.toVariantMap();
         if (items != m_taterRecommendations || batch != m_taterRecommendationBatch) {
             m_taterRecommendations = items;
             m_taterRecommendationBatch = batch;
