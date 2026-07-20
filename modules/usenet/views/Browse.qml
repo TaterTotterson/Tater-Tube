@@ -1196,14 +1196,25 @@ FocusScope {
                 font.pixelSize: root.sh * 0.04
                 clip: true
 
-                Keys.onReturnPressed: runSearch()
-                Keys.onEnterPressed: runSearch()
+                function openInputKeyboard() {
+                    root.openTaterKeyboard(
+                                searchField, "SEARCH", false,
+                                function() { runSearch() },
+                                function() { searchField.forceActiveFocus() })
+                }
+
+                Keys.onReturnPressed: searchField.openInputKeyboard()
+                Keys.onEnterPressed: searchField.openInputKeyboard()
                 Keys.onPressed: function(event) {
                     if (event.key === Qt.Key_Escape || event.key === Qt.Key_Back) {
                         mode = "categories"
                         setListIndex(categoryList, currentCategoryIndex)
                         event.accepted = true
                     }
+                }
+
+                TapHandler {
+                    onTapped: searchField.openInputKeyboard()
                 }
             }
         }
@@ -1530,6 +1541,7 @@ FocusScope {
     }
 
     component SetupField: Item {
+        id: setupFieldControl
         property alias text: fieldInput.text
         property string label: ""
         property bool selected: false
@@ -1537,6 +1549,20 @@ FocusScope {
 
         function forceInputFocus() {
             fieldInput.forceActiveFocus()
+        }
+
+        function finishInput() {
+            if (setupRow === setupConnectRow - 1)
+                saveSetup()
+            else
+                setupNext()
+        }
+
+        function openInputKeyboard() {
+            root.openTaterKeyboard(
+                        fieldInput, label, password,
+                        function() { setupFieldControl.finishInput() },
+                        function() { setupFieldControl.forceInputFocus() })
         }
 
         width: setupForm.width
@@ -1576,20 +1602,19 @@ FocusScope {
 
             Keys.onUpPressed: setupPrevious()
             Keys.onDownPressed: setupNext()
-            Keys.onReturnPressed: {
-                if (setupRow === setupConnectRow - 1) saveSetup()
-                else setupNext()
-            }
-            Keys.onEnterPressed: {
-                if (setupRow === setupConnectRow - 1) saveSetup()
-                else setupNext()
-            }
+            Keys.onReturnPressed: setupFieldControl.openInputKeyboard()
+            Keys.onEnterPressed: setupFieldControl.openInputKeyboard()
             Keys.onPressed: function(event) {
                 if (event.key === Qt.Key_Escape || event.key === Qt.Key_Back) {
                     goBack()
                     event.accepted = true
                 }
             }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: setupFieldControl.openInputKeyboard()
         }
     }
 }

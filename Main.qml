@@ -171,6 +171,14 @@ Window {
     readonly property real sw: width
     readonly property real sh: height
 
+    function openTaterKeyboard(target, prompt, password, onAccepted, onCanceled) {
+        taterKeyboard.open(target, prompt, password, onAccepted, onCanceled)
+    }
+
+    function dismissTaterKeyboard() {
+        taterKeyboard.dismiss()
+    }
+
     Connections {
         target: appCore
         function onAppSettingChanged(key, value) {
@@ -361,6 +369,7 @@ Window {
     }
 
     function goHome() {
+        root.dismissTaterKeyboard()
         if (mpvController && mpvController.running)
             mpvController.stop()
         root.appNavStack = []
@@ -442,6 +451,19 @@ Window {
         color: "black"
         visible: mpvController && mpvController.videoTransitionActive
         z: 10000
+    }
+
+    TaterKeyboard {
+        id: taterKeyboard
+        anchors.fill: parent
+        screenWidth: root.sw
+        screenHeight: root.sh
+        primaryColor: root.primaryColor
+        secondaryColor: root.secondaryColor
+        surfaceColor: root.surfaceColor
+        accentColor: "#FF4A00"
+        fontFamily: root.globalFont
+        z: 20000
     }
 
     Rectangle {

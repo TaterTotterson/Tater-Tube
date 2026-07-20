@@ -2,3 +2,4 @@ module Components
 AppBar AppBar.qml
 StaticBackground StaticBackground.qml
 NoSignalScreen NoSignalScreen.qml
+TaterKeyboard TaterKeyboard.qml

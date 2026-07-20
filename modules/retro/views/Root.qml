@@ -632,6 +632,7 @@ FocusScope {
     }
 
     component SetupField: Item {
+        id: setupFieldControl
         property alias text: fieldInput.text
         property string label: ""
         property bool selected: false
@@ -639,6 +640,13 @@ FocusScope {
 
         function forceInputFocus() {
             fieldInput.forceActiveFocus()
+        }
+
+        function openInputKeyboard() {
+            root.openTaterKeyboard(
+                        fieldInput, label, password,
+                        function() { setupNext() },
+                        function() { setupFieldControl.forceInputFocus() })
         }
 
         width: setupForm.width
@@ -680,8 +688,14 @@ FocusScope {
 
             Keys.onUpPressed: setupPrevious()
             Keys.onDownPressed: setupNext()
-            Keys.onReturnPressed: setupNext()
-            Keys.onEnterPressed: setupNext()
+            Keys.onReturnPressed: setupFieldControl.openInputKeyboard()
+            Keys.onEnterPressed: setupFieldControl.openInputKeyboard()
+            Keys.onSpacePressed: setupFieldControl.openInputKeyboard()
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: setupFieldControl.openInputKeyboard()
         }
     }
 }
