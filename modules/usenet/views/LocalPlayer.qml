@@ -345,11 +345,15 @@ FocusScope {
     }
 
     Component.onCompleted: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:usenet-local-player", true)
         bumperSettingsFallback.start()
         usenetBackend.load_tater_bumper_settings()
     }
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:usenet-local-player", false)
         if (playbackStarted && !playingTaterBumper)
             saveCurrentPlayState(false)
         if (mpvController.running)

@@ -14,6 +14,7 @@ FocusScope {
     property string moduleIcon: _moduleInfo.icon || ""
 
     property string mode: "loading"
+    readonly property bool menuSoundSessionActive: mode === "playing" || mode === "tv"
     property string statusText: "LOADING PLAYLISTS..."
     property string playlistTitle: "YOUTUBE PLAYLIST"
     property string playlistInput: ""
@@ -69,6 +70,11 @@ FocusScope {
     property var tvPendingCommercials: []
 
     focus: true
+
+    onMenuSoundSessionActiveChanged: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:youtube-playback", menuSoundSessionActive)
+    }
 
     function settingValue(key, fallback) {
         var value = appCore.get_setting(moduleId, key)
@@ -1171,6 +1177,8 @@ FocusScope {
     Component.onCompleted: loadPlaylistLibrary(0)
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:youtube-playback", false)
         if (mpvController.running)
             mpvController.stop()
     }

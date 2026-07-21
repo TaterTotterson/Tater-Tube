@@ -2054,9 +2054,15 @@ FocusScope {
         }
     }
 
-    Component.onCompleted: startServerLineupLoad()
+    Component.onCompleted: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:tube-tv", true)
+        startServerLineupLoad()
+    }
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:tube-tv", false)
         if (!leaving && mpvController.running)
             mpvController.stop()
     }

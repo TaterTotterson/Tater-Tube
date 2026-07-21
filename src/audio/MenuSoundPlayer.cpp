@@ -52,14 +52,27 @@ MenuSoundPlayer::~MenuSoundPlayer()
 
 void MenuSoundPlayer::setPlaybackActive(bool active)
 {
-    m_playbackActive = active;
+    setContextActive(QStringLiteral("mpv"), active);
+}
+
+void MenuSoundPlayer::setContextActive(const QString &context, bool active)
+{
+    const QString key = context.trimmed();
+    if (key.isEmpty())
+        return;
+
+    if (active)
+        m_activeContexts.insert(key);
+    else
+        m_activeContexts.remove(key);
+
     if (!active || !m_audioDevice)
         return;
 
-    // Let a short Select cue finish while the external player starts, then
-    // release the menu audio device so playback owns the output cleanly.
+    // Block new cues immediately, but let the short Select cue that launched
+    // the experience finish before releasing the menu audio device.
     QTimer::singleShot(250, this, [this]() {
-        if (m_playbackActive)
+        if (!m_activeContexts.isEmpty())
             closeAudioDevice();
     });
 }
@@ -67,8 +80,10 @@ void MenuSoundPlayer::setPlaybackActive(bool active)
 bool MenuSoundPlayer::eventFilter(QObject *watched, QEvent *event)
 {
     Q_UNUSED(watched)
-    if (!m_enabled || m_playbackActive || event->type() != QEvent::KeyPress)
+    if (!m_enabled || !m_activeContexts.isEmpty()
+            || event->type() != QEvent::KeyPress) {
         return false;
+    }
 
     const auto *keyEvent = static_cast<QKeyEvent *>(event);
     const Cue cue = cueForKey(keyEvent->key());

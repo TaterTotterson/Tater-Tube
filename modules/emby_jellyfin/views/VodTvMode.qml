@@ -944,10 +944,14 @@ FocusScope {
     }
 
     Component.onCompleted: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:vod-tv", true)
         embyBackend.load_vod_tv_channels(false)
     }
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:vod-tv", false)
         if (!leaving && mpvController.running)
             mpvController.stop()
     }

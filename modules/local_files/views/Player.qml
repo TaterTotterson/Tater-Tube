@@ -160,6 +160,8 @@ FocusScope {
     }
 
     Component.onCompleted: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:local-player", true)
         if (filePath === "") return
         loopOn        = !!appCore.get_setting(moduleRoot.moduleId, "loop_playback")
         shuffleOn     = !!appCore.get_setting(moduleRoot.moduleId, "shuffle_playback")
@@ -200,6 +202,8 @@ FocusScope {
     }
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:local-player", false)
         if (mpvController.running)
             mpvController.stop()
     }

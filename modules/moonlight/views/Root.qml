@@ -22,8 +22,14 @@ FocusScope {
     property bool loadingApps: false
     property int pairWaitStage: 0
     property string messageReturnMode: ""
+    property bool streamSessionActive: false
 
     focus: true
+
+    onStreamSessionActiveChanged: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:moonlight-stream", streamSessionActive)
+    }
 
     function settingValue(key, fallback) {
         var value = appCore.get_setting(moduleId, key)
@@ -154,6 +160,7 @@ FocusScope {
         messageReturnMode = "apps"
         mode = "loading"
         statusText = "TUNING " + (item.title || name)
+        streamSessionActive = true
         moonlightBackend.launch_app(name)
     }
 
@@ -254,6 +261,8 @@ FocusScope {
     Component.onCompleted: refresh()
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:moonlight-stream", false)
         moonlightBackend.cancel_pairing()
         if (moonlightBackend.running)
             moonlightBackend.stop_stream()
@@ -337,12 +346,14 @@ FocusScope {
         }
 
         function onStreamFinished() {
+            streamSessionActive = false
             mode = apps.length > 0 ? "apps" : "message"
             if (mode === "message")
                 statusText = "PC LINK CLOSED"
         }
 
         function onErrorOccurred(message) {
+            streamSessionActive = false
             var wasLoadingApps = loadingApps
             loadingApps = false
             var lower = (message || "").toLowerCase()

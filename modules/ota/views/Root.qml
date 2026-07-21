@@ -459,10 +459,14 @@ FocusScope {
     }
 
     Component.onCompleted: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:ota-tv", true)
         loadHdhomerunSource()
     }
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:ota-tv", false)
         if (!leaving)
             mpvController.stop()
     }

@@ -1,14 +1,13 @@
 {
-  "version": "v1.7.0",
-  "app_version": "1.7.0",
+  "version": "v1.7.1",
+  "app_version": "1.7.1",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.7.0/Tater-Tube-v1.7.0-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.7.0.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.7.1/Tater-Tube-v1.7.1-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.7.1.tar.gz",
   "notes": [
-    "Adds three selectable VCR-themed menu sound packs with distinct move, page, back, and select cues plus a master disable option.",
-    "Fixes PC Link pairing by showing the Sunshine PIN and reliably resetting failed or stale pairing state for another attempt.",
-    "Shows the TV channel overlay only when tuning or changing channels instead of before every video or commercial."
+    "Keeps menu sound effects inside menus by muting them throughout video, TV, Tape Deck, Game Center, and PC Link sessions.",
+    "Keeps sounds muted during loading and transitions between clips, then restores them when the user returns to a menu."
   ]
 }

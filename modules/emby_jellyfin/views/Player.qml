@@ -493,6 +493,8 @@ FocusScope {
     }
 
     Component.onCompleted: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:emby-player", true)
         initStreamIndices()
         if (streamUrl === "") return
         resumeSetting = appCore.get_setting(moduleRoot.moduleId, "resume_playback") || "ask"
@@ -509,6 +511,8 @@ FocusScope {
     }
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:emby-player", false)
         if (mpvController.running)
             mpvController.stop()
     }

@@ -17,6 +17,7 @@ FocusScope {
     property string moduleIcon: _moduleInfo.icon || ""
 
     property string mode: "loading"
+    property bool menuSoundSessionActive: false
     property string statusText: "LOADING THE TUBE..."
     property var categories: []
     property var subcategories: []
@@ -53,6 +54,11 @@ FocusScope {
     property string messageReturnMode: ""
 
     focus: true
+
+    onMenuSoundSessionActiveChanged: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:usenet-stream", menuSoundSessionActive)
+    }
 
     function settingValue(key, fallback) {
         var value = appCore.get_setting(moduleId, key)
@@ -546,6 +552,7 @@ FocusScope {
             return
         }
         pendingPlaybackItem = row
+        menuSoundSessionActive = true
         messageReturnMode = "items"
         nzbStreamResponseReady = false
         streams = []
@@ -618,6 +625,7 @@ FocusScope {
 
     function playStream(stream, title, item) {
         if (!stream || !stream.url) {
+            menuSoundSessionActive = false
             mode = "message"
             statusText = "STREAM URL MISSING"
             return
@@ -660,6 +668,7 @@ FocusScope {
     }
 
     function stopPlayback() {
+        menuSoundSessionActive = false
         pendingRequestId = ""
         pendingPlaybackItem = ({})
         nzbMovieBumperActive = false
@@ -799,6 +808,7 @@ FocusScope {
                            pendingPlaybackItem)
                 event.accepted = true
             } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace || event.key === Qt.Key_Back) {
+                menuSoundSessionActive = false
                 pendingPlaybackItem = ({})
                 nzbStreamResponseReady = false
                 mode = "items"
@@ -854,6 +864,8 @@ FocusScope {
     }
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:usenet-stream", false)
         if (playbackStarted) {
             saveCurrentPlayState(false)
             mpvController.stop()
@@ -963,6 +975,7 @@ FocusScope {
         }
 
         function onErrorOccurred(message) {
+            menuSoundSessionActive = false
             pendingRequestId = ""
             pendingPlaybackItem = ({})
             pendingSearchMediaType = ""
@@ -999,6 +1012,7 @@ FocusScope {
                 return
             }
             if (mode === "playing") {
+                menuSoundSessionActive = false
                 saveCurrentPlayState(false)
                 playbackStarted = false
                 currentStreamUsesServer = false
@@ -1014,6 +1028,7 @@ FocusScope {
                 return
             }
             if (mode === "playing") {
+                menuSoundSessionActive = false
                 saveCurrentPlayState(true)
                 playbackStarted = false
                 currentStreamUsesServer = false
@@ -1031,6 +1046,7 @@ FocusScope {
                 return
             }
             if (mode === "playing") {
+                menuSoundSessionActive = false
                 saveCurrentPlayState(false)
                 playbackStarted = false
                 currentStreamUsesServer = false

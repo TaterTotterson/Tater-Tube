@@ -3,6 +3,7 @@
 #include <QByteArray>
 #include <QElapsedTimer>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QVariant>
 #include <SDL.h>
@@ -18,6 +19,7 @@ public:
     ~MenuSoundPlayer() override;
 
     void setPlaybackActive(bool active);
+    Q_INVOKABLE void setContextActive(const QString &context, bool active);
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -41,7 +43,7 @@ private:
     AppCore *m_appCore = nullptr;
     QString m_packSlug = QStringLiteral("soft-touch");
     bool m_enabled = true;
-    bool m_playbackActive = false;
+    QSet<QString> m_activeContexts;
     bool m_audioSubsystemReady = false;
     bool m_audioWarningShown = false;
     SDL_AudioDeviceID m_audioDevice = 0;

@@ -112,6 +112,14 @@ int main(int argc, char *argv[]) {
                      &mpvController, &MpvController::sendKey);
     QObject::connect(&mpvController, &MpvController::runningChanged,
                      &menuSoundPlayer, &MenuSoundPlayer::setPlaybackActive);
+    QObject::connect(&retroBackend, &RetroBackend::runningChanged,
+                     &menuSoundPlayer, [&menuSoundPlayer](bool running) {
+        menuSoundPlayer.setContextActive(QStringLiteral("retroarch"), running);
+    });
+    QObject::connect(&moonlightBackend, &MoonlightBackend::runningChanged,
+                     &menuSoundPlayer, [&menuSoundPlayer](bool running) {
+        menuSoundPlayer.setContextActive(QStringLiteral("moonlight"), running);
+    });
 
     // Each module backend is wired in one call: stored for action routing, exposed to QML
     // under its context-property name, and its optional signals/slots connected by
@@ -130,6 +138,7 @@ int main(int argc, char *argv[]) {
     ctx->setContextProperty("appCore",       &appCore);
     ctx->setContextProperty("mpvController", &mpvController);
     ctx->setContextProperty("inputManager",  &inputManager);
+    ctx->setContextProperty("menuSoundPlayer", &menuSoundPlayer);
 #ifdef Q_OS_MAC
     // QVariant(0), not literal 0 — a bare 0 is a null pointer constant and
     // resolves to the QObject* overload, handing QML null instead of an int.

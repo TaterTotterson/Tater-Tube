@@ -15,6 +15,7 @@ FocusScope {
     property int currentAlbumIndex: 0
     property int trackIndex: 0
     property string mode: "loading"
+    readonly property bool menuSoundSessionActive: mode === "deck"
     property string statusText: "LOADING TAPES..."
     property string currentLibraryTitle: "TAPE DECK"
     property string currentAlbumTitle: "TAPE"
@@ -31,6 +32,11 @@ FocusScope {
     property string messageReturnMode: ""
 
     focus: true
+
+    onMenuSoundSessionActiveChanged: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:tape-deck", menuSoundSessionActive)
+    }
 
     function currentTrack() {
         if (trackIndex < 0 || trackIndex >= tracks.length) return ({})
@@ -405,6 +411,8 @@ FocusScope {
     Component.onCompleted: loadLibraries()
 
     Component.onDestruction: {
+        if (menuSoundPlayer)
+            menuSoundPlayer.setContextActive("qml:tape-deck", false)
         if (mpvController.running)
             mpvController.stop()
     }
