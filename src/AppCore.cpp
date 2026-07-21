@@ -1,5 +1,4 @@
 #include "AppCore.h"
-#include "player/MpvController.h"
 #include <algorithm>
 #include <QDir>
 #include <QFile>
@@ -13,7 +12,6 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QProcess>
-#include <QStandardPaths>
 #include <QUrl>
 #include <QVariantMap>
 #include <QDebug>
@@ -879,20 +877,32 @@ void AppCore::stopTaterNarration() {
     if (m_taterNarrationPollTimer)
         m_taterNarrationPollTimer->stop();
 
+    if (m_taterNarrationAudioReply) {
+        QNetworkReply *reply = m_taterNarrationAudioReply;
+        m_taterNarrationAudioReply = nullptr;
+        reply->disconnect(this);
+        reply->abort();
+        reply->deleteLater();
+    }
+
     const QString requestId = m_taterNarrationRequestId;
     m_taterNarrationRequestId.clear();
     m_taterNarrationPollAttempts = 0;
     if (!requestId.isEmpty())
         cancelTaterNarrationRequest(requestId);
 
-    if (m_taterNarrationProcess) {
-        QProcess *process = m_taterNarrationProcess;
-        m_taterNarrationProcess = nullptr;
-        process->disconnect(this);
-        if (process->state() != QProcess::NotRunning)
-            process->kill();
-        process->deleteLater();
-    }
+    emit taterNarrationStopRequested();
+    setTaterNarrating(false);
+}
+
+void AppCore::finishTaterNarrationPlayback(quint64 generation) {
+    if (generation != m_taterNarrationGeneration)
+        return;
+
+    const QString requestId = m_taterNarrationRequestId;
+    m_taterNarrationRequestId.clear();
+    if (!requestId.isEmpty())
+        cancelTaterNarrationRequest(requestId);
     setTaterNarrating(false);
 }
 
@@ -1021,18 +1031,6 @@ void AppCore::playTaterNarrationAudio(const QString &requestId, quint64 generati
     if (generation != m_taterNarrationGeneration ||
         requestId != m_taterNarrationRequestId)
         return;
-    QString mpv = QStandardPaths::findExecutable(QStringLiteral("mpv"));
-#ifdef Q_OS_MACOS
-    if (mpv.isEmpty() && QFileInfo::exists(QStringLiteral("/opt/homebrew/bin/mpv")))
-        mpv = QStringLiteral("/opt/homebrew/bin/mpv");
-    if (mpv.isEmpty() && QFileInfo::exists(QStringLiteral("/usr/local/bin/mpv")))
-        mpv = QStringLiteral("/usr/local/bin/mpv");
-#endif
-    if (mpv.isEmpty()) {
-        qWarning("[AppCore] mpv not found for Tater narration");
-        stopTaterNarration();
-        return;
-    }
 
     const QString token = taterServerToken();
     const QString endpoint = taterServerApiUrl(
@@ -1043,56 +1041,30 @@ void AppCore::playTaterNarrationAudio(const QString &requestId, quint64 generati
         return;
     }
 
-    QProcess *process = new QProcess(this);
-    m_taterNarrationProcess = process;
-    process->setProcessChannelMode(QProcess::MergedChannels);
-    connect(process, &QProcess::started, this, [this, process, generation]() {
+    QNetworkRequest request{QUrl(endpoint)};
+    request.setRawHeader("Accept", "audio/wav");
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
+    QNetworkReply *reply = m_updateNetwork->get(request);
+    m_taterNarrationAudioReply = reply;
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, requestId, generation]() {
+        if (m_taterNarrationAudioReply == reply)
+            m_taterNarrationAudioReply = nullptr;
+        const QByteArray wavData = reply->readAll();
+        const bool ok = reply->error() == QNetworkReply::NoError;
+        reply->deleteLater();
         if (generation != m_taterNarrationGeneration ||
-            m_taterNarrationProcess != process)
+            requestId != m_taterNarrationRequestId)
             return;
-        setTaterNarrating(true);
-        qInfo("[AppCore] Tater narration audio started");
-    });
-    connect(process,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this,
-            [this, process, requestId, generation](int, QProcess::ExitStatus) {
-        if (m_taterNarrationProcess == process)
-            m_taterNarrationProcess = nullptr;
-        process->deleteLater();
-        if (generation != m_taterNarrationGeneration)
+        if (!ok || wavData.isEmpty()) {
+            qWarning("[AppCore] Could not download Tater narration audio");
+            stopTaterNarration();
             return;
-        if (m_taterNarrationRequestId == requestId) {
-            m_taterNarrationRequestId.clear();
-            cancelTaterNarrationRequest(requestId);
         }
-        setTaterNarrating(false);
+
+        setTaterNarrating(true);
+        emit taterNarrationAudioReady(wavData, generation);
     });
-    connect(process, &QProcess::errorOccurred, this,
-            [this, process, generation](QProcess::ProcessError error) {
-        if (error != QProcess::FailedToStart ||
-            generation != m_taterNarrationGeneration)
-            return;
-        if (m_taterNarrationProcess == process)
-            m_taterNarrationProcess = nullptr;
-        process->deleteLater();
-        qWarning("[AppCore] Could not start mpv for Tater narration");
-        stopTaterNarration();
-    });
-    QStringList args{
-        QStringLiteral("--no-video"),
-        QStringLiteral("--audio-display=no"),
-        QStringLiteral("--force-window=no"),
-        QStringLiteral("--no-input-terminal"),
-        QStringLiteral("--no-terminal"),
-        QStringLiteral("--really-quiet"),
-        QStringLiteral("--ytdl=no"),
-        QStringLiteral("--http-header-fields=Authorization: Bearer %1").arg(token),
-    };
-    if (m_mpvController)
-        args.append(m_mpvController->narrationAudioArgs());
-    args.append(endpoint);
-    process->start(mpv, args);
 }
 
 void AppCore::save_setting(const QString &moduleId, const QString &key, const QVariant &value) {

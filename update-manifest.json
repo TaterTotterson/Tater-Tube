@@ -1,15 +1,14 @@
 {
-  "version": "v1.7.3",
-  "app_version": "1.7.3",
+  "version": "v1.7.4",
+  "app_version": "1.7.4",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.7.3/Tater-Tube-v1.7.3-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.7.3.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.7.4/Tater-Tube-v1.7.4-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.7.4.tar.gz",
   "notes": [
-    "Keeps Raspberry Pi 5 menu sounds working without leaking their SDL audio route into video playback.",
-    "Prevents HDMI audio from dropping during Tube TV channel and schedule transitions.",
-    "Streams server-scheduled Tater bumpers through the server playback endpoint without invalid local-file transcode parameters.",
-    "Shows the TV channel overlay only when tuning a channel, not between videos, commercials, or bumpers."
+    "Plays Tater Picks narration through the app's shared SDL audio mixer instead of a separate mpv process.",
+    "Allows Tater narration and navigation sounds to play together without competing for the audio device.",
+    "Keeps narration synchronized with the app's volume and mute controls while preserving independent menu-sound settings."
   ]
 }

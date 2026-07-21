@@ -100,7 +100,8 @@ int main(int argc, char *argv[]) {
     MpvController       mpvController(appRoot, &appCore);
     InputManager        inputManager(dataRoot);
     MenuSoundPlayer     menuSoundPlayer(appRoot, &appCore);
-    appCore.setMpvController(&mpvController);
+    menuSoundPlayer.setNarrationVolume(mpvController.volume());
+    menuSoundPlayer.setNarrationMuted(mpvController.muted());
     ControlApiServer    controlApi(&mpvController, &appCore, &embyBackend,
                                     &retroBackend, &moonlightBackend);
 
@@ -112,6 +113,16 @@ int main(int argc, char *argv[]) {
                      &mpvController, &MpvController::sendKey);
     QObject::connect(&mpvController, &MpvController::runningChanged,
                      &menuSoundPlayer, &MenuSoundPlayer::setPlaybackActive);
+    QObject::connect(&appCore, &AppCore::taterNarrationAudioReady,
+                     &menuSoundPlayer, &MenuSoundPlayer::playNarration);
+    QObject::connect(&appCore, &AppCore::taterNarrationStopRequested,
+                     &menuSoundPlayer, &MenuSoundPlayer::stopNarration);
+    QObject::connect(&menuSoundPlayer, &MenuSoundPlayer::narrationFinished,
+                     &appCore, &AppCore::finishTaterNarrationPlayback);
+    QObject::connect(&mpvController, &MpvController::volumeChanged,
+                     &menuSoundPlayer, &MenuSoundPlayer::setNarrationVolume);
+    QObject::connect(&mpvController, &MpvController::mutedChanged,
+                     &menuSoundPlayer, &MenuSoundPlayer::setNarrationMuted);
     QObject::connect(&retroBackend, &RetroBackend::runningChanged,
                      &menuSoundPlayer, [&menuSoundPlayer](bool running) {
         menuSoundPlayer.setContextActive(QStringLiteral("retroarch"), running);

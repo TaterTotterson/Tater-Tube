@@ -57,8 +57,6 @@ public:
     double volumeMax() const { return 200.0; }
     bool muted() const { return m_muted; }
     bool videoTransitionActive() const { return m_videoTransitionActive; }
-    QStringList narrationAudioArgs() const;
-
     Q_INVOKABLE void loadAndPlay(const QString &url, float startSeconds,
                                   int audioTrack, int subTrack,
                                   const QStringList &subFiles = {},

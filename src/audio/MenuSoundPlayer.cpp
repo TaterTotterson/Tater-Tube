@@ -221,11 +221,14 @@ void MenuSoundPlayer::reloadSettings()
     }
 
     m_enabled = enabled;
-    if (!m_enabled)
-        closeAudioDevice();
+    if (!m_enabled && m_audioDevice) {
+        SDL_LockAudioDevice(m_audioDevice);
+        m_activeCueSound.clear();
+        m_activeCueOffset = 0;
+        SDL_UnlockAudioDevice(m_audioDevice);
+    }
     if (packSlug != m_packSlug || m_moveSound.isEmpty()) {
         m_packSlug = packSlug;
-        closeAudioDevice();
         loadPack(m_packSlug);
     }
 }
@@ -252,14 +255,49 @@ QByteArray MenuSoundPlayer::loadWave(const QString &path) const
         return {};
     }
 
+    const QByteArray sound = convertAudio(
+        spec, buffer, length, QString::fromLocal8Bit(encodedPath));
+    SDL_FreeWAV(buffer);
+    return sound;
+}
+
+QByteArray MenuSoundPlayer::decodeWave(const QByteArray &wavData) const
+{
+    if (wavData.isEmpty())
+        return {};
+
+    SDL_RWops *source = SDL_RWFromConstMem(wavData.constData(), wavData.size());
+    if (!source) {
+        qWarning("[app-audio] could not open narration WAV: %s", SDL_GetError());
+        return {};
+    }
+
+    SDL_AudioSpec spec{};
+    Uint8 *buffer = nullptr;
+    Uint32 length = 0;
+    if (!SDL_LoadWAV_RW(source, 1, &spec, &buffer, &length)) {
+        qWarning("[app-audio] could not decode narration WAV: %s", SDL_GetError());
+        return {};
+    }
+
+    const QByteArray sound = convertAudio(
+        spec, buffer, length, QStringLiteral("Tater narration"));
+    SDL_FreeWAV(buffer);
+    return sound;
+}
+
+QByteArray MenuSoundPlayer::convertAudio(const SDL_AudioSpec &spec,
+                                         const Uint8 *buffer, Uint32 length,
+                                         const QString &description) const
+{
     QByteArray sound;
     SDL_AudioCVT converter{};
     const int conversion = SDL_BuildAudioCVT(
         &converter, spec.format, spec.channels, spec.freq,
         AUDIO_S16SYS, kOutputChannels, kSampleRate);
     if (conversion < 0) {
-        qWarning("[menu-sounds] could not prepare %s: %s",
-                 encodedPath.constData(), SDL_GetError());
+        qWarning("[app-audio] could not prepare %s: %s",
+                 qPrintable(description), SDL_GetError());
     } else if (conversion == 0) {
         sound = QByteArray(reinterpret_cast<const char *>(buffer), int(length));
     } else {
@@ -267,21 +305,20 @@ QByteArray MenuSoundPlayer::loadWave(const QString &path) const
         converter.buf = static_cast<Uint8 *>(
             SDL_malloc(size_t(converter.len) * size_t(converter.len_mult)));
         if (!converter.buf) {
-            qWarning("[menu-sounds] could not allocate converted audio for %s",
-                     encodedPath.constData());
+            qWarning("[app-audio] could not allocate converted audio for %s",
+                     qPrintable(description));
         } else {
             SDL_memcpy(converter.buf, buffer, length);
             if (SDL_ConvertAudio(&converter) == 0) {
                 sound = QByteArray(reinterpret_cast<const char *>(converter.buf),
                                    converter.len_cvt);
             } else {
-                qWarning("[menu-sounds] could not convert %s: %s",
-                         encodedPath.constData(), SDL_GetError());
+                qWarning("[app-audio] could not convert %s: %s",
+                         qPrintable(description), SDL_GetError());
             }
             SDL_free(converter.buf);
         }
     }
-    SDL_FreeWAV(buffer);
     return sound;
 }
 
@@ -298,7 +335,8 @@ bool MenuSoundPlayer::openAudioDevice()
     desired.format = AUDIO_S16SYS;
     desired.channels = kOutputChannels;
     desired.samples = 1024;
-    desired.callback = nullptr;
+    desired.callback = &MenuSoundPlayer::audioCallback;
+    desired.userdata = this;
     // SDL2 reads AUDIODEV inside SDL_OpenAudioDevice(). Limit the override to
     // this call so it can never leak into mpv's QProcess environment.
     const ScopedEnvironmentOverride deviceOverride(
@@ -320,9 +358,18 @@ void MenuSoundPlayer::closeAudioDevice()
 {
     if (!m_audioDevice)
         return;
-    SDL_ClearQueuedAudio(m_audioDevice);
-    SDL_CloseAudioDevice(m_audioDevice);
+    const SDL_AudioDeviceID device = m_audioDevice;
     m_audioDevice = 0;
+    SDL_PauseAudioDevice(device, 1);
+    SDL_CloseAudioDevice(device);
+    const quint64 generation = m_narrationGeneration;
+    m_activeCueSound.clear();
+    m_narrationSound.clear();
+    m_activeCueOffset = 0;
+    m_narrationOffset = 0;
+    m_narrationGeneration = 0;
+    if (generation)
+        emit narrationFinished(generation);
 }
 
 void MenuSoundPlayer::play(Cue cue)
@@ -331,9 +378,107 @@ void MenuSoundPlayer::play(Cue cue)
     if (sound.isEmpty() || !openAudioDevice())
         return;
 
-    SDL_ClearQueuedAudio(m_audioDevice);
-    if (SDL_QueueAudio(m_audioDevice, sound.constData(), Uint32(sound.size())) != 0)
-        qWarning("[menu-sounds] could not queue sound: %s", SDL_GetError());
+    SDL_LockAudioDevice(m_audioDevice);
+    m_activeCueSound = sound;
+    m_activeCueOffset = 0;
+    SDL_UnlockAudioDevice(m_audioDevice);
+}
+
+void MenuSoundPlayer::playNarration(const QByteArray &wavData, quint64 generation)
+{
+    const QByteArray sound = decodeWave(wavData);
+    if (sound.isEmpty() || !openAudioDevice()) {
+        qWarning("[app-audio] Tater narration could not be played");
+        emit narrationFinished(generation);
+        return;
+    }
+
+    SDL_LockAudioDevice(m_audioDevice);
+    m_narrationSound = sound;
+    m_narrationOffset = 0;
+    m_narrationGeneration = generation;
+    SDL_UnlockAudioDevice(m_audioDevice);
+    qInfo("[app-audio] Tater narration started in the shared mixer");
+}
+
+void MenuSoundPlayer::stopNarration()
+{
+    if (m_audioDevice)
+        SDL_LockAudioDevice(m_audioDevice);
+    m_narrationSound.clear();
+    m_narrationOffset = 0;
+    m_narrationGeneration = 0;
+    if (m_audioDevice)
+        SDL_UnlockAudioDevice(m_audioDevice);
+}
+
+void MenuSoundPlayer::setNarrationVolume(double volume)
+{
+    if (m_audioDevice)
+        SDL_LockAudioDevice(m_audioDevice);
+    m_narrationGain = qBound(0.0, volume, 200.0) / 100.0;
+    if (m_audioDevice)
+        SDL_UnlockAudioDevice(m_audioDevice);
+}
+
+void MenuSoundPlayer::setNarrationMuted(bool muted)
+{
+    if (m_audioDevice)
+        SDL_LockAudioDevice(m_audioDevice);
+    m_narrationMuted = muted;
+    if (m_audioDevice)
+        SDL_UnlockAudioDevice(m_audioDevice);
+}
+
+void MenuSoundPlayer::audioCallback(void *userdata, Uint8 *stream, int length)
+{
+    static_cast<MenuSoundPlayer *>(userdata)->mixAudio(stream, length);
+}
+
+void MenuSoundPlayer::mixAudio(Uint8 *stream, int length)
+{
+    SDL_memset(stream, 0, size_t(length));
+    mixBuffer(m_narrationSound, m_narrationOffset, stream, length,
+              m_narrationMuted ? 0.0 : m_narrationGain);
+    mixBuffer(m_activeCueSound, m_activeCueOffset, stream, length, 1.0);
+
+    if (!m_narrationSound.isEmpty()
+            && m_narrationOffset >= m_narrationSound.size()) {
+        const quint64 generation = m_narrationGeneration;
+        m_narrationSound.clear();
+        m_narrationOffset = 0;
+        m_narrationGeneration = 0;
+        if (generation) {
+            QMetaObject::invokeMethod(this, [this, generation]() {
+                emit narrationFinished(generation);
+            }, Qt::QueuedConnection);
+        }
+    }
+    if (!m_activeCueSound.isEmpty()
+            && m_activeCueOffset >= m_activeCueSound.size()) {
+        m_activeCueSound.clear();
+        m_activeCueOffset = 0;
+    }
+}
+
+void MenuSoundPlayer::mixBuffer(const QByteArray &source, qsizetype &offset,
+                                Uint8 *stream, int length, double gain)
+{
+    if (source.isEmpty() || offset >= source.size())
+        return;
+    const qsizetype remaining = source.size() - offset;
+    const int count = int(qMin<qsizetype>(remaining, length)) & ~1;
+    if (count <= 0) {
+        offset = source.size();
+        return;
+    }
+    const auto *input = reinterpret_cast<const qint16 *>(source.constData() + offset);
+    auto *output = reinterpret_cast<qint16 *>(stream);
+    for (int i = 0; i < count / int(sizeof(qint16)); ++i) {
+        const int mixed = int(output[i]) + int(double(input[i]) * gain);
+        output[i] = qint16(qBound(-32768, mixed, 32767));
+    }
+    offset += count;
 }
 
 const QByteArray &MenuSoundPlayer::soundForCue(Cue cue) const

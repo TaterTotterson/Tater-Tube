@@ -1,4 +1,5 @@
 #pragma once
+#include <QByteArray>
 #include <QObject>
 #include <QVariant>
 #include <QVariantList>
@@ -8,9 +9,8 @@
 
 class QQmlContext;
 class QNetworkAccessManager;
-class QProcess;
+class QNetworkReply;
 class QTimer;
-class MpvController;
 
 struct ModuleEntry {
     QString id;
@@ -39,7 +39,6 @@ public:
     QVariantMap taterRecommendationBatch() const { return m_taterRecommendationBatch; }
     QString taterPicksTitle() const;
     bool taterNarrating() const { return m_taterNarrating; }
-    void setMpvController(MpvController *controller) { m_mpvController = controller; }
 
     // True when launched by the autostart systemd service (which injects MP240_AUTOSTART=1).
     // Gates the quit overlay's "Exit to Terminal" option, which only makes sense on a
@@ -84,6 +83,7 @@ public:
     Q_INVOKABLE void speakTaterRecommendation(const QString &recommendationId);
     Q_INVOKABLE void speakTaterBriefing(const QString &batchId);
     Q_INVOKABLE void stopTaterNarration();
+    void finishTaterNarrationPlayback(quint64 generation);
 
     // Registers a module backend: stores it for action routing, exposes it to QML under
     // contextProperty, and connects its optional signals/slots by introspection (only
@@ -104,6 +104,8 @@ signals:
     void bluetoothActionFinished(const QString &action, const QVariantMap &result);
     void taterRecommendationsChanged();
     void taterNarratingChanged();
+    void taterNarrationAudioReady(const QByteArray &wavData, quint64 generation);
+    void taterNarrationStopRequested();
 
 private slots:
     // Receive a backend's signal and re-emit it with the module ID prepended, recovering
@@ -134,11 +136,10 @@ private:
     QList<ModuleEntry> m_modules;
     QMap<QString, QObject*> m_backends;
     QNetworkAccessManager *m_updateNetwork = nullptr;
-    MpvController *m_mpvController = nullptr;
     QTimer *m_taterRecommendationsTimer = nullptr;
     QTimer *m_taterRecommendationsRetryTimer = nullptr;
     QTimer *m_taterNarrationPollTimer = nullptr;
-    QProcess *m_taterNarrationProcess = nullptr;
+    QNetworkReply *m_taterNarrationAudioReply = nullptr;
     QVariantList m_taterRecommendations;
     QVariantMap m_taterRecommendationBatch;
     QString m_taterNarrationRequestId;
