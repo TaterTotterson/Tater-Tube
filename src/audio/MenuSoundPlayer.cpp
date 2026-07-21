@@ -12,7 +12,70 @@
 
 namespace {
 constexpr int kSampleRate = 48000;
+constexpr Uint8 kOutputChannels = 2;
 constexpr int kMinimumSoundIntervalMs = 38;
+
+QString connectedPiAlsaDevice()
+{
+#ifdef Q_OS_LINUX
+    // Composite output on the Pi uses the analogue Headphones device.
+    if (QFile::exists(QStringLiteral("/sys/class/drm/card1-Composite-1"))
+            && QFile::exists(QStringLiteral("/proc/asound/Headphones"))) {
+        return QStringLiteral("sysdefault:CARD=Headphones");
+    }
+
+    QDir drmDir(QStringLiteral("/sys/class/drm"));
+    const QStringList connectors = drmDir.entryList(
+        QStringList{QStringLiteral("card*-HDMI-A-*")},
+        QDir::Dirs | QDir::NoDotAndDotDot,
+        QDir::Name);
+    for (const QString &connector : connectors) {
+        QFile statusFile(drmDir.absoluteFilePath(
+            connector + QStringLiteral("/status")));
+        if (!statusFile.open(QIODevice::ReadOnly)
+                || QString::fromLatin1(statusFile.readAll()).trimmed()
+                    != QStringLiteral("connected")) {
+            continue;
+        }
+
+        QString card;
+        if (connector.endsWith(QStringLiteral("HDMI-A-1")))
+            card = QStringLiteral("vc4hdmi0");
+        else if (connector.endsWith(QStringLiteral("HDMI-A-2")))
+            card = QStringLiteral("vc4hdmi1");
+
+        if (!card.isEmpty()
+                && QFile::exists(QStringLiteral("/proc/asound/") + card)) {
+            return QStringLiteral("sysdefault:CARD=%1").arg(card);
+        }
+    }
+#endif
+    return {};
+}
+
+void configurePiSdlAudio()
+{
+#ifdef Q_OS_LINUX
+    // An explicit device always wins. A non-ALSA driver also indicates that
+    // the caller wants SDL to use its own desktop/session routing.
+    if (!qEnvironmentVariableIsEmpty("SDL_AUDIO_ALSA_DEFAULT_DEVICE"))
+        return;
+    const QByteArray requestedDriver = qgetenv("SDL_AUDIODRIVER").trimmed();
+    if (!requestedDriver.isEmpty()
+            && requestedDriver.compare("alsa", Qt::CaseInsensitive) != 0) {
+        return;
+    }
+
+    const QString device = connectedPiAlsaDevice();
+    if (device.isEmpty())
+        return;
+
+    if (requestedDriver.isEmpty())
+        qputenv("SDL_AUDIODRIVER", QByteArrayLiteral("alsa"));
+    qputenv("SDL_AUDIO_ALSA_DEFAULT_DEVICE", device.toLocal8Bit());
+    qInfo("[menu-sounds] using Pi ALSA output: %s", qPrintable(device));
+#endif
+}
 }
 
 MenuSoundPlayer::MenuSoundPlayer(const QString &appRoot, AppCore *appCore,
@@ -21,6 +84,7 @@ MenuSoundPlayer::MenuSoundPlayer(const QString &appRoot, AppCore *appCore,
     , m_appRoot(appRoot)
     , m_appCore(appCore)
 {
+    configurePiSdlAudio();
     if (SDL_InitSubSystem(SDL_INIT_AUDIO) == 0) {
         m_audioSubsystemReady = true;
     } else {
@@ -148,11 +212,33 @@ QByteArray MenuSoundPlayer::loadWave(const QString &path) const
     }
 
     QByteArray sound;
-    if (spec.freq == kSampleRate && spec.format == AUDIO_S16SYS
-            && spec.channels == 1) {
+    SDL_AudioCVT converter{};
+    const int conversion = SDL_BuildAudioCVT(
+        &converter, spec.format, spec.channels, spec.freq,
+        AUDIO_S16SYS, kOutputChannels, kSampleRate);
+    if (conversion < 0) {
+        qWarning("[menu-sounds] could not prepare %s: %s",
+                 encodedPath.constData(), SDL_GetError());
+    } else if (conversion == 0) {
         sound = QByteArray(reinterpret_cast<const char *>(buffer), int(length));
     } else {
-        qWarning("[menu-sounds] unsupported WAV format for %s", encodedPath.constData());
+        converter.len = int(length);
+        converter.buf = static_cast<Uint8 *>(
+            SDL_malloc(size_t(converter.len) * size_t(converter.len_mult)));
+        if (!converter.buf) {
+            qWarning("[menu-sounds] could not allocate converted audio for %s",
+                     encodedPath.constData());
+        } else {
+            SDL_memcpy(converter.buf, buffer, length);
+            if (SDL_ConvertAudio(&converter) == 0) {
+                sound = QByteArray(reinterpret_cast<const char *>(converter.buf),
+                                   converter.len_cvt);
+            } else {
+                qWarning("[menu-sounds] could not convert %s: %s",
+                         encodedPath.constData(), SDL_GetError());
+            }
+            SDL_free(converter.buf);
+        }
     }
     SDL_FreeWAV(buffer);
     return sound;
@@ -169,7 +255,7 @@ bool MenuSoundPlayer::openAudioDevice()
     SDL_AudioSpec obtained{};
     desired.freq = kSampleRate;
     desired.format = AUDIO_S16SYS;
-    desired.channels = 1;
+    desired.channels = kOutputChannels;
     desired.samples = 1024;
     desired.callback = nullptr;
     m_audioDevice = SDL_OpenAudioDevice(nullptr, 0, &desired, &obtained, 0);

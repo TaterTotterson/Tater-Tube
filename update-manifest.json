@@ -1,13 +1,13 @@
 {
-  "version": "v1.7.1",
-  "app_version": "1.7.1",
+  "version": "v1.7.2",
+  "app_version": "1.7.2",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.7.1/Tater-Tube-v1.7.1-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.7.1.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.7.2/Tater-Tube-v1.7.2-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.7.2.tar.gz",
   "notes": [
-    "Keeps menu sound effects inside menus by muting them throughout video, TV, Tape Deck, Game Center, and PC Link sessions.",
-    "Keeps sounds muted during loading and transitions between clips, then restores them when the user returns to a menu."
+    "Restores menu sounds on Raspberry Pi 5 by routing SDL audio to the connected HDMI or composite output.",
+    "Converts menu cues to a Pi-compatible stereo format while preserving explicit audio overrides."
   ]
 }
