@@ -277,6 +277,21 @@ function next(appCoreObject, source) {
     return bumperItem(definition)
 }
 
+// Record a bumper selected by a server-controlled schedule without replacing
+// its URL. Live TV owns the item sequence and serves bumpers through the same
+// endpoint as commercials, so substituting a bundled file would bypass that
+// stream and can make the client timeline disagree with the server.
+function recordScheduled(appCoreObject, scheduledItem, source) {
+    var scheduled = definitionFor(scheduledItem)
+    if (!scheduled)
+        return
+
+    var state = loadRotationState(appCoreObject)
+    resetCompletedCycle(state)
+    recordDefinition(state, scheduled, source)
+    saveRotationState(appCoreObject, state)
+}
+
 // Claims a bumper selected by a TV schedule. If that bumper has already played
 // in the current player-wide cycle, return a local replacement that has not.
 // A null return means the scheduled bumper itself is safe to play.

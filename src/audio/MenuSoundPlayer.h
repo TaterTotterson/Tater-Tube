@@ -40,6 +40,7 @@ private:
     static bool isTextEditingFocus(QObject *focusObject);
 
     QString m_appRoot;
+    QString m_piAlsaDevice;
     AppCore *m_appCore = nullptr;
     QString m_packSlug = QStringLiteral("soft-touch");
     bool m_enabled = true;

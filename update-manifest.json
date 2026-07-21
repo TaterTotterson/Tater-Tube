@@ -1,13 +1,15 @@
 {
-  "version": "v1.7.2",
-  "app_version": "1.7.2",
+  "version": "v1.7.3",
+  "app_version": "1.7.3",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.7.2/Tater-Tube-v1.7.2-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.7.2.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.7.3/Tater-Tube-v1.7.3-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.7.3.tar.gz",
   "notes": [
-    "Restores menu sounds on Raspberry Pi 5 by routing SDL audio to the connected HDMI or composite output.",
-    "Converts menu cues to a Pi-compatible stereo format while preserving explicit audio overrides."
+    "Keeps Raspberry Pi 5 menu sounds working without leaking their SDL audio route into video playback.",
+    "Prevents HDMI audio from dropping during Tube TV channel and schedule transitions.",
+    "Streams server-scheduled Tater bumpers through the server playback endpoint without invalid local-file transcode parameters.",
+    "Shows the TV channel overlay only when tuning a channel, not between videos, commercials, or bumpers."
   ]
 }

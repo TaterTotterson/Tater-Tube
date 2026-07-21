@@ -1656,13 +1656,9 @@ FocusScope {
             return
         }
         if (String(item.kind || "").toLowerCase() === "tater_bumper") {
-            var replacement = TaterBumpers.claimScheduled(
-                        appCore, item, "server-live-tv")
-            if (replacement) {
-                item = Object.assign({}, item, replacement, {
-                    kind: "tater_bumper"
-                })
-            }
+            // Keep the server-provided item URL. Server Live TV streams Tater
+            // bumpers through the same schedule endpoint as commercials.
+            TaterBumpers.recordScheduled(appCore, item, "server-live-tv")
         }
         var label = channelLabel(channel)
         statusText = label

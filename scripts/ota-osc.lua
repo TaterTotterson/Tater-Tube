@@ -401,16 +401,23 @@ mp.register_script_message("240mp-ota-stream-info", function(info)
 end)
 
 mp.register_event("file-loaded", function()
+    -- Automatic video/commercial handoffs ask for a black transition without
+    -- re-showing the channel label. Consume that request before the normal
+    -- tune transition: show_initial_label is fixed when this mpv process is
+    -- launched and otherwise leaks the original tune label into every file.
+    if quiet_next_file then
+        quiet_next_file = false
+        if transition_pending then
+            show_transition_black()
+        end
+        return
+    end
     if transition_pending then
         if latest_label ~= "" and initial_label_enabled() then
             show_tuning_transition(latest_label)
         else
             show_transition_black()
         end
-    end
-    if quiet_next_file then
-        quiet_next_file = false
-        return
     end
     if not labels_enabled() or not top_label_enabled() then
         return

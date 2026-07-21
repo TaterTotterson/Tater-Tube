@@ -581,6 +581,15 @@ void MpvController::loadAndPlay(const QString &url, float startSeconds,
     });
 
     m_headlessMode = detectHeadlessMode();
+    if (m_headlessMode && isOtaMode && !muteAudio
+            && !connectedPiHdmiAudioCard().isEmpty()) {
+        // Raspberry Pi HDMI audio can latch its MAI FIFO underrun state while
+        // loadfile replaces one TV item with the next. Keep a fixed output
+        // format open and feed silence through buffering gaps so the FIFO never
+        // drains during channel and schedule transitions.
+        args << QStringLiteral("--audio-stream-silence=yes")
+             << QStringLiteral("--gapless-audio=yes");
+    }
     if (!muteAudio)
         appendAudioArgs(args);
 

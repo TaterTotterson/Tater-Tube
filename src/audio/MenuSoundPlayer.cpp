@@ -15,6 +15,36 @@ constexpr int kSampleRate = 48000;
 constexpr Uint8 kOutputChannels = 2;
 constexpr int kMinimumSoundIntervalMs = 38;
 
+class ScopedEnvironmentOverride {
+public:
+    ScopedEnvironmentOverride(const QByteArray &name, const QByteArray &value,
+                              bool enabled)
+        : m_name(name)
+        , m_wasSet(qEnvironmentVariableIsSet(name.constData()))
+        , m_previousValue(qgetenv(name.constData()))
+        , m_enabled(enabled)
+    {
+        if (m_enabled)
+            qputenv(m_name.constData(), value);
+    }
+
+    ~ScopedEnvironmentOverride()
+    {
+        if (!m_enabled)
+            return;
+        if (m_wasSet)
+            qputenv(m_name.constData(), m_previousValue);
+        else
+            qunsetenv(m_name.constData());
+    }
+
+private:
+    QByteArray m_name;
+    bool m_wasSet = false;
+    QByteArray m_previousValue;
+    bool m_enabled = false;
+};
+
 QString connectedPiAlsaDevice()
 {
 #ifdef Q_OS_LINUX
@@ -53,27 +83,31 @@ QString connectedPiAlsaDevice()
     return {};
 }
 
-void configurePiSdlAudio()
+QString piSdlAudioDevice()
 {
 #ifdef Q_OS_LINUX
-    // An explicit device always wins. A non-ALSA driver also indicates that
-    // the caller wants SDL to use its own desktop/session routing.
-    if (!qEnvironmentVariableIsEmpty("SDL_AUDIO_ALSA_DEFAULT_DEVICE"))
-        return;
+    // Caller-provided routing always wins. SDL2's ALSA backend reads AUDIODEV;
+    // SDL_AUDIO_DEVICE_NAME is also treated as an explicit generic override.
+    if (!qEnvironmentVariableIsEmpty("AUDIODEV")
+            || !qEnvironmentVariableIsEmpty("SDL_AUDIO_DEVICE_NAME")) {
+        return {};
+    }
     const QByteArray requestedDriver = qgetenv("SDL_AUDIODRIVER").trimmed();
     if (!requestedDriver.isEmpty()
             && requestedDriver.compare("alsa", Qt::CaseInsensitive) != 0) {
-        return;
+        return {};
     }
 
-    const QString device = connectedPiAlsaDevice();
-    if (device.isEmpty())
-        return;
+    // Accept the existing launcher override, but do not publish it as a global
+    // AUDIODEV value: child playback processes must not inherit menu routing.
+    const QByteArray configuredDevice =
+        qgetenv("SDL_AUDIO_ALSA_DEFAULT_DEVICE").trimmed();
+    if (!configuredDevice.isEmpty())
+        return QString::fromLocal8Bit(configuredDevice);
 
-    if (requestedDriver.isEmpty())
-        qputenv("SDL_AUDIODRIVER", QByteArrayLiteral("alsa"));
-    qputenv("SDL_AUDIO_ALSA_DEFAULT_DEVICE", device.toLocal8Bit());
-    qInfo("[menu-sounds] using Pi ALSA output: %s", qPrintable(device));
+    return connectedPiAlsaDevice();
+#else
+    return {};
 #endif
 }
 }
@@ -82,11 +116,22 @@ MenuSoundPlayer::MenuSoundPlayer(const QString &appRoot, AppCore *appCore,
                                  QObject *parent)
     : QObject(parent)
     , m_appRoot(appRoot)
+    , m_piAlsaDevice(piSdlAudioDevice())
     , m_appCore(appCore)
 {
-    configurePiSdlAudio();
+    // Select ALSA only while SDL initializes. Restoring the process environment
+    // immediately keeps mpv and every other child process isolated from the
+    // menu-sound route.
+    const bool selectAlsa = !m_piAlsaDevice.isEmpty()
+        && qEnvironmentVariableIsEmpty("SDL_AUDIODRIVER");
+    const ScopedEnvironmentOverride driverOverride(
+        QByteArrayLiteral("SDL_AUDIODRIVER"), QByteArrayLiteral("alsa"), selectAlsa);
     if (SDL_InitSubSystem(SDL_INIT_AUDIO) == 0) {
         m_audioSubsystemReady = true;
+        if (!m_piAlsaDevice.isEmpty()) {
+            qInfo("[menu-sounds] using Pi ALSA output: %s",
+                  qPrintable(m_piAlsaDevice));
+        }
     } else {
         qWarning("[menu-sounds] SDL audio init failed: %s", SDL_GetError());
     }
@@ -130,15 +175,11 @@ void MenuSoundPlayer::setContextActive(const QString &context, bool active)
     else
         m_activeContexts.remove(key);
 
-    if (!active || !m_audioDevice)
-        return;
-
-    // Block new cues immediately, but let the short Select cue that launched
-    // the experience finish before releasing the menu audio device.
-    QTimer::singleShot(250, this, [this]() {
-        if (!m_activeContexts.isEmpty())
-            closeAudioDevice();
-    });
+    // Playback owns the Pi output exclusively. Release the menu handle before
+    // mpv, RetroArch, or Moonlight can open it; context signals already block
+    // all subsequent cues until the external experience has ended.
+    if (active)
+        closeAudioDevice();
 }
 
 bool MenuSoundPlayer::eventFilter(QObject *watched, QEvent *event)
@@ -258,6 +299,11 @@ bool MenuSoundPlayer::openAudioDevice()
     desired.channels = kOutputChannels;
     desired.samples = 1024;
     desired.callback = nullptr;
+    // SDL2 reads AUDIODEV inside SDL_OpenAudioDevice(). Limit the override to
+    // this call so it can never leak into mpv's QProcess environment.
+    const ScopedEnvironmentOverride deviceOverride(
+        QByteArrayLiteral("AUDIODEV"), m_piAlsaDevice.toLocal8Bit(),
+        !m_piAlsaDevice.isEmpty());
     m_audioDevice = SDL_OpenAudioDevice(nullptr, 0, &desired, &obtained, 0);
     if (!m_audioDevice) {
         if (!m_audioWarningShown) {

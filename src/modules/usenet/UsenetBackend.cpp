@@ -329,9 +329,18 @@ bool UsenetBackend::isRaspberryPi5() const
 
 QString UsenetBackend::playback_url(const QString &rawUrl, int screenWidth, int screenHeight) const
 {
-    QUrl url(rawUrl.trimmed());
+    const QString trimmedUrl = rawUrl.trimmed();
+    QUrl url(trimmedUrl);
     if (!url.isValid() || url.scheme().isEmpty())
-        return rawUrl.trimmed();
+        return trimmedUrl;
+
+    // Transcode controls are understood only by Tater's HTTP playback API.
+    // Appending them to a local file:// bumper changes the filename mpv tries
+    // to open (for example, bumper.mp4?transcode=1), which makes the handoff
+    // fail and leaves the television displaying its own "No Signal" screen.
+    const QString scheme = url.scheme().toLower();
+    if (scheme != QStringLiteral("http") && scheme != QStringLiteral("https"))
+        return trimmedUrl;
 
     const QString mode = setting(QStringLiteral("tube_transcode_mode"),
                                  QStringLiteral("On")).trimmed().toLower();
