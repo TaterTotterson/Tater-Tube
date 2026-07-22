@@ -1,0 +1,69 @@
+diff --git a/nod-ffi/src/handle.rs b/nod-ffi/src/handle.rs
+index 6e8d93b..b12d725 100644
+--- a/nod-ffi/src/handle.rs
++++ b/nod-ffi/src/handle.rs
+@@ -26,42 +26,40 @@ pub(crate) enum NodHandleInner {
+     File(OwnedFileReader),
+ }
+ 
+-impl NodHandleInner {
+-    fn as_read(&mut self) -> &mut dyn Read {
++impl Read for NodHandleInner {
++    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+         match self {
+-            NodHandleInner::Disc(r) => r,
+-            NodHandleInner::Partition { reader, .. } => reader.as_mut(),
+-            NodHandleInner::File(r) => r,
++            NodHandleInner::Disc(reader) => reader.read(buf),
++            NodHandleInner::Partition { reader, .. } => reader.read(buf),
++            NodHandleInner::File(reader) => reader.read(buf),
+         }
+     }
++}
+ 
+-    fn as_seek(&mut self) -> &mut dyn Seek {
++impl BufRead for NodHandleInner {
++    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+         match self {
+-            NodHandleInner::Disc(r) => r,
+-            NodHandleInner::Partition { reader, .. } => reader.as_mut(),
+-            NodHandleInner::File(r) => r,
++            NodHandleInner::Disc(reader) => reader.fill_buf(),
++            NodHandleInner::Partition { reader, .. } => reader.fill_buf(),
++            NodHandleInner::File(reader) => reader.fill_buf(),
+         }
+     }
+ 
+-    fn as_bufread(&mut self) -> &mut dyn BufRead {
++    fn consume(&mut self, n: usize) {
+         match self {
+-            NodHandleInner::Disc(r) => r,
+-            NodHandleInner::Partition { reader, .. } => reader.as_mut(),
+-            NodHandleInner::File(r) => r,
++            NodHandleInner::Disc(reader) => reader.consume(n),
++            NodHandleInner::Partition { reader, .. } => reader.consume(n),
++            NodHandleInner::File(reader) => reader.consume(n),
+         }
+     }
+ }
+ 
+-impl Read for NodHandleInner {
+-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> { self.as_read().read(buf) }
+-}
+-
+-impl BufRead for NodHandleInner {
+-    fn fill_buf(&mut self) -> io::Result<&[u8]> { self.as_bufread().fill_buf() }
+-
+-    fn consume(&mut self, n: usize) { self.as_bufread().consume(n); }
+-}
+-
+ impl Seek for NodHandleInner {
+-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> { self.as_seek().seek(pos) }
++    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
++        match self {
++            NodHandleInner::Disc(reader) => reader.seek(pos),
++            NodHandleInner::Partition { reader, .. } => reader.seek(pos),
++            NodHandleInner::File(reader) => reader.seek(pos),
++        }
++    }
+ }

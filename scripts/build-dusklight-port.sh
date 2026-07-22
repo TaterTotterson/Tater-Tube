@@ -8,6 +8,7 @@ OUTPUT_DIR="${1:?Usage: build-dusklight-port.sh OUTPUT_DIR}"
 UPSTREAM_URL="${DUSKLIGHT_URL:-https://github.com/TwilitRealm/dusklight.git}"
 UPSTREAM_REF="${DUSKLIGHT_REF:-f5642f307384bd4b7b7a09f690e391152445c815}"
 PATCH_FILE="${DUSKLIGHT_PATCH:-${REPO_ROOT}/packaging/ports/dusklight/tater-tube.patch}"
+NOD_PATCH_FILE="${DUSKLIGHT_NOD_PATCH:-${REPO_ROOT}/packaging/ports/dusklight/nod-rust-1.85.patch}"
 BUILD_ROOT="${DUSKLIGHT_BUILD_ROOT:-${TMPDIR:-/tmp}/tater-tube-dusklight-build}"
 BUILD_JOBS="${DUSKLIGHT_BUILD_JOBS:-3}"
 DAWN_PROVIDER="${DUSKLIGHT_DAWN_PROVIDER:-auto}"
@@ -40,6 +41,10 @@ if [ ! -f "${PATCH_FILE}" ]; then
     echo "Dusklight patch not found: ${PATCH_FILE}" >&2
     exit 1
 fi
+if [ ! -f "${NOD_PATCH_FILE}" ]; then
+    echo "Dusklight nod compatibility patch not found: ${NOD_PATCH_FILE}" >&2
+    exit 1
+fi
 
 cmake -E remove_directory "${SOURCE_DIR}"
 cmake -E remove_directory "${BUILD_DIR}"
@@ -67,6 +72,13 @@ cmake -S "${SOURCE_DIR}" -B "${BUILD_DIR}" -G Ninja \
     -DDUSK_ENABLE_SENTRY_NATIVE=OFF \
     -DDUSK_ENABLE_UPDATE_CHECKER=OFF \
     -DDUSK_PACKAGE_INSTALL=OFF
+NOD_SOURCE_DIR="${BUILD_DIR}/_deps/aurora_nod-src"
+NOD_PATCH_NOTE="not required for the selected nod provider"
+if [ -d "${NOD_SOURCE_DIR}/nod-ffi" ]; then
+    git -C "${NOD_SOURCE_DIR}" apply --check "${NOD_PATCH_FILE}"
+    git -C "${NOD_SOURCE_DIR}" apply "${NOD_PATCH_FILE}"
+    NOD_PATCH_NOTE="nod-rust-1.85.patch"
+fi
 cmake --build "${BUILD_DIR}" --parallel "${BUILD_JOBS}"
 cmake --install "${BUILD_DIR}"
 
@@ -114,6 +126,7 @@ cat > "${OUTPUT_DIR}/SOURCE.txt" <<EOF
 Dusklight 1.4.1 (${UPSTREAM_REF})
 Source: ${UPSTREAM_URL}
 Tater Tube patch: tater-tube.patch
+nod compatibility patch: ${NOD_PATCH_NOTE}
 Build options: Release, Vulkan, updater/Discord/Sentry disabled
 License: CC0-1.0 (Aurora is MIT)
 No Twilight Princess disc image, extracted game asset, BIOS, save, or credential is included.
