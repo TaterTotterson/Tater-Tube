@@ -7,7 +7,7 @@
 #include <QSize>
 #include <QString>
 #include <QStringList>
-#include <QtTypes>
+#include <QtGlobal>
 
 struct GamePortRomRequirement {
     QString label;
