@@ -1,0 +1,59 @@
+diff --git a/soh/soh/OTRGlobals.cpp b/soh/soh/OTRGlobals.cpp
+index 39f04ddb..184961dd 100644
+--- a/soh/soh/OTRGlobals.cpp
++++ b/soh/soh/OTRGlobals.cpp
+@@ -2,6 +2,7 @@
+ #include "OTRAudio.h"
+ #include <algorithm>
+ #include <atomic>
++#include <cstdlib>
+ #include <filesystem>
+ #include <fstream>
+ #include <vector>
+@@ -415,6 +416,18 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
+     std::string dataPath = Ship::Context::GetAppDirectoryPath(appShortName);
+     std::string file;
+ 
++    const char* managedRom = std::getenv("TATER_TUBE_PORT_ROM");
++    const bool managedLaunch = managedRom != nullptr && managedRom[0] != '\0';
++    if (managedLaunch) {
++        const bool archiveExists =
++            std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot-mq.o2r", appShortName)) ||
++            std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("oot.o2r", appShortName));
++        if (shouldRegen || !archiveExists) {
++            args.clear();
++            args.emplace_back(managedRom);
++        }
++    }
++
+ #if defined(__SWITCH__)
+     SohGui::RegisterPopup("Outdated ROM Archives",
+                           "\x1b[2;2HYou've launched the Ship with an old ROM O2R file."
+@@ -559,6 +572,10 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
+             case ES_EXTRACT_ARGS: {
+ #if !defined(__SWITCH__) && !defined(__WIIU__)
+                 if (args.empty()) {
++                    if (managedLaunch) {
++                        extractStep = ES_VERIFY;
++                        continue;
++                    }
+                     SohGui::RegisterPopup(
+                         "Run Ship of Harkinian", "All files have been processed. Run SoH?", "Yes", "No",
+                         [&]() {
+diff --git a/soh/soh/SohGui/Menu.cpp b/soh/soh/SohGui/Menu.cpp
+index 0147d75a..9f50f906 100644
+--- a/soh/soh/SohGui/Menu.cpp
++++ b/soh/soh/SohGui/Menu.cpp
+@@ -760,10 +760,10 @@ void Menu::DrawElement() {
+     UIWidgets::ButtonOptions options3 = {};
+     options3.color = UIWidgets::Colors::Red;
+     options3.size = UIWidgets::Sizes::Inline;
+-    options3.tooltip = "Quit SoH";
++    options3.tooltip = "Exit to Tater Tube";
+     if (UIWidgets::Button(ICON_FA_POWER_OFF, options3)) {
+         SohGui::mModalWindow->RegisterPopup(
+-            "Quit SoH", "Are you sure you want to quit SoH?", "Quit", "Cancel",
++            "Exit to Tater Tube", "Return to Tater Tube?", "Exit", "Cancel",
+             []() {
+                 std::shared_ptr<Menu> menu =
+                     static_pointer_cast<Menu>(Ship::Context::GetInstance()->GetWindow()->GetGui()->GetMenu());

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "2ship2harkinian",
+  "title": "2 Ship 2 Harkinian",
+  "sourceUrl": "https://github.com/HarbourMasters/2ship2harkinian",
+  "distribution": "bundled-patched-engine",
+  "engineEnvironment": "TATER_TUBE_2SHIP2HARKINIAN",
+  "romFolders": [
+    "N64",
+    "Nintendo64",
+    "Nintendo 64"
+  ],
+  "romExtensions": [
+    "z64"
+  ],
+  "romRequirements": [
+    {
+      "label": "The Legend of Zelda: Majora's Mask (USA 1.0)",
+      "fileName": "baserom.mm.us.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "d6133ace5afaa0882cf214cf88daba39e266c078",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Majora's Mask (USA GameCube)",
+      "fileName": "baserom.mm.us-gc.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "9743aa026e9269b339eb0e3044cd5830a440c1fd",
+      "size": 33554432
+    }
+  ],
+  "executables": {
+    "linux-x86_64": [
+      "2ship2harkinian"
+    ],
+    "linux-arm64": [
+      "2ship2harkinian"
+    ]
+  },
+  "launchArguments": []
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "spaghettikart",
+  "title": "SpaghettiKart",
+  "sourceUrl": "https://github.com/HarbourMasters/SpaghettiKart",
+  "distribution": "bundled-patched-engine",
+  "engineEnvironment": "TATER_TUBE_SPAGHETTIKART",
+  "romFolders": [
+    "N64",
+    "Nintendo64",
+    "Nintendo 64"
+  ],
+  "romExtensions": [
+    "z64"
+  ],
+  "romRequirements": [
+    {
+      "label": "Mario Kart 64 (USA)",
+      "fileName": "baserom.mk64.us.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "579c48e211ae952530ffc8738709f078d5dd215e",
+      "size": 12582912
+    }
+  ],
+  "executables": {
+    "linux-x86_64": [
+      "spaghettikart"
+    ],
+    "linux-arm64": [
+      "spaghettikart"
+    ]
+  },
+  "launchArguments": []
+}

@@ -42,6 +42,12 @@
       "default": ""
     },
     {
+      "key": "ports_path",
+      "label": "PORT ENGINES PATH",
+      "type": "directory_browser",
+      "default": ""
+    },
+    {
       "key": "core_install_status",
       "label": "CORE INSTALL",
       "type": "list_single",

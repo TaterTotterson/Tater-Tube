@@ -1,0 +1,32 @@
+diff --git a/src/graphic/Fast3D/Fast3dWindow.cpp b/src/graphic/Fast3D/Fast3dWindow.cpp
+--- a/src/graphic/Fast3D/Fast3dWindow.cpp
++++ b/src/graphic/Fast3D/Fast3dWindow.cpp
+@@ -12,6 +12,7 @@
+ #include "graphic/Fast3D/backends/gfx_direct3d11.h"
+ #include "backends/gfx_window_manager_api.h"
+ 
++#include <cstdlib>
+ #include <fstream>
+ 
+ namespace Fast {
+@@ -88,6 +89,20 @@ void Fast3dWindow::Init() {
+         width = Ship::Context::GetInstance()->GetConfig()->GetInt("Window.Width", 640);
+         height = Ship::Context::GetInstance()->GetConfig()->GetInt("Window.Height", 480);
+     }
++
++    const char* crtWidth = std::getenv("TATER_TUBE_CRT_WIDTH");
++    const char* crtHeight = std::getenv("TATER_TUBE_CRT_HEIGHT");
++    if (crtWidth != nullptr && crtHeight != nullptr) {
++        const int parsedWidth = std::atoi(crtWidth);
++        const int parsedHeight = std::atoi(crtHeight);
++        if (parsedWidth == 720 && (parsedHeight == 480 || parsedHeight == 576)) {
++            isFullscreen = true;
++            width = static_cast<uint32_t>(parsedWidth);
++            height = static_cast<uint32_t>(parsedHeight);
++            posX = 0;
++            posY = 0;
++        }
++    }
+ 
+     SetForceCursorVisibility(CVarGetInteger("gForceCursorVisibility", 0));
+ 

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "sm64coopdx",
+  "title": "Super Mario 64 Coop Deluxe",
+  "sourceUrl": "https://github.com/coop-deluxe/sm64coopdx",
+  "distribution": "bundled-patched-engine",
+  "engineEnvironment": "TATER_TUBE_SM64COOPDX",
+  "romFolders": [
+    "N64",
+    "Nintendo64",
+    "Nintendo 64"
+  ],
+  "romExtensions": [
+    "z64"
+  ],
+  "romRequirements": [
+    {
+      "label": "Super Mario 64 (USA)",
+      "fileName": "baserom.us.z64",
+      "hashAlgorithm": "md5",
+      "hash": "20b854b239203baf6c961b850a4a51a2",
+      "size": 8388608
+    }
+  ],
+  "executables": {
+    "linux-x86_64": [
+      "sm64coopdx"
+    ],
+    "linux-arm64": [
+      "sm64coopdx.arm",
+      "sm64coopdx"
+    ],
+    "linux-arm": [
+      "sm64coopdx.arm",
+      "sm64coopdx"
+    ]
+  },
+  "launchArguments": [
+    "--savepath",
+    "{savePath}",
+    "--fullscreen",
+    "--skip-update-check",
+    "--no-discord"
+  ],
+  "crtLaunchArguments": [
+    "--width",
+    "{displayWidth}",
+    "--height",
+    "{displayHeight}"
+  ]
+}

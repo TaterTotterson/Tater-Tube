@@ -1,0 +1,165 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9ba3f19..3b1f5f8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -229,7 +229,7 @@ endif()
+ 
+ #=================== SSE2NEON ===================
+ set(SSE2NEON_DIR ${CMAKE_BINARY_DIR}/_deps/sse2neon)
+-file(DOWNLOAD "https://raw.githubusercontent.com/DLTcollab/sse2neon/refs/heads/master/sse2neon.h" "${SSE2NEON_DIR}/sse2neon.h")
++file(DOWNLOAD "https://raw.githubusercontent.com/DLTcollab/sse2neon/3b70b3727edc9a151c113814129258c3423a771c/sse2neon.h" "${SSE2NEON_DIR}/sse2neon.h")
+ 
+ include_directories(${SSE2NEON_DIR})
+ 
+@@ -393,7 +393,7 @@ option(BUILD_SM64 "Build with Super Mario 64 support" OFF)
+ option(BUILD_MK64 "Build with Mario Kart 64 support" OFF)
+ option(BUILD_FZERO "Build with F-Zero X support" OFF)
+ add_subdirectory(tools/Torch)
+-target_link_libraries(${PROJECT_NAME} PRIVATE torch "${ADDITIONAL_LIBRARY_DEPENDENCIES}")
++target_link_libraries(${PROJECT_NAME} PRIVATE torch "${ADDITIONAL_LIBRARY_DEPENDENCIES}" ${CMAKE_DL_LIBS})
+ 
+ if(CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch")
+ 
+@@ -575,7 +575,8 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+       if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+         set(CPU_OPTION -msse2 -mfpmath=sse)
+       elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+-        set(CPU_OPTION -mfpu=neon)
++        # AArch64 always provides Advanced SIMD; -mfpu is an AArch32-only flag.
++        set(CPU_OPTION)
+       endif()
+ 
+       target_compile_options(${PROJECT_NAME} PRIVATE
+diff --git a/src/audio/mixer.c b/src/audio/mixer.c
+index d3c5a4d..7776bc8 100644
+--- a/src/audio/mixer.c
++++ b/src/audio/mixer.c
+@@ -322,7 +322,9 @@ void aADPCMdecImpl(uint8_t flags, ADPCM_STATE state) {
+ 
+             __m128i ins_vec;
+             if (flags & 4) {
+-                ins_vec = _mm_loadu_si16((__m128i*) in);
++                uint16_t packed_ins;
++                memcpy(&packed_ins, in, sizeof(packed_ins));
++                ins_vec = _mm_cvtsi32_si128((int32_t) packed_ins);
+                 ins_vec = _mm_unpacklo_epi8(ins_vec, _mm_setzero_si128());
+                 __m128i in_vec_up2bit = _mm_srli_epi16(ins_vec, 6);
+                 __m128i in_vec_uplower2bit = _mm_and_si128(_mm_srli_epi16(ins_vec, 4), mask_2bit);
+@@ -339,7 +341,9 @@ void aADPCMdecImpl(uint8_t flags, ADPCM_STATE state) {
+                 
+                 in += 2;
+             } else {
+-                ins_vec = _mm_loadu_si32((__m128i*) in);
++                uint32_t packed_ins;
++                memcpy(&packed_ins, in, sizeof(packed_ins));
++                ins_vec = _mm_cvtsi32_si128((int32_t) packed_ins);
+                 ins_vec = _mm_unpacklo_epi8(ins_vec, _mm_setzero_si128());
+                 __m128i in_vec_up4bit = _mm_srli_epi16(ins_vec, 4);
+                 __m128i in_vec_lower4bit = _mm_and_si128(ins_vec, mask_4bit);
+diff --git a/src/port/Engine.cpp b/src/port/Engine.cpp
+index d2bee9e..b80a7c3 100644
+--- a/src/port/Engine.cpp
++++ b/src/port/Engine.cpp
+@@ -42,6 +42,7 @@
+ #include "port/mods/PortEnhancements.h"
+ 
+ #include <Fast3D/interpreter.h>
++#include <cstdlib>
+ #include <filesystem>
+ 
+ #ifdef __SWITCH__
+@@ -69,6 +70,8 @@ GameEngine::GameEngine() {
+ #endif
+ 
+     std::vector<std::string> archiveFiles;
++    const char* managedRom = std::getenv("TATER_TUBE_PORT_ROM");
++    const bool managedLaunch = managedRom != nullptr && managedRom[0] != '\0';
+     const std::string main_path = Ship::Context::GetPathRelativeToAppDirectory("sf64.o2r");
+ #ifdef __linux__
+     const std::string assets_path = Ship::Context::GetPathRelativeToAppBundle("starship.o2r");
+@@ -88,7 +91,7 @@ GameEngine::GameEngine() {
+     if (std::filesystem::exists(main_path)) {
+         archiveFiles.push_back(main_path);
+     } else {
+-        if (ShowYesNoBox("Starship - Asset Extraction", "Please provide a Starfox 64 ROM.\n\nSupported Versions:\nUS 1.0\nUS 1.1\n\nAssets will be extracted into an O2R file.") == IDYES) {
++        if (managedLaunch || ShowYesNoBox("Starship - Asset Extraction", "Please provide a Starfox 64 ROM.\n\nSupported Versions:\nUS 1.0\nUS 1.1\n\nAssets will be extracted into an O2R file.") == IDYES) {
+             if(!GenAssetFile()){
+                 ShowMessage("Error", "An error occured, no O2R file was generated.\n\nExiting...");
+                 exit(1);
+@@ -96,7 +99,7 @@ GameEngine::GameEngine() {
+                 archiveFiles.push_back(main_path);
+             }
+ 
+-            if (ShowYesNoBox("Extraction Complete", "ROM Extracted. Extract another?\n\n Starship supports JP and EU ROMs for voice replacement.\n Voice replacement ROM assets can also be installed in:\n Settings->Language->Install JP/EU Audio") == IDYES) {
++            if (!managedLaunch && ShowYesNoBox("Extraction Complete", "ROM Extracted. Extract another?\n\n Starship supports JP and EU ROMs for voice replacement.\n Voice replacement ROM assets can also be installed in:\n Settings->Language->Install JP/EU Audio") == IDYES) {
+                 if(!GenAssetFile()){
+                     ShowMessage("Error", "An error occured, no O2R file was generated.");
+                 }
+@@ -291,13 +294,18 @@ bool GameEngine::GenAssetFile(bool exitOnFail) {
+         }
+     }
+ 
+-    ShowMessage(("Starship - Extraction - Found " + game.value()).c_str(), "The extraction process will now begin.\n\nThis may take a few minutes.", SDL_MESSAGEBOX_INFORMATION);
++    if (std::getenv("TATER_TUBE_PORT_ROM") == nullptr) {
++        ShowMessage(("Starship - Extraction - Found " + game.value()).c_str(), "The extraction process will now begin.\n\nThis may take a few minutes.", SDL_MESSAGEBOX_INFORMATION);
++    }
+ 
+     return extractor->GenerateOTR();
+ }
+ 
+ void GameEngine::Create() {
+     const auto instance = Instance = new GameEngine();
++    if (std::getenv("TATER_TUBE_PORT_ID") != nullptr) {
++        CVarRegisterInteger("gControlNav", 1);
++    }
+     instance->AudioInit();
+     DisplayListPatch::Run();
+     GameUI::SetupGuiElements();
+diff --git a/src/port/extractor/GameExtractor.cpp b/src/port/extractor/GameExtractor.cpp
+index f8392bc..6217576 100644
+--- a/src/port/extractor/GameExtractor.cpp
++++ b/src/port/extractor/GameExtractor.cpp
+@@ -1,5 +1,6 @@
+ #include "GameExtractor.h"
+ 
++#include <cstdlib>
+ #include <fstream>
+ 
+ #include "Context.h"
+@@ -24,13 +25,18 @@ std::unordered_map<std::string, std::string> mGameList = {
+ 
+ bool GameExtractor::SelectGameFromUI() {
+ #if !defined(__IOS__) && !defined(__ANDROID__) && !defined(__SWITCH__)
+-    auto selection = pfd::open_file("Select a file", ".", { "N64 Roms", "*.z64" }).result();
++    const char* managedRom = std::getenv("TATER_TUBE_PORT_ROM");
++    if (managedRom != nullptr && managedRom[0] != '\0') {
++        this->mGamePath = managedRom;
++    } else {
++        auto selection = pfd::open_file("Select a file", ".", { "N64 Roms", "*.z64" }).result();
+ 
+-    if (selection.empty()) {
+-        return false;
+-    }
++        if (selection.empty()) {
++            return false;
++        }
+ 
+-    this->mGamePath = selection[0];
++        this->mGamePath = selection[0];
++    }
+ #else
+     this->mGamePath = Ship::Context::GetPathRelativeToAppDirectory("baserom.us.rev1.z64");
+ #endif
+diff --git a/src/port/ui/ImguiUI.cpp b/src/port/ui/ImguiUI.cpp
+index 61c3f7f..c2ef7d4 100644
+--- a/src/port/ui/ImguiUI.cpp
++++ b/src/port/ui/ImguiUI.cpp
+@@ -561,7 +561,7 @@ void DrawGameMenu() {
+         }
+ #endif
+ 
+-        if (UIWidgets::MenuItem("Quit")) {
++        if (UIWidgets::MenuItem("Exit to Tater Tube")) {
+             Ship::Context::GetInstance()->GetWindow()->Close();
+         }
+         ImGui::EndMenu();

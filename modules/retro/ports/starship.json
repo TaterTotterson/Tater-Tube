@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "starship",
+  "title": "Starship",
+  "sourceUrl": "https://github.com/HarbourMasters/Starship",
+  "distribution": "bundled-patched-engine",
+  "engineEnvironment": "TATER_TUBE_STARSHIP",
+  "romFolders": [
+    "N64",
+    "Nintendo64",
+    "Nintendo 64"
+  ],
+  "romExtensions": [
+    "z64"
+  ],
+  "romRequirements": [
+    {
+      "label": "Star Fox 64 (USA 1.0)",
+      "fileName": "baserom.sf64.us-10.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "d8b1088520f7c5f81433292a9258c1184afa1457",
+      "size": 12582912
+    },
+    {
+      "label": "Star Fox 64 (USA 1.1)",
+      "fileName": "baserom.sf64.us-11.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "09f0d105f476b00efa5303a3ebc42e60a7753b7a",
+      "size": 12582912
+    }
+  ],
+  "executables": {
+    "linux-x86_64": [
+      "starship"
+    ],
+    "linux-arm64": [
+      "starship"
+    ]
+  },
+  "launchArguments": []
+}

@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "id": "shipwright",
+  "title": "Ship of Harkinian",
+  "sourceUrl": "https://github.com/HarbourMasters/Shipwright",
+  "distribution": "bundled-patched-engine",
+  "engineEnvironment": "TATER_TUBE_SHIPWRIGHT",
+  "romFolders": [
+    "N64",
+    "Nintendo64",
+    "Nintendo 64"
+  ],
+  "romExtensions": [
+    "z64"
+  ],
+  "romRequirements": [
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (PAL 1.0)",
+      "fileName": "baserom.oot.pal-10.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "328a1f1beba30ce5e178f031662019eb32c5f3b5",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (PAL 1.1)",
+      "fileName": "baserom.oot.pal-11.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "cfbb98d392e4a9d39da8285d10cbef3974c2f012",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (PAL GameCube)",
+      "fileName": "baserom.oot.pal-gc.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "0227d7c0074f2d0ac935631990da8ec5914597b4",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (PAL Master Quest)",
+      "fileName": "baserom.oot.pal-mq.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "f46239439f59a2a594ef83cf68ef65043b1bffe2",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (PAL GameCube Debug)",
+      "fileName": "baserom.oot.pal-gc-debug.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "cee6bc3c2a634b41728f2af8da54d9bf8cc14099"
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (PAL Master Quest Debug 1)",
+      "fileName": "baserom.oot.pal-mq-debug-1.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "079b855b943d6ad8bd1eb026c0ed169ecbdac7da"
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (PAL Master Quest Debug 2)",
+      "fileName": "baserom.oot.pal-mq-debug-2.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "50bebedad9e0f10746a52b07239e47fa6c284d03"
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (PAL Master Quest Debug 3)",
+      "fileName": "baserom.oot.pal-mq-debug-3.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "cfecfdc58d650e71a200c81f033de4e6d617a9f6"
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC 1.0 (USA))",
+      "fileName": "baserom.oot.ntsc-us-10.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "ad69c91157f6705e8ab06c79fe08aad47bb57ba7",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC 1.1 (USA))",
+      "fileName": "baserom.oot.ntsc-us-11.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "d3ecb253776cd847a5aa63d859d8c89a2f37b364",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC 1.2 (USA))",
+      "fileName": "baserom.oot.ntsc-us-12.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "41b3bdc48d98c48529219919015a1af22f5057c2",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC 1.0 (Japan))",
+      "fileName": "baserom.oot.ntsc-jp-10.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "c892bbda3993e66bd0d56a10ecd30b1ee612210f",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC 1.1 (Japan))",
+      "fileName": "baserom.oot.ntsc-jp-11.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "dbfc81f655187dc6fefd93fa6798face770d579d",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC 1.2 (Japan))",
+      "fileName": "baserom.oot.ntsc-jp-12.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "fa5f5942b27480d60243c2d52c0e93e26b9e6b86",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC GameCube (USA))",
+      "fileName": "baserom.oot.ntsc-us-gc.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "b82710ba2bd3b4c6ee8aa1a7e9acf787dfc72e9b",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC Master Quest (USA))",
+      "fileName": "baserom.oot.ntsc-us-mq.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "8b5d13aac69bfbf989861cfdc50b1d840945fc1d",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC GameCube (Japan))",
+      "fileName": "baserom.oot.ntsc-jp-gc.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "0769c84615422d60f16925cd859593cdfa597f84",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC GameCube Collector's Edition (Japan))",
+      "fileName": "baserom.oot.ntsc-jp-gc-ce.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "2ce2d1a9f0534c9cd9fa04ea5317b80da21e5e73",
+      "size": 33554432
+    },
+    {
+      "label": "The Legend of Zelda: Ocarina of Time (NTSC Master Quest (Japan))",
+      "fileName": "baserom.oot.ntsc-jp-mq.z64",
+      "hashAlgorithm": "sha1",
+      "hash": "dd14e143c4275861fe93ea79d0c02e36ae8c6c2f",
+      "size": 33554432
+    }
+  ],
+  "executables": {
+    "linux-x86_64": [
+      "shipwright"
+    ],
+    "linux-arm64": [
+      "shipwright"
+    ]
+  },
+  "launchArguments": []
+}

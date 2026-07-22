@@ -1,0 +1,31 @@
+diff --git a/src/pc/djui/djui_panel_pause.c b/src/pc/djui/djui_panel_pause.c
+index 6a4c2ef..1b9f453 100644
+--- a/src/pc/djui/djui_panel_pause.c
++++ b/src/pc/djui/djui_panel_pause.c
+@@ -52,6 +52,17 @@ static void djui_panel_pause_quit(struct DjuiBase* caller) {
+     }
+ }
+ 
++static void djui_panel_pause_exit_tater_tube_yes(UNUSED struct DjuiBase* caller) {
++    game_exit();
++}
++
++static void djui_panel_pause_exit_tater_tube(struct DjuiBase* caller) {
++    djui_panel_confirm_create(caller,
++                              "EXIT TO TATER TUBE",
++                              "RETURN TO TATER TUBE?",
++                              djui_panel_pause_exit_tater_tube_yes);
++}
++
+ void djui_panel_pause_create(struct DjuiBase* caller) {
+     if (gDjuiPanelPauseCreated) { return; }
+     if (gDjuiChatBoxFocus) { djui_chat_box_toggle(); }
+@@ -114,6 +125,8 @@ void djui_panel_pause_create(struct DjuiBase* caller) {
+         } else {
+             djui_button_create(body, DLANG(PAUSE, DISCONNECT), DJUI_BUTTON_STYLE_BACK, djui_panel_pause_quit);
+         }
++
++        djui_button_create(body, "EXIT TO TATER TUBE", DJUI_BUTTON_STYLE_BACK, djui_panel_pause_exit_tater_tube);
+     }
+ 
+     djui_panel_add(caller, panel, defaultBase);

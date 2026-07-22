@@ -1,0 +1,172 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9b4be14..c88beab 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -355,7 +355,7 @@ endif()
+ 
+ #=================== SSE2NEON ===================
+ set(SSE2NEON_DIR ${CMAKE_BINARY_DIR}/_deps/sse2neon)
+-file(DOWNLOAD "https://raw.githubusercontent.com/DLTcollab/sse2neon/refs/heads/master/sse2neon.h" "${SSE2NEON_DIR}/sse2neon.h")
++file(DOWNLOAD "https://raw.githubusercontent.com/DLTcollab/sse2neon/3b70b3727edc9a151c113814129258c3423a771c/sse2neon.h" "${SSE2NEON_DIR}/sse2neon.h")
+ 
+ include_directories(${SSE2NEON_DIR})
+ 
+diff --git a/src/engine/mods/ModManager.cpp b/src/engine/mods/ModManager.cpp
+index 137fb97..c1b3bc4 100644
+--- a/src/engine/mods/ModManager.cpp
++++ b/src/engine/mods/ModManager.cpp
+@@ -5,6 +5,7 @@
+ #include "port/Engine.h"
+ #include "semver.hpp"
+ #include "utils/StringHelper.h"
++#include <cstdlib>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -52,7 +53,10 @@ void UnloadMods() {
+ }
+ 
+ void GenerateAssetsMods() {
+-    if (GameEngine::ShowYesNoBox("No O2R Files", "No O2R files found. Generate one now?") == IDYES) {
++    const char* managedRom = std::getenv("TATER_TUBE_PORT_ROM");
++    const bool managedLaunch = managedRom != nullptr && managedRom[0] != '\0';
++    if (managedLaunch ||
++        GameEngine::ShowYesNoBox("No O2R Files", "No O2R files found. Generate one now?") == IDYES) {
+         if (!GameEngine::GenAssetFile()) {
+             GameEngine::ShowMessage("Error", "An error occured, no O2R file was generated.\n\nExiting...");
+             exit(1);
+diff --git a/src/port/Engine.cpp b/src/port/Engine.cpp
+index 2cd2c99..cd14db5 100644
+--- a/src/port/Engine.cpp
++++ b/src/port/Engine.cpp
+@@ -35,6 +35,7 @@
+ // #include <Fast3D/gfx_rendering_api.h>
+ #include <SDL2/SDL.h>
+ 
++#include <cstdlib>
+ #include <utility>
+ 
+ #ifdef __SWITCH__
+@@ -280,8 +281,10 @@ bool GameEngine::GenAssetFile() {
+         exit(1);
+     }
+ 
+-    ShowMessage(("Found " + game.value()).c_str(),
+-                "The extraction process will now begin.\n\nThis may take a few minutes.", SDL_MESSAGEBOX_INFORMATION);
++    if (std::getenv("TATER_TUBE_PORT_ROM") == nullptr) {
++        ShowMessage(("Found " + game.value()).c_str(),
++                    "The extraction process will now begin.\n\nThis may take a few minutes.", SDL_MESSAGEBOX_INFORMATION);
++    }
+ 
+     return extractor->GenerateOTR();
+ }
+@@ -345,6 +348,9 @@ int GameEngine::ShowYesNoBox(const char* title, const char* box) {
+ 
+ void GameEngine::Create() {
+     const auto instance = Instance = new GameEngine();
++    if (std::getenv("TATER_TUBE_PORT_ID") != nullptr) {
++        CVarRegisterInteger("gControlNav", 1);
++    }
+     InitModsSystem();
+     instance->gHMAS = new HMAS();
+     instance->AudioInit();
+diff --git a/src/port/GameExtractor.cpp b/src/port/GameExtractor.cpp
+index 4e8b4df..146f389 100644
+--- a/src/port/GameExtractor.cpp
++++ b/src/port/GameExtractor.cpp
+@@ -5,6 +5,7 @@
+ #pragma comment(lib, "Shlwapi.lib")
+ #endif
+ #include "GameExtractor.h"
++#include <cstdlib>
+ #include <cstdio>
+ #include <unordered_map>
+ 
+@@ -32,7 +33,12 @@ std::unordered_map<std::string, std::string> mGameList = {
+ 
+ bool GameExtractor::SelectGameFromUI() {
+     std::vector<std::string> roms;
+-    GetRoms(roms);
++    const char* managedRom = std::getenv("TATER_TUBE_PORT_ROM");
++    if (managedRom != nullptr && managedRom[0] != '\0') {
++        roms.emplace_back(managedRom);
++    } else {
++        GetRoms(roms);
++    }
+ 
+     bool foundGame = false;
+ 
+@@ -74,6 +80,10 @@ bool GameExtractor::SelectGameFromUI() {
+ #if !defined(__IOS__) && !defined(__ANDROID__) && !defined(__SWITCH__)
+     // Desktop: fallback to file dialogue if no baserom found
+     if (!foundGame) {
++        if (managedRom != nullptr && managedRom[0] != '\0') {
++            SPDLOG_ERROR("Tater Tube's validated ROM could not be opened or recognized: {}", managedRom);
++            return false;
++        }
+         if (!pfd::settings::available()) {
+             SPDLOG_ERROR(
+                 "portable-file-dialogs is not available on this system."
+diff --git a/src/port/ui/Menu.cpp b/src/port/ui/Menu.cpp
+index 8a4f261..3ba2bb0 100644
+--- a/src/port/ui/Menu.cpp
++++ b/src/port/ui/Menu.cpp
+@@ -668,7 +668,7 @@ void Menu::DrawElement() {
+     UIWidgets::ButtonOptions options3 = {};
+     options3.color = UIWidgets::Colors::Red;
+     options3.size = UIWidgets::Sizes::Inline;
+-    options3.tooltip = "Quit";
++    options3.tooltip = "Exit to Tater Tube";
+     if (UIWidgets::Button(ICON_FA_POWER_OFF, options3)) {
+         if (!popped) {
+             ToggleVisibility();
+diff --git a/src/port/ui/PortMenu.cpp b/src/port/ui/PortMenu.cpp
+index 09a115e..6aa6ccc 100644
+--- a/src/port/ui/PortMenu.cpp
++++ b/src/port/ui/PortMenu.cpp
+@@ -176,6 +176,11 @@ void PortMenu::AddSettings() {
+             SDL_OpenURL(std::string("file:///" + std::filesystem::absolute(filesPath).string()).c_str());
+         })
+         .Options(ButtonOptions().Tooltip("Opens the folder that contains the save and mods folders, etc."));
++    AddWidget(path, "Exit to Tater Tube", WIDGET_BUTTON)
++        .Callback([](WidgetInfo& info) { Ship::Context::GetInstance()->GetWindow()->Close(); })
++        .Options(ButtonOptions()
++                     .Color(Colors::Red)
++                     .Tooltip("Closes SpaghettiKart and returns to Tater Tube."));
+ 
+     // Audio Settings
+     path.sidebarName = "Audio";
+diff --git a/src/audio/mixer.c b/src/audio/mixer.c
+index 9b8157a..fb85283 100644
+--- a/src/audio/mixer.c
++++ b/src/audio/mixer.c
+@@ -308,7 +308,9 @@ void aADPCMdecImpl(uint8_t flags, ADPCM_STATE state) {
+             __m128i prev1_vec = _mm_set1_epi16(prev1);
+             __m128i prev2_vec = _mm_set1_epi16(prev2);
+ 
+-            __m128i ins_vec = _mm_loadu_si32((__m128i*) in);
++            uint32_t packed_ins;
++            memcpy(&packed_ins, in, sizeof(packed_ins));
++            __m128i ins_vec = _mm_cvtsi32_si128((int32_t) packed_ins);
+             ins_vec = _mm_unpacklo_epi8(ins_vec, _mm_setzero_si128());
+             __m128i in_vec_up4bit = _mm_srli_epi16(ins_vec, 4);
+             __m128i in_vec_lower4bit = _mm_and_si128(ins_vec, mask);
+@@ -1058,4 +1060,4 @@ void aUnkCmd19Impl(uint8_t f, uint16_t count, uint16_t out_addr, uint16_t in_add
+         out += 32;
+         nbytes -= 32 * sizeof(int16_t);
+     } while (nbytes > 0);
+-}
+\ No newline at end of file
++}
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -522,7 +522,7 @@ option(BUILD_SF64 "Build with Star Fox 64 support" OFF)
+ option(BUILD_FZERO "Build with F-Zero X support" OFF)
+ 
+ add_subdirectory(torch)
+-target_link_libraries(${PROJECT_NAME} PRIVATE torch "${ADDITIONAL_LIBRARY_DEPENDENCIES}")
++target_link_libraries(${PROJECT_NAME} PRIVATE torch "${ADDITIONAL_LIBRARY_DEPENDENCIES}" ${CMAKE_DL_LIBS})
+ 
+ if(CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch")
+ 

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "dusklight",
+  "title": "Dusklight (Twilight Princess)",
+  "sourceUrl": "https://github.com/TwilitRealm/dusklight",
+  "distribution": "bundled-patched-engine",
+  "engineEnvironment": "TATER_TUBE_DUSKLIGHT",
+  "romValidation": "engine",
+  "romAccess": "direct",
+  "romFolders": [
+    "GameCube",
+    "Game Cube",
+    "Nintendo GameCube",
+    "Nintendo - GameCube",
+    "GC"
+  ],
+  "romExtensions": [
+    "iso",
+    "gcm",
+    "ciso",
+    "gcz",
+    "nfs",
+    "rvz",
+    "wbfs",
+    "wia",
+    "tgc"
+  ],
+  "executables": {
+    "linux-x86_64": [
+      "dusklight"
+    ],
+    "linux-arm64": [
+      "dusklight"
+    ]
+  },
+  "validationArguments": [
+    "--tater-validate-disc",
+    "{romPath}"
+  ],
+  "launchArguments": [
+    "--dvd",
+    "{romPath}",
+    "--backend",
+    "vulkan",
+    "--cvar",
+    "video.enableFullscreen=true"
+  ],
+  "crtLaunchArguments": [
+    "--cvar",
+    "game.internalResolutionScale=1"
+  ]
+}

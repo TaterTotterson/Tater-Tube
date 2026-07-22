@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
-project(TaterTube VERSION 1.7.4 LANGUAGES CXX)
+project(TaterTube VERSION 1.8.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 include(GNUInstallDirs)
+include(CTest)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick Qml Network Svg Concurrent)
 find_package(SDL2 CONFIG REQUIRED) # gamepad input (InputManager)
@@ -17,6 +18,19 @@ if(NOT APPLE)
     pkg_check_modules(Libdrm REQUIRED libdrm)
 endif()
 
+if(BUILD_TESTING)
+    find_package(Qt6 QUIET COMPONENTS Test)
+    if(TARGET Qt6::Test)
+        add_executable(game-port-catalog-test
+            tests/GamePortCatalogTest.cpp
+            src/modules/retro/GamePortCatalog.cpp
+        )
+        target_include_directories(game-port-catalog-test PRIVATE src)
+        target_link_libraries(game-port-catalog-test PRIVATE Qt6::Core Qt6::Test)
+        add_test(NAME game-port-catalog COMMAND game-port-catalog-test)
+    endif()
+endif()
+
 if(APPLE)
     enable_language(OBJCXX)
 endif()
@@ -26,6 +40,7 @@ add_executable(240mp
     src/AppCore.cpp
     src/modules/local_files/LocalFilesBackend.cpp
     src/modules/emby_jellyfin/EmbyJellyfinBackend.cpp
+    src/modules/retro/GamePortCatalog.cpp
     src/modules/retro/RetroBackend.cpp
     src/modules/youtube_playlist/YouTubePlaylistBackend.cpp
     src/modules/moonlight/MoonlightBackend.cpp
