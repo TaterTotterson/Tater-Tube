@@ -1,15 +1,16 @@
 {
-  "version": "v1.8.0",
-  "app_version": "1.8.0",
+  "version": "v1.8.1",
+  "app_version": "1.8.1",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.8.0/Tater-Tube-v1.8.0-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.8.0.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.8.1/Tater-Tube-v1.8.1-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.8.1.tar.gz",
   "notes": [
-    "Adds a Game Center Ports library for Super Mario 64 Coop Deluxe, 2 Ship 2 Harkinian, Ship of Harkinian, SpaghettiKart, Starship, and Dusklight.",
-    "Builds and bundles the approved open-source port engines without including ROMs or copyrighted game data.",
-    "Finds and validates user-owned game files through the existing RetroNAS library, with cached scans and a responsive loading screen.",
-    "Forces native NTSC or PAL composite output for game ports on Raspberry Pi while leaving HDMI and desktop resolution behavior unchanged."
+    "Fixes native game-port HDMI audio routing on Raspberry Pi 5, including SpaghettiKart.",
+    "Recovers HarbourMasters ports when a saved configuration disabled the audio backend.",
+    "Uses fullscreen widescreen defaults for managed native ports on HDMI while preserving CRT output behavior.",
+    "Fixes Super Mario 64 GLES shader compatibility on Raspberry Pi 4 and Pi 5.",
+    "Adds the native runtime libraries required by the bundled ports."
   ]
 }
