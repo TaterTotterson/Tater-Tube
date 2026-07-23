@@ -21,6 +21,7 @@ FocusScope {
     property int currentGameIndex: 0
     property int setupRow: 0
     property bool mounting: false
+    property bool automaticMountAttempted: false
     property string messageReturnMode: ""
     property string selectedSystemId: ""
     property string selectedSystemTitle: ""
@@ -91,12 +92,27 @@ FocusScope {
         return slash < 0 ? "" : value.substring(0, slash)
     }
 
-    function compareRows(left, right) {
-        var a = ((left.title || "") + "").toUpperCase()
-        var b = ((right.title || "") + "").toUpperCase()
+    function compareText(left, right) {
+        var a = ((left || "") + "").toUpperCase()
+        var b = ((right || "") + "").toUpperCase()
         if (a < b) return -1
         if (a > b) return 1
         return 0
+    }
+
+    function compareRows(left, right) {
+        return compareText(left.title, right.title)
+    }
+
+    function sortedItems(items, key) {
+        var result = []
+        var source = items || []
+        for (var i = 0; i < source.length; i++)
+            result.push(source[i])
+        result.sort(function(left, right) {
+            return compareText((left || {})[key], (right || {})[key])
+        })
+        return result
     }
 
     function buildGameRows() {
@@ -201,9 +217,27 @@ FocusScope {
             statusText = "NO GAME RUNTIME IS AVAILABLE"
             return
         }
-        if (!status.gamesRootExists && !status.portsReady) {
-            showSetup("ENTER RETRONAS INFO")
-            return
+        if (!status.gamesRootExists) {
+            if (!automaticMountAttempted
+                    && (status.localPath || "") === ""
+                    && (status.host || "") !== "") {
+                automaticMountAttempted = true
+                mounting = true
+                scanningLibrary = false
+                statusText = "CONNECTING TO RETRONAS..."
+                mode = "loading"
+                retroBackend.mount_retronas(
+                    status.host || "",
+                    status.share || "mister",
+                    status.remotePath || "games",
+                    status.username || "",
+                    settingValue("retronas_password", ""))
+                return
+            }
+            if (!status.portsReady) {
+                showSetup("ENTER RETRONAS INFO")
+                return
+            }
         }
         loadSystems()
     }
@@ -430,7 +464,7 @@ FocusScope {
 
         function onSystemsLoaded(items) {
             scanningLibrary = false
-            systems = items || []
+            systems = sortedItems(items, "label")
             if (systems.length === 0) {
                 mode = "message"
                 statusText = "NO SUPPORTED ROM FOLDERS"
@@ -443,7 +477,7 @@ FocusScope {
 
         function onGamesLoaded(items) {
             scanningLibrary = false
-            games = items || []
+            games = sortedItems(items, "title")
             currentGameFolder = ""
             buildGameRows()
             if (gameRows.length === 0) {

@@ -1,16 +1,14 @@
 {
-  "version": "v1.8.1",
-  "app_version": "1.8.1",
+  "version": "v1.8.2",
+  "app_version": "1.8.2",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.8.1/Tater-Tube-v1.8.1-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.8.1.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.8.2/Tater-Tube-v1.8.2-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.8.2.tar.gz",
   "notes": [
-    "Fixes native game-port HDMI audio routing on Raspberry Pi 5, including SpaghettiKart.",
-    "Recovers HarbourMasters ports when a saved configuration disabled the audio backend.",
-    "Uses fullscreen widescreen defaults for managed native ports on HDMI while preserving CRT output behavior.",
-    "Fixes Super Mario 64 GLES shader compatibility on Raspberry Pi 4 and Pi 5.",
-    "Adds the native runtime libraries required by the bundled ports."
+    "Sorts every Game Center system and game list alphabetically, including Ports.",
+    "Automatically reconnects a saved RetroNAS share when Game Center opens after a restart or update.",
+    "Shows a clear RetroNAS connection message instead of reporting a valid cached ROM path as outside the game library."
   ]
 }

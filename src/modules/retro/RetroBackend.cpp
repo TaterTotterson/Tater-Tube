@@ -1509,6 +1509,15 @@ void RetroBackend::launchLocalPort(const QString &portId, const QString &romPath
         return;
     }
 
+    if (!QFileInfo(romPath).isFile()) {
+        const bool configuredRetroNas = setting(QStringLiteral("local_path")).isEmpty()
+            && !setting(QStringLiteral("retronas_host")).isEmpty();
+        emit errorOccurred(configuredRetroNas && !QDir(gamesRoot()).exists()
+                               ? QStringLiteral("RETRONAS IS NOT CONNECTED. REOPEN GAME CENTER TO RECONNECT")
+                               : QStringLiteral("PORT ROM FILE NOT FOUND. REFRESH THE GAME LIST"));
+        return;
+    }
+
     const QString userRoot = GamePortCatalog::portUserRoot(m_dataRoot, port);
     const bool allowedRom = pathIsInside(romPath, gamesRoot())
         || pathIsInside(romPath, userRoot);
