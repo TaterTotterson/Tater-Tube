@@ -28,6 +28,16 @@ tar \
 
 install -m 0755 "$SOURCE_DIR/scripts/lib/pi-setup.sh" "${ROOTFS_DIR}/tmp/240mp-pi-setup.sh"
 
+if [ -n "${PI240_RUNTIME_BUNDLE_DIR:-}" ]; then
+    if [ ! -d "${PI240_RUNTIME_BUNDLE_DIR}" ]; then
+        echo "Tater Tube runtime bundle directory not found: ${PI240_RUNTIME_BUNDLE_DIR}" >&2
+        exit 1
+    fi
+    RUNTIME_TARGET="${ROOTFS_DIR}/opt/240mp/share/240mp/vendor"
+    install -d "${RUNTIME_TARGET}"
+    cp -a "${PI240_RUNTIME_BUNDLE_DIR}/." "${RUNTIME_TARGET}/"
+fi
+
 {
     printf 'PI240_SERVICE_USER=%q\n' "${PI240_SERVICE_USER:-mp240}"
     printf 'PI240_SERVICE_HOME=%q\n' "${PI240_SERVICE_HOME:-/var/lib/240mp}"

@@ -20,12 +20,24 @@ pi240_install_retro_mount_helper "$PI240_SERVICE_USER" /usr/local/sbin/240mp-ret
 pi240_install_retro_core_control "$PI240_SERVICE_USER" /usr/local/sbin/240mp-retro-core-control
 pi240_install_argon_fan_control "$PI240_SERVICE_USER" /usr/local/sbin/240mp-argon-fan-control
 pi240_install_moonlight_sdl_bundle /opt/240mp
-/opt/240mp-src/scripts/build-sm64coopdx-port.sh /opt/240mp/share/240mp/vendor/ports/sm64coopdx
-/opt/240mp-src/scripts/build-2ship2harkinian-port.sh /opt/240mp/share/240mp/vendor/ports/2ship2harkinian
-/opt/240mp-src/scripts/build-shipwright-port.sh /opt/240mp/share/240mp/vendor/ports/shipwright
-SPAGHETTIKART_BUILD_JOBS=3 /opt/240mp-src/scripts/build-spaghettikart-port.sh /opt/240mp/share/240mp/vendor/ports/spaghettikart
-STARSHIP_BUILD_JOBS=3 /opt/240mp-src/scripts/build-starship-port.sh /opt/240mp/share/240mp/vendor/ports/starship
-DUSKLIGHT_BUILD_JOBS=3 /opt/240mp-src/scripts/build-dusklight-port.sh /opt/240mp/share/240mp/vendor/ports/dusklight
+if [ ! -x /opt/240mp/share/240mp/vendor/ports/sm64coopdx/sm64coopdx ]; then
+    /opt/240mp-src/scripts/build-sm64coopdx-port.sh /opt/240mp/share/240mp/vendor/ports/sm64coopdx
+fi
+if [ ! -x /opt/240mp/share/240mp/vendor/ports/2ship2harkinian/2s2h.elf ]; then
+    /opt/240mp-src/scripts/build-2ship2harkinian-port.sh /opt/240mp/share/240mp/vendor/ports/2ship2harkinian
+fi
+if [ ! -x /opt/240mp/share/240mp/vendor/ports/shipwright/soh.elf ]; then
+    /opt/240mp-src/scripts/build-shipwright-port.sh /opt/240mp/share/240mp/vendor/ports/shipwright
+fi
+if [ ! -x /opt/240mp/share/240mp/vendor/ports/spaghettikart/Spaghettify ]; then
+    SPAGHETTIKART_BUILD_JOBS=3 /opt/240mp-src/scripts/build-spaghettikart-port.sh /opt/240mp/share/240mp/vendor/ports/spaghettikart
+fi
+if [ ! -x /opt/240mp/share/240mp/vendor/ports/starship/Starship ]; then
+    STARSHIP_BUILD_JOBS=3 /opt/240mp-src/scripts/build-starship-port.sh /opt/240mp/share/240mp/vendor/ports/starship
+fi
+if [ ! -x /opt/240mp/share/240mp/vendor/ports/dusklight/dusklight-bin ]; then
+    DUSKLIGHT_BUILD_JOBS=3 /opt/240mp-src/scripts/build-dusklight-port.sh /opt/240mp/share/240mp/vendor/ports/dusklight
+fi
 pi240_install_moonlight_control "$PI240_SERVICE_USER" /usr/local/sbin/240mp-moonlight-control
 case "${PI240_IMAGE_PROFILE:-}" in
     crt-ntsc)

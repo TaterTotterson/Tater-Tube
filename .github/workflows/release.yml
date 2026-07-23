@@ -103,26 +103,8 @@ jobs:
       - name: Install
         run: cmake --install build
 
-      - name: Build bundled Moonlight SDL runtime
-        run: ./scripts/build-moonlight-sdl.sh "${GITHUB_WORKSPACE}/install/usr/local/share/240mp/vendor/moonlight-sdl"
-
-      - name: Build bundled sm64coopdx port engine
-        run: ./scripts/build-sm64coopdx-port.sh "${GITHUB_WORKSPACE}/install/usr/local/share/240mp/vendor/ports/sm64coopdx"
-
-      - name: Build bundled 2 Ship 2 Harkinian port engine
-        run: ./scripts/build-2ship2harkinian-port.sh "${GITHUB_WORKSPACE}/install/usr/local/share/240mp/vendor/ports/2ship2harkinian"
-
-      - name: Build bundled Ship of Harkinian port engine
-        run: ./scripts/build-shipwright-port.sh "${GITHUB_WORKSPACE}/install/usr/local/share/240mp/vendor/ports/shipwright"
-
-      - name: Build bundled SpaghettiKart port engine
-        run: ./scripts/build-spaghettikart-port.sh "${GITHUB_WORKSPACE}/install/usr/local/share/240mp/vendor/ports/spaghettikart"
-
-      - name: Build bundled Starship port engine
-        run: ./scripts/build-starship-port.sh "${GITHUB_WORKSPACE}/install/usr/local/share/240mp/vendor/ports/starship"
-
-      - name: Build bundled Dusklight port engine
-        run: DUSKLIGHT_BUILD_JOBS=3 ./scripts/build-dusklight-port.sh "${GITHUB_WORKSPACE}/install/usr/local/share/240mp/vendor/ports/dusklight"
+      - name: Fetch pinned ARM64 runtime bundle
+        run: ./scripts/fetch-pi-runtime-bundle.sh "${GITHUB_WORKSPACE}/install/usr/local/share/240mp/vendor"
 
       - name: Create tarball
         run: |
@@ -158,6 +140,9 @@ jobs:
       - name: Validate generated helpers
         run: bash scripts/check-generated-helpers.sh
 
+      - name: Fetch pinned ARM64 runtime bundle
+        run: ./scripts/fetch-pi-runtime-bundle.sh "${GITHUB_WORKSPACE}/out/pi-runtime"
+
       - name: Build image
         env:
           PI_IMAGE_NAME: tater-tube-${{ github.ref_name }}-${{ matrix.image_profile }}
@@ -165,6 +150,7 @@ jobs:
           PI_ENABLE_SSH: "1"
           PI_FIRST_USER_NAME: tater
           PI_FIRST_USER_PASS: pi
+          PI_RUNTIME_BUNDLE_DIR: ${{ github.workspace }}/out/pi-runtime
         run: ./scripts/build-pi-image.sh
 
       - name: Prepare image artifacts

@@ -35,6 +35,7 @@ BUILD_LOG="${BUILD_ROOT}/build.log"
 if ! make -C "${SOURCE_DIR}" -j"${BUILD_JOBS}" \
         HANDHELD=1 \
         DISCORD_SDK=0 \
+        EXTRA_CPP_FLAGS=-std=c++17 \
         UPDATER=0 >"${BUILD_LOG}" 2>&1; then
     echo "sm64coopdx build failed; final compiler output:" >&2
     tail -n 160 "${BUILD_LOG}" >&2
@@ -59,7 +60,7 @@ cat > "${OUTPUT_DIR}/SOURCE.txt" <<EOF
 sm64coopdx ${UPSTREAM_REF}
 Source: ${UPSTREAM_URL}
 Tater Tube patch: exit-to-tater-tube.patch
-Build options: HANDHELD=1 DISCORD_SDK=0 UPDATER=0
+Build options: HANDHELD=1 DISCORD_SDK=0 EXTRA_CPP_FLAGS=-std=c++17 UPDATER=0
 No ROM, extracted ROM asset, BIOS, or Nintendo-owned game data is included.
 EOF
 

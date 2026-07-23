@@ -137,6 +137,11 @@ Search results return launch IDs such as `vod:movie:...`, `vod:show:...`, and `g
 
 Download the latest `.img.xz` for your display from the GitHub release page, flash it with Raspberry Pi Imager or Balena Etcher, and boot the Pi.
 
+Release builds reuse a checksum-pinned ARM64 runtime bundle for Moonlight and
+the native Game Center ports. This keeps the project open source while avoiding
+four identical multi-hour engine rebuilds for every application tag; bundle
+sources and rebuild commands are documented in [BUILDING.md](BUILDING.md).
+
 ## Hardware Notes
 
 - Pi 4 composite images default to analog video and analog audio

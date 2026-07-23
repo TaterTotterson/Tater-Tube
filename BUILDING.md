@@ -88,7 +88,8 @@ Requirements on your build machine:
 Build the default Raspberry Pi 4 composite/Argon IR image:
 
 ```bash
-./scripts/build-pi-image.sh
+./scripts/fetch-pi-runtime-bundle.sh out/pi-runtime
+PI_RUNTIME_BUNDLE_DIR="$PWD/out/pi-runtime" ./scripts/build-pi-image.sh
 ```
 
 Build a PAL composite image:
@@ -120,6 +121,19 @@ Output images are written to:
 ```text
 .cache/pi-gen-arm64/deploy/
 ```
+
+Tagged releases use the immutable ARM64 archive and SHA-256 pinned in
+`packaging/pi/runtime-bundle.lock`. Build a new bundle only when a port engine,
+Moonlight, its patch set, toolchain, or ABI changes:
+
+```bash
+./scripts/build-pi-runtimes.sh out/pi-runtime
+./scripts/package-pi-runtime-bundle.sh
+```
+
+Publish the archive as a new, never-overwritten GitHub Release asset, then
+update the lock file. Application-only releases reuse the pinned bundle across
+the update tarball and all three image profiles.
 
 ## Playback Tuning
 

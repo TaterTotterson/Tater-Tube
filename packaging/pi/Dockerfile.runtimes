@@ -1,0 +1,134 @@
+FROM debian:trixie@sha256:fac46bff2e02f51425b6e33b0e1169f55dfb053d83511ca28aa50c09fd5ed7a4 AS builder
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG BUILD_JOBS=4
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        bsdextrautils \
+        ca-certificates \
+        cargo \
+        cmake \
+        curl \
+        git \
+        libasound2-dev \
+        libavahi-client-dev \
+        libavcodec-dev \
+        libavutil-dev \
+        libcurl4-openssl-dev \
+        libdbus-1-dev \
+        libdecor-0-dev \
+        libdrm-dev \
+        libevdev-dev \
+        libexpat1-dev \
+        libfreetype6-dev \
+        libglew-dev \
+        libglu1-mesa-dev \
+        libgtk-3-dev \
+        libncurses-dev \
+        libogg-dev \
+        libopengl-dev \
+        libopus-dev \
+        libopusfile-dev \
+        libpipewire-0.3-dev \
+        libpng-dev \
+        libpulse-dev \
+        libsdl2-dev \
+        libsdl2-net-dev \
+        libspdlog-dev \
+        libssl-dev \
+        libtinyxml2-dev \
+        libudev-dev \
+        libunwind-dev \
+        libusb-1.0-0-dev \
+        libusb-dev \
+        libvulkan-dev \
+        libvorbis-dev \
+        libwayland-dev \
+        libx11-xcb-dev \
+        libxcursor-dev \
+        libxi-dev \
+        libxinerama-dev \
+        libxkbcommon-dev \
+        libxrandr-dev \
+        libxss-dev \
+        libzip-dev \
+        lsb-release \
+        ninja-build \
+        nlohmann-json3-dev \
+        pkg-config \
+        python3 \
+        python3-markupsafe \
+        rustc \
+        wayland-protocols \
+        zipcmp \
+        zipmerge \
+        ziptool \
+        zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV RUNTIME_ROOT=/opt/tater-tube-runtimes
+
+COPY scripts/build-moonlight-sdl.sh /tmp/build-moonlight-sdl.sh
+RUN MOONLIGHT_BUILD_JOBS="${BUILD_JOBS}" \
+    /tmp/build-moonlight-sdl.sh "${RUNTIME_ROOT}/moonlight-sdl"
+
+COPY scripts/build-sm64coopdx-port.sh /tmp/build-sm64coopdx-port.sh
+COPY packaging/ports/sm64coopdx/exit-to-tater-tube.patch /tmp/sm64-exit.patch
+RUN SM64COOPDX_PATCH=/tmp/sm64-exit.patch \
+    SM64COOPDX_BUILD_JOBS="${BUILD_JOBS}" \
+    /tmp/build-sm64coopdx-port.sh "${RUNTIME_ROOT}/ports/sm64coopdx"
+
+COPY scripts/build-2ship2harkinian-port.sh /tmp/build-2ship2harkinian-port.sh
+COPY packaging/ports/2ship2harkinian/tater-tube.patch /tmp/2ship-tater-tube.patch
+COPY packaging/ports/2ship2harkinian/crt-display.patch /tmp/2ship-crt.patch
+RUN TWO_SHIP_PATCH=/tmp/2ship-tater-tube.patch \
+    TWO_SHIP_CRT_PATCH=/tmp/2ship-crt.patch \
+    TWO_SHIP_BUILD_JOBS="${BUILD_JOBS}" \
+    /tmp/build-2ship2harkinian-port.sh "${RUNTIME_ROOT}/ports/2ship2harkinian"
+
+COPY scripts/build-shipwright-port.sh /tmp/build-shipwright-port.sh
+COPY packaging/ports/shipwright/tater-tube.patch /tmp/shipwright-tater-tube.patch
+COPY packaging/ports/shipwright/crt-display.patch /tmp/shipwright-crt.patch
+RUN SHIPWRIGHT_PATCH=/tmp/shipwright-tater-tube.patch \
+    SHIPWRIGHT_CRT_PATCH=/tmp/shipwright-crt.patch \
+    SHIPWRIGHT_BUILD_JOBS="${BUILD_JOBS}" \
+    /tmp/build-shipwright-port.sh "${RUNTIME_ROOT}/ports/shipwright"
+
+COPY scripts/build-spaghettikart-port.sh /tmp/build-spaghettikart-port.sh
+COPY packaging/ports/spaghettikart/tater-tube.patch /tmp/spaghettikart-tater-tube.patch
+COPY packaging/ports/spaghettikart/crt-display.patch /tmp/spaghettikart-crt.patch
+RUN SPAGHETTIKART_PATCH=/tmp/spaghettikart-tater-tube.patch \
+    SPAGHETTIKART_CRT_PATCH=/tmp/spaghettikart-crt.patch \
+    SPAGHETTIKART_BUILD_JOBS="${BUILD_JOBS}" \
+    /tmp/build-spaghettikart-port.sh "${RUNTIME_ROOT}/ports/spaghettikart"
+
+COPY scripts/build-starship-port.sh /tmp/build-starship-port.sh
+COPY packaging/ports/starship/tater-tube.patch /tmp/starship-tater-tube.patch
+COPY packaging/ports/starship/crt-display.patch /tmp/starship-crt.patch
+RUN STARSHIP_PATCH=/tmp/starship-tater-tube.patch \
+    STARSHIP_CRT_PATCH=/tmp/starship-crt.patch \
+    STARSHIP_BUILD_JOBS="${BUILD_JOBS}" \
+    /tmp/build-starship-port.sh "${RUNTIME_ROOT}/ports/starship"
+
+COPY scripts/build-dusklight-port.sh /tmp/build-dusklight-port.sh
+COPY packaging/ports/dusklight/tater-tube.patch /tmp/dusklight-tater-tube.patch
+COPY packaging/ports/dusklight/nod-rust-1.85.patch /tmp/dusklight-nod-rust.patch
+ARG DUSKLIGHT_BUILD_JOBS=3
+RUN DUSKLIGHT_PATCH=/tmp/dusklight-tater-tube.patch \
+    DUSKLIGHT_NOD_PATCH=/tmp/dusklight-nod-rust.patch \
+    DUSKLIGHT_BUILD_JOBS="${DUSKLIGHT_BUILD_JOBS}" \
+    /tmp/build-dusklight-port.sh "${RUNTIME_ROOT}/ports/dusklight"
+
+RUN curl -fsSL --retry 3 \
+        https://raw.githubusercontent.com/moonlight-stream/moonlight-embedded/f32e415aea6797d261d6b470dcf8bf18727341c2/LICENSE \
+        -o "${RUNTIME_ROOT}/moonlight-sdl/LICENSE" \
+    && printf '%s\n' \
+        'Moonlight Embedded f32e415aea6797d261d6b470dcf8bf18727341c2' \
+        'Source: https://github.com/moonlight-stream/moonlight-embedded' \
+        > "${RUNTIME_ROOT}/moonlight-sdl/SOURCE.txt"
+
+FROM scratch
+
+COPY --from=builder /opt/tater-tube-runtimes /opt/tater-tube-runtimes

@@ -26,6 +26,7 @@ PI_IR_GPIO_PIN="${PI_IR_GPIO_PIN:-23}"
 PI_IR_PROTOCOL="${PI_IR_PROTOCOL:-nec}"
 PI_ENABLE_BLUETOOTH="${PI_ENABLE_BLUETOOTH:-1}"
 PI_ENABLE_BOOT_SPLASH="${PI_ENABLE_BOOT_SPLASH:-1}"
+PI_RUNTIME_BUNDLE_DIR="${PI_RUNTIME_BUNDLE_DIR:-}"
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -135,6 +136,22 @@ fi
 require_cmd git
 require_cmd docker
 
+runtime_bundle_opts=""
+if [ -n "${PI_RUNTIME_BUNDLE_DIR}" ]; then
+    if [ ! -d "${PI_RUNTIME_BUNDLE_DIR}" ]; then
+        echo "Pi runtime bundle directory not found: ${PI_RUNTIME_BUNDLE_DIR}" >&2
+        exit 1
+    fi
+    PI_RUNTIME_BUNDLE_DIR="$(cd "${PI_RUNTIME_BUNDLE_DIR}" && pwd)"
+    case "${PI_RUNTIME_BUNDLE_DIR}" in
+        *" "*)
+            echo "Pi runtime bundle paths containing spaces are unsupported: ${PI_RUNTIME_BUNDLE_DIR}" >&2
+            exit 1
+            ;;
+    esac
+    runtime_bundle_opts=" --mount type=bind,source=${PI_RUNTIME_BUNDLE_DIR},target=/240mp-runtime-bundle,readonly -e PI240_RUNTIME_BUNDLE_DIR=/240mp-runtime-bundle"
+fi
+
 mkdir -p "$(dirname "$PI_GEN_DIR")" "$(dirname "$PI_GEN_CONFIG")"
 
 if [ ! -d "${PI_GEN_DIR}/.git" ]; then
@@ -174,7 +191,7 @@ if [ -n "$PI_FIRST_USER_PUBKEY" ]; then
     write_config_value DISABLE_FIRST_BOOT_USER_RENAME "1"
 fi
 
-export PIGEN_DOCKER_OPTS="${PIGEN_DOCKER_OPTS:-} --mount type=bind,source=${REPO_ROOT},target=/240mp-src,readonly -e PI240_SOURCE_DIR=/240mp-src -e PI240_IMAGE_PROFILE=${PI_IMAGE_PROFILE} -e PI240_SERVICE_USER=${PI_SERVICE_USER} -e PI240_SERVICE_HOME=${PI_SERVICE_HOME} -e PI240_ENABLE_SSH=${PI_ENABLE_SSH} -e PI240_ENABLE_IR=${PI_ENABLE_IR} -e PI240_IR_GPIO_PIN=${PI_IR_GPIO_PIN} -e PI240_IR_PROTOCOL=${PI_IR_PROTOCOL} -e PI240_ENABLE_BLUETOOTH=${PI_ENABLE_BLUETOOTH} -e PI240_ENABLE_BOOT_SPLASH=${PI_ENABLE_BOOT_SPLASH}"
+export PIGEN_DOCKER_OPTS="${PIGEN_DOCKER_OPTS:-} --mount type=bind,source=${REPO_ROOT},target=/240mp-src,readonly -e PI240_SOURCE_DIR=/240mp-src -e PI240_IMAGE_PROFILE=${PI_IMAGE_PROFILE} -e PI240_SERVICE_USER=${PI_SERVICE_USER} -e PI240_SERVICE_HOME=${PI_SERVICE_HOME} -e PI240_ENABLE_SSH=${PI_ENABLE_SSH} -e PI240_ENABLE_IR=${PI_ENABLE_IR} -e PI240_IR_GPIO_PIN=${PI_IR_GPIO_PIN} -e PI240_IR_PROTOCOL=${PI_IR_PROTOCOL} -e PI240_ENABLE_BLUETOOTH=${PI_ENABLE_BLUETOOTH} -e PI240_ENABLE_BOOT_SPLASH=${PI_ENABLE_BOOT_SPLASH}${runtime_bundle_opts}"
 
 echo "Building ${PI_IMAGE_NAME} Raspberry Pi image with pi-gen..."
 echo "pi-gen: ${PI_GEN_DIR}"
@@ -185,6 +202,7 @@ echo "IR receiver: ${PI_ENABLE_IR} (GPIO ${PI_IR_GPIO_PIN}, protocol ${PI_IR_PRO
 echo "Bluetooth: ${PI_ENABLE_BLUETOOTH}"
 echo "boot splash: ${PI_ENABLE_BOOT_SPLASH}"
 echo "rootfs margin: ${PI_IMAGE_ROOT_MARGIN_MB} MB"
+echo "runtime bundle: ${PI_RUNTIME_BUNDLE_DIR:-build from source}"
 
 (
     cd "$PI_GEN_DIR"
