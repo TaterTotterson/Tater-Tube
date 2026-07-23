@@ -36,9 +36,13 @@ PI240_RUNTIME_PACKAGES=(
     libasound2t64
     libevdev2
     libopus0
+    libopusfile0
     libcurl4t64
     libexpat1
     libavahi-client3
+    libzip5
+    libtinyxml2-11
+    libspdlog1.15
 )
 
 PI240_MOONLIGHT_BUILD_PACKAGES=(

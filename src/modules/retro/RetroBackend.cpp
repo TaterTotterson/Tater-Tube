@@ -9,11 +9,13 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QScreen>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QTimer>
@@ -65,6 +67,96 @@ QSize activeCompositeDisplayMode()
     }
 #endif
     return {};
+}
+
+QSize activeWideDisplayMode()
+{
+    QScreen *screen = QGuiApplication::primaryScreen();
+    if (!screen)
+        return {};
+
+    const QSize size = screen->size();
+    if (size.width() < 640 || size.height() < 480
+        || size.width() * 2 <= size.height() * 3) {
+        return {};
+    }
+    return size;
+}
+
+QString managedPortConfigName(const QString &portId)
+{
+    if (portId == QLatin1String("2ship2harkinian"))
+        return QStringLiteral("2ship2harkinian.json");
+    if (portId == QLatin1String("shipwright"))
+        return QStringLiteral("shipofharkinian.json");
+    if (portId == QLatin1String("spaghettikart"))
+        return QStringLiteral("spaghettify.cfg.json");
+    if (portId == QLatin1String("starship"))
+        return QStringLiteral("starship.cfg.json");
+    return {};
+}
+
+void prepareManagedPortConfig(const QString &portId,
+                              const QString &userRoot,
+                              const QSize &wideDisplayMode)
+{
+    const QString configName = managedPortConfigName(portId);
+    if (configName.isEmpty())
+        return;
+
+    const QString configPath = QDir(userRoot).absoluteFilePath(configName);
+    QJsonObject root;
+    QFile input(configPath);
+    if (input.exists()) {
+        if (!input.open(QIODevice::ReadOnly))
+            return;
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(input.readAll(), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+            return;
+        root = document.object();
+    }
+
+    QJsonObject window = root.value(QStringLiteral("Window")).toObject();
+    bool changed = false;
+    const QString audioBackend =
+        window.value(QStringLiteral("AudioBackend")).toString().trimmed().toLower();
+    if (audioBackend.isEmpty() || audioBackend == QLatin1String("null")) {
+        window.insert(QStringLiteral("AudioBackend"), QStringLiteral("sdl"));
+        changed = true;
+    }
+
+    if (wideDisplayMode.isValid()) {
+        QJsonObject fullscreen =
+            window.value(QStringLiteral("Fullscreen")).toObject();
+        if (!fullscreen.contains(QStringLiteral("Enabled"))) {
+            fullscreen.insert(QStringLiteral("Enabled"), true);
+            changed = true;
+        }
+        if (!fullscreen.contains(QStringLiteral("Width"))) {
+            fullscreen.insert(QStringLiteral("Width"), wideDisplayMode.width());
+            changed = true;
+        }
+        if (!fullscreen.contains(QStringLiteral("Height"))) {
+            fullscreen.insert(QStringLiteral("Height"), wideDisplayMode.height());
+            changed = true;
+        }
+        window.insert(QStringLiteral("Fullscreen"), fullscreen);
+    }
+
+    if (!changed)
+        return;
+
+    root.insert(QStringLiteral("Window"), window);
+    QDir().mkpath(userRoot);
+    QSaveFile output(configPath);
+    if (!output.open(QIODevice::WriteOnly))
+        return;
+    output.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    if (output.commit()) {
+        qInfo("[RetroBackend] updated managed port defaults: %s",
+              qPrintable(configPath));
+    }
 }
 
 QString normalizedRemotePath(QString path)
@@ -142,6 +234,22 @@ QString connectedPiHdmiAudioCard()
     }
 #endif
     return QString();
+}
+
+QString connectedPiAudioDevice()
+{
+#ifdef Q_OS_LINUX
+    // Composite output on the Pi uses the analogue Headphones device.
+    if (QFile::exists(QStringLiteral("/sys/class/drm/card1-Composite-1"))
+            && QFile::exists(QStringLiteral("/proc/asound/Headphones"))) {
+        return QStringLiteral("sysdefault:CARD=Headphones");
+    }
+
+    const QString hdmiCard = connectedPiHdmiAudioCard();
+    if (!hdmiCard.isEmpty())
+        return QStringLiteral("sysdefault:CARD=%1").arg(hdmiCard);
+#endif
+    return {};
 }
 
 QVariantMap loadControllerMapping(const QString &dataRoot)
@@ -1453,12 +1561,26 @@ void RetroBackend::launchLocalPort(const QString &portId, const QString &romPath
     env.remove(QStringLiteral("TATER_TUBE_CRT_WIDTH"));
     env.remove(QStringLiteral("TATER_TUBE_CRT_HEIGHT"));
 #ifdef Q_OS_LINUX
+    // SDL's default ALSA device can point at a disconnected Pi HDMI port.
+    // Route only the native game-port child to the connector Tater Tube is
+    // displaying on, without changing mpv or the app-wide audio environment.
+    const QString piAudioDevice = connectedPiAudioDevice();
+    if (!piAudioDevice.isEmpty()) {
+        env.insert(QStringLiteral("SDL_AUDIODRIVER"), QStringLiteral("alsa"));
+        env.insert(QStringLiteral("AUDIODEV"), piAudioDevice);
+        env.insert(QStringLiteral("SDL_AUDIO_ALSA_DEFAULT_DEVICE"), piAudioDevice);
+    }
+#endif
+#ifdef Q_OS_LINUX
     // Native ports must not inherit the app's private library stack. Keeping
     // only sibling port libraries avoids mixing incompatible dependency sets.
     env.insert(QStringLiteral("LD_LIBRARY_PATH"), QFileInfo(engine).absolutePath());
 #endif
 
     const QSize compositeMode = activeCompositeDisplayMode();
+    const QSize wideDisplayMode =
+        compositeMode.isValid() ? QSize() : activeWideDisplayMode();
+    prepareManagedPortConfig(port.id, userRoot, wideDisplayMode);
     if (compositeMode.isValid()) {
         env.insert(QStringLiteral("TATER_TUBE_CRT_WIDTH"),
                    QString::number(compositeMode.width()));
