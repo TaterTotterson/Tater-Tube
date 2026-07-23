@@ -51,7 +51,7 @@ cmake -S "${SOURCE_DIR}" -B "${BUILD_DIR}" -G Ninja \
 cmake --build "${BUILD_DIR}" --target GeneratePortO2R --parallel "${BUILD_JOBS}"
 cmake --build "${BUILD_DIR}" --parallel "${BUILD_JOBS}"
 
-install -m 0755 "${BUILD_DIR}/Starship" "${OUTPUT_DIR}/Starship"
+install -m 0755 "${BUILD_DIR}/Starship" "${OUTPUT_DIR}/starship-bin"
 install -m 0644 "${BUILD_DIR}/starship.o2r" "${OUTPUT_DIR}/starship.o2r"
 install -m 0644 "${SOURCE_DIR}/config.yml" "${OUTPUT_DIR}/config.yml"
 cmake -E make_directory "${OUTPUT_DIR}/assets"
@@ -87,7 +87,7 @@ for support_path in config.yml assets; do
     fi
 done
 cd "${user_root}"
-exec "${engine_dir}/Starship" "$@"
+exec "${engine_dir}/starship-bin" "$@"
 EOF
 chmod 0755 "${OUTPUT_DIR}/starship"
 

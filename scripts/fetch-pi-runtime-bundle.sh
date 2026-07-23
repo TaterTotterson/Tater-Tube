@@ -48,7 +48,7 @@ for required_path in \
     ports/2ship2harkinian/2s2h.elf \
     ports/shipwright/soh.elf \
     ports/spaghettikart/Spaghettify \
-    ports/starship/Starship \
+    ports/starship/starship-bin \
     ports/dusklight/dusklight-bin; do
     test -f "${OUTPUT_DIR}/${required_path}"
 done

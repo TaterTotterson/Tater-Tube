@@ -32,7 +32,7 @@ fi
 if [ ! -x /opt/240mp/share/240mp/vendor/ports/spaghettikart/Spaghettify ]; then
     SPAGHETTIKART_BUILD_JOBS=3 /opt/240mp-src/scripts/build-spaghettikart-port.sh /opt/240mp/share/240mp/vendor/ports/spaghettikart
 fi
-if [ ! -x /opt/240mp/share/240mp/vendor/ports/starship/Starship ]; then
+if [ ! -x /opt/240mp/share/240mp/vendor/ports/starship/starship-bin ]; then
     STARSHIP_BUILD_JOBS=3 /opt/240mp-src/scripts/build-starship-port.sh /opt/240mp/share/240mp/vendor/ports/starship
 fi
 if [ ! -x /opt/240mp/share/240mp/vendor/ports/dusklight/dusklight-bin ]; then

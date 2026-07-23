@@ -22,7 +22,7 @@ for required_path in \
     ports/spaghettikart/Spaghettify \
     ports/spaghettikart/LICENSES/libultraship.txt \
     ports/spaghettikart/SOURCE.txt \
-    ports/starship/Starship \
+    ports/starship/starship-bin \
     ports/starship/LICENSES/Starship.txt \
     ports/starship/SOURCE.txt \
     ports/dusklight/dusklight-bin \
