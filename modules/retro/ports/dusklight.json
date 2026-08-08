@@ -15,6 +15,7 @@
     "GC"
   ],
   "romExtensions": [
+    "nkit.iso",
     "iso",
     "gcm",
     "ciso",

@@ -130,7 +130,8 @@ nod compatibility patch: ${NOD_PATCH_NOTE}
 Build options: Release, Vulkan, updater/Discord/Sentry disabled
 License: CC0-1.0 (Aurora is MIT)
 No Twilight Princess disc image, extracted game asset, BIOS, save, or credential is included.
-At runtime Dusklight reads a supported user-owned GameCube USA or EUR disc image directly.
+At runtime Dusklight reads a supported user-owned GameCube USA or EUR disc image directly,
+including legacy NKit images when the bundled disc loader can open their filesystem.
 EOF
 
 if find "${OUTPUT_DIR}" -type f \

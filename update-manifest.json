@@ -1,14 +1,15 @@
 {
-  "version": "v1.8.2",
-  "app_version": "1.8.2",
+  "version": "v1.8.5",
+  "app_version": "1.8.5",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.8.2/Tater-Tube-v1.8.2-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.8.2.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.8.5/Tater-Tube-v1.8.5-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.8.5.tar.gz",
   "notes": [
-    "Sorts every Game Center system and game list alphabetically, including Ports.",
-    "Automatically reconnects a saved RetroNAS share when Game Center opens after a restart or update.",
-    "Shows a clear RetroNAS connection message instead of reporting a valid cached ROM path as outside the game library."
+    "Adds explicit legacy .nkit.iso discovery for the Dusklight game port.",
+    "Checks the actual Dusklight disc partition and filesystem before launch, including images stored on RetroNAS.",
+    "Shows specific disc, region, filesystem, and timeout errors instead of a generic game-port failure.",
+    "Saves bounded per-port launch diagnostics when a native game port closes with an error."
   ]
 }

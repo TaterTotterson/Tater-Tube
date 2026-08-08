@@ -62,7 +62,18 @@ bool folderMatches(const GamePortDefinition &port, const QString &folder)
 
 bool extensionMatches(const GamePortDefinition &port, const QString &path)
 {
-    return port.romExtensions.contains(QFileInfo(path).suffix(), Qt::CaseInsensitive);
+    const QString fileName = QFileInfo(path).fileName();
+    for (QString extension : port.romExtensions) {
+        extension = extension.trimmed();
+        while (extension.startsWith(QLatin1Char('.')))
+            extension.remove(0, 1);
+        if (!extension.isEmpty()
+            && fileName.endsWith(QLatin1Char('.') + extension,
+                                 Qt::CaseInsensitive)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 QCryptographicHash::Algorithm hashAlgorithm(const QString &name, bool *ok)
@@ -108,8 +119,28 @@ QString fileHashCacheKey(const QFileInfo &info, const QString &algorithm)
         .arg(info.lastModified().toMSecsSinceEpoch());
 }
 
+QString engineValidationFailure(const GamePortDefinition &port,
+                                const QByteArray &output)
+{
+    if (port.id == QLatin1String("dusklight")) {
+        if (output.contains("TATER_DUSKLIGHT_ERROR=disc-not-readable"))
+            return QStringLiteral("DUSKLIGHT COULD NOT READ THE DISC IMAGE");
+        if (output.contains("TATER_DUSKLIGHT_ERROR=invalid-disc-image"))
+            return QStringLiteral("THIS IS NOT A VALID GAMECUBE DISC IMAGE");
+        if (output.contains("TATER_DUSKLIGHT_ERROR=wrong-game"))
+            return QStringLiteral("DUSKLIGHT REQUIRES A TWILIGHT PRINCESS DISC IMAGE");
+        if (output.contains("TATER_DUSKLIGHT_ERROR=unsupported-region-or-version"))
+            return QStringLiteral("DUSKLIGHT SUPPORTS GAMECUBE USA OR EUR RELEASES");
+        if (output.contains("TATER_DUSKLIGHT_ERROR=disc-filesystem-open-failed")) {
+            return QStringLiteral(
+                "DUSKLIGHT COULD NOT OPEN THE DISC FILESYSTEM. CHECK THE IMAGE OR RETRONAS CONNECTION");
+        }
+    }
+    return QStringLiteral("THE SELECTED ROM IS NOT A SUPPORTED ORIGINAL DUMP");
+}
+
 bool engineValidatesRom(const GamePortDefinition &port, const QString &enginePath,
-                        const QFileInfo &romInfo)
+                        const QFileInfo &romInfo, QString *validationError)
 {
     const QFileInfo engineInfo(enginePath);
     if (!engineInfo.isFile() || !engineInfo.isExecutable()
@@ -134,14 +165,34 @@ bool engineValidatesRom(const GamePortDefinition &port, const QString &enginePat
 #endif
     validator.setProcessEnvironment(environment);
     validator.start();
-    if (!validator.waitForStarted(5000))
-        return false;
-    if (!validator.waitForFinished(15000)) {
-        validator.kill();
-        validator.waitForFinished(1000);
+    if (!validator.waitForStarted(5000)) {
+        if (validationError)
+            *validationError = QStringLiteral("THE GAME PORT VALIDATOR COULD NOT START");
         return false;
     }
-    return validator.exitStatus() == QProcess::NormalExit && validator.exitCode() == 0;
+    if (!validator.waitForFinished(30000)) {
+        validator.kill();
+        validator.waitForFinished(1000);
+        qWarning("[game-port] %s disc validation timed out: %s",
+                 qPrintable(port.id), qPrintable(romInfo.absoluteFilePath()));
+        if (validationError)
+            *validationError = QStringLiteral("DISC VALIDATION TIMED OUT. CHECK THE RETRONAS CONNECTION");
+        return false;
+    }
+    const bool valid = validator.exitStatus() == QProcess::NormalExit
+        && validator.exitCode() == 0;
+    const QByteArray output = validator.readAll().trimmed().right(4096);
+    if (!valid) {
+        qWarning("[game-port] %s rejected disc %s%s%s",
+                 qPrintable(port.id), qPrintable(romInfo.absoluteFilePath()),
+                 output.isEmpty() ? "" : ": ", output.constData());
+        if (validationError)
+            *validationError = engineValidationFailure(port, output);
+    } else if (!output.isEmpty()) {
+        qInfo("[game-port] %s disc preflight: %s",
+              qPrintable(port.id), output.constData());
+    }
+    return valid;
 }
 
 QString executableIn(const QString &path, const QStringList &names,
@@ -378,7 +429,8 @@ bool GamePortCatalog::romMatches(const GamePortDefinition &port,
                                  const QString &path,
                                  QString *stagedFileName,
                                  QHash<QString, QByteArray> *hashCache,
-                                 const QString &enginePath)
+                                 const QString &enginePath,
+                                 QString *validationError)
 {
     const QFileInfo info(path);
     if (!info.isFile() || !info.isReadable() || info.size() <= 0
@@ -404,7 +456,8 @@ bool GamePortCatalog::romMatches(const GamePortDefinition &port,
             info, validatorIdentity);
         auto cachedResult = cache->constFind(cacheKey);
         if (cachedResult == cache->constEnd()) {
-            const QByteArray result = engineValidatesRom(port, enginePath, info)
+            const QByteArray result = engineValidatesRom(
+                port, enginePath, info, validationError)
                 ? QByteArrayLiteral("match") : QByteArrayLiteral("miss");
             cachedResult = cache->insert(cacheKey, result);
         }
@@ -478,9 +531,13 @@ bool GamePortCatalog::stageRom(const GamePortDefinition &port,
                                const QString &enginePath)
 {
     QString fileName;
-    if (!romMatches(port, sourcePath, &fileName, nullptr, enginePath)) {
+    QString validationError;
+    if (!romMatches(port, sourcePath, &fileName, nullptr, enginePath,
+                    &validationError)) {
         if (error)
-            *error = QStringLiteral("THE SELECTED ROM IS NOT A SUPPORTED ORIGINAL DUMP");
+            *error = validationError.isEmpty()
+                ? QStringLiteral("THE SELECTED ROM IS NOT A SUPPORTED ORIGINAL DUMP")
+                : validationError;
         return false;
     }
 

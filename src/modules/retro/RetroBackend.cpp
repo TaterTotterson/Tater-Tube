@@ -48,6 +48,37 @@ constexpr const char *kGameCacheFile = "game-cache.json";
 constexpr const char *kPortRomHashCacheFile = "port-rom-hashes.json";
 constexpr int kGameCacheVersion = 5;
 constexpr const char *kPortsSystemId = "ports";
+constexpr qsizetype kMaximumGamePortOutputBytes = 64 * 1024;
+
+void appendGamePortOutput(QByteArray *output, const QByteArray &chunk)
+{
+    if (!output || chunk.isEmpty())
+        return;
+    output->append(chunk);
+    if (output->size() > kMaximumGamePortOutputBytes)
+        output->remove(0, output->size() - kMaximumGamePortOutputBytes);
+}
+
+QString gamePortFailureMessage(const QString &portId, const QByteArray &output,
+                               const QString &logPath)
+{
+    if (portId == QLatin1String("dusklight")) {
+        const QByteArray lower = output.toLower();
+        if (lower.contains("failed to open dvd image")
+            || lower.contains("disc-filesystem-open-failed")) {
+            return QStringLiteral(
+                "DUSKLIGHT COULD NOT READ THE DISC IMAGE. CHECK RETRONAS ACCESS OR DISC FORMAT");
+        }
+        if (lower.contains("dvd image from command line failed validation")) {
+            return QStringLiteral(
+                "DUSKLIGHT DOES NOT SUPPORT THIS GAME OR DISC REGION");
+        }
+    }
+
+    return logPath.isEmpty()
+        ? QStringLiteral("GAME PORT CLOSED WITH AN ERROR")
+        : QStringLiteral("GAME PORT CLOSED WITH AN ERROR. LOG SAVED TO %1").arg(logPath);
+}
 
 QSize activeCompositeDisplayMode()
 {
@@ -1540,6 +1571,8 @@ void RetroBackend::launchLocalPort(const QString &portId, const QString &romPath
 
     QDir().mkpath(userRoot);
     m_currentTitle = port.title;
+    m_currentPortId = port.id;
+    m_gamePortOutput.clear();
     m_processLogName = QStringLiteral("game-port");
     m_processFailureMessage = QStringLiteral("GAME PORT CLOSED WITH AN ERROR");
     m_process = new QProcess(this);
@@ -1547,6 +1580,7 @@ void RetroBackend::launchLocalPort(const QString &portId, const QString &romPath
     m_process->setProcessChannelMode(QProcess::MergedChannels);
     connect(m_process, &QProcess::readyRead, this, [this]() {
         const QByteArray out = m_process ? m_process->readAll() : QByteArray();
+        appendGamePortOutput(&m_gamePortOutput, out);
         if (!out.isEmpty())
             qWarning("[%s] %s", qPrintable(m_processLogName), out.trimmed().constData());
     });
@@ -1720,9 +1754,11 @@ void RetroBackend::onProcessFinished(int exitCode, QProcess::ExitStatus exitStat
 {
     const QString logName = m_processLogName;
     const QString failureMessage = m_processFailureMessage;
+    const QString portId = m_currentPortId;
     QProcess *finished = m_process;
     if (finished) {
         const QByteArray remaining = finished->readAll();
+        appendGamePortOutput(&m_gamePortOutput, remaining);
         if (!remaining.isEmpty())
             qWarning("[%s] %s", qPrintable(logName), remaining.trimmed().constData());
         finished->deleteLater();
@@ -1735,9 +1771,32 @@ void RetroBackend::onProcessFinished(int exitCode, QProcess::ExitStatus exitStat
 
     if (exitStatus != QProcess::NormalExit || exitCode != 0) {
         qWarning("[RetroBackend] %s exited with code %d", qPrintable(logName), exitCode);
-        emit errorOccurred(failureMessage);
+        QString errorMessage = failureMessage;
+        if (!portId.isEmpty()) {
+            const QString logDirectory = QDir(m_dataRoot).absoluteFilePath(
+                QStringLiteral("logs"));
+            const QString logPath = QDir(logDirectory).absoluteFilePath(
+                QStringLiteral("game-port-%1.log").arg(portId));
+            QDir().mkpath(logDirectory);
+            QSaveFile log(logPath);
+            QString savedLogPath;
+            if (log.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                log.write("PORT_ID=" + portId.toUtf8() + '\n');
+                log.write("EXIT_CODE=" + QByteArray::number(exitCode) + '\n');
+                log.write("EXIT_STATUS="
+                          + QByteArray::number(static_cast<int>(exitStatus)) + "\n\n");
+                log.write(m_gamePortOutput);
+                if (log.commit())
+                    savedLogPath = logPath;
+            }
+            errorMessage = gamePortFailureMessage(
+                portId, m_gamePortOutput, savedLogPath);
+        }
+        emit errorOccurred(errorMessage);
     }
 
+    m_currentPortId.clear();
+    m_gamePortOutput.clear();
     m_processLogName = QStringLiteral("retroarch");
     m_processFailureMessage = QStringLiteral("RETROARCH PLAYBACK FAILED");
 }

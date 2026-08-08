@@ -50,13 +50,16 @@ port-owned `starship.o2r` are bundled. Developers can rebuild it with
 
 The Dusklight integration is built from pinned 1.4.1 CC0 source. It accepts the
 upstream-supported GameCube USA and EUR releases in ISO/GCM, CISO, GCZ, NFS,
-RVZ, WBFS, WIA, or TGC form. Because compressed disc images do not have stable
-whole-file hashes, Dusklight performs the game and supported-region check
-itself. Game Center passes the read-only RetroNAS path directly to the engine
-instead of copying a multi-gigabyte image into local storage. Its normal quit
-menu is labelled **Exit to Tater Tube**. Developers can rebuild it with
-`scripts/build-dusklight-port.sh`. Linux requires Vulkan; Raspberry Pi support
-therefore depends on a working Mesa V3DV driver and suitable performance.
+RVZ, WBFS, WIA, or TGC form. Game Center also recognizes legacy `.nkit.iso`
+images and uses them directly when Dusklight's disc loader can open their data
+partition and filesystem. Because compressed disc images do not have stable
+whole-file hashes, the preflight checks the game, supported region, and actual
+disc filesystem instead. Game Center passes the read-only RetroNAS path
+directly to the engine instead of copying a multi-gigabyte image into local
+storage. Its normal quit menu is labelled **Exit to Tater Tube**. Developers
+can rebuild it with `scripts/build-dusklight-port.sh`. Linux requires Vulkan;
+Raspberry Pi support therefore depends on a working Mesa V3DV driver and
+suitable performance.
 
 For development, `TATER_TUBE_SM64COOPDX` may point directly to the executable or
 its containing directory.

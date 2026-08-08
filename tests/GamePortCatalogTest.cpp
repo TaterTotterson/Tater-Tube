@@ -16,6 +16,7 @@ private slots:
     void discoversValidatesAndStagesPort();
     void reusesHashesAcrossRequirementsAndPorts();
     void streamsEngineValidatedDiscWithoutCopying();
+    void recognizesMultiPartRomExtensions();
     void detectsCompositeDisplayModes();
 };
 
@@ -234,6 +235,36 @@ void GamePortCatalogTest::streamsEngineValidatedDiscWithoutCopying()
         port, QStringLiteral("/ports/dusklight"), launchedPath,
         GamePortCatalog::portUserRoot(dataRoot, port));
     QCOMPARE(arguments, QStringList({QStringLiteral("--dvd"), launchedPath}));
+
+    const QString rejectedValidatorPath = temporary.filePath(
+        QStringLiteral("dusklight-rejected"));
+    QFile rejectedValidator(rejectedValidatorPath);
+    QVERIFY(rejectedValidator.open(QIODevice::WriteOnly | QIODevice::Text));
+    QVERIFY(rejectedValidator.write(
+        "#!/bin/sh\necho TATER_DUSKLIGHT_ERROR=unsupported-region-or-version >&2\nexit 1\n") > 0);
+    rejectedValidator.close();
+    QVERIFY(QFile::setPermissions(
+        rejectedValidatorPath,
+        QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+    QVERIFY(!GamePortCatalog::stageRom(
+        port, discPath, dataRoot, &launchedPath, &stageError,
+        rejectedValidatorPath));
+    QCOMPARE(stageError,
+             QStringLiteral("DUSKLIGHT SUPPORTS GAMECUBE USA OR EUR RELEASES"));
+}
+
+void GamePortCatalogTest::recognizesMultiPartRomExtensions()
+{
+    GamePortDefinition port;
+    port.romFolders = {QStringLiteral("GameCube")};
+    port.romExtensions = {QStringLiteral("nkit.iso")};
+
+    QVERIFY(GamePortCatalog::remotePathCanProvideRom(
+        port, QStringLiteral("GameCube/Twilight Princess.NKIT.ISO")));
+    QVERIFY(!GamePortCatalog::remotePathCanProvideRom(
+        port, QStringLiteral("GameCube/Twilight Princess.iso")));
+    QVERIFY(!GamePortCatalog::remotePathCanProvideRom(
+        port, QStringLiteral("Wii/Twilight Princess.nkit.iso")));
 }
 
 void GamePortCatalogTest::detectsCompositeDisplayModes()

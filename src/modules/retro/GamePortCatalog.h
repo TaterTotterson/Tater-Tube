@@ -52,7 +52,8 @@ public:
                            const QString &path,
                            QString *stagedFileName = nullptr,
                            QHash<QString, QByteArray> *hashCache = nullptr,
-                           const QString &enginePath = QString());
+                           const QString &enginePath = QString(),
+                           QString *validationError = nullptr);
     static QString findMatchingRom(const GamePortDefinition &port,
                                    const QStringList &candidates,
                                    QString *stagedFileName = nullptr,

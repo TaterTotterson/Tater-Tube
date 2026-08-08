@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QObject>
 #include <QFutureWatcher>
 #include <QHash>
@@ -138,6 +139,8 @@ private:
     QProcess *m_coreInstallProcess = nullptr;
     QFutureWatcher<QVariantMap> *m_gameCacheWatcher = nullptr;
     QString m_currentTitle;
+    QString m_currentPortId;
+    QByteArray m_gamePortOutput;
     QString m_processLogName = QStringLiteral("retroarch");
     QString m_processFailureMessage = QStringLiteral("RETROARCH PLAYBACK FAILED");
     QString m_coreInstallStatus;
