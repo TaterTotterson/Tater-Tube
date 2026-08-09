@@ -1,4 +1,4 @@
 PI_RUNTIME_BUNDLE_REPOSITORY=TaterTotterson/Tater-Tube
-PI_RUNTIME_BUNDLE_TAG=runtime-linux-arm64-v4
-PI_RUNTIME_BUNDLE_FILE=Tater-Tube-runtime-linux-arm64-v4.tar.gz
-PI_RUNTIME_BUNDLE_SHA256=2b4b6e2e02fa77cf7b3ba546793a9ee80e896d9f8bf6cc5d6ba4e7ab619437c6
+PI_RUNTIME_BUNDLE_TAG=runtime-linux-arm64-v5
+PI_RUNTIME_BUNDLE_FILE=Tater-Tube-runtime-linux-arm64-v5.tar.gz
+PI_RUNTIME_BUNDLE_SHA256=614fb099908dc9accae338a83f1b83fb5841ef532eddbc63e8f2cd1e0a5af086

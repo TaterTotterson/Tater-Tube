@@ -27,6 +27,7 @@ struct GamePortDefinition {
     QString romAccess = QStringLiteral("copy");
     QStringList romFolders;
     QStringList romExtensions;
+    QStringList romNameHints;
     QList<GamePortRomRequirement> romRequirements;
     QMap<QString, QStringList> executables;
     QStringList validationArguments;

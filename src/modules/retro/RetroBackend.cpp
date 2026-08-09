@@ -1210,8 +1210,6 @@ void RetroBackend::mount_retronas(const QString &host,
 
 #ifndef Q_OS_LINUX
     const bool ready = QDir(gamesRoot()).exists();
-    if (ready)
-        clearGameCache();
     emit mountFinished(ready,
                        ready
                            ? QStringLiteral("LOCAL ROM PATH READY")
@@ -1257,8 +1255,9 @@ void RetroBackend::mount_retronas(const QString &host,
 
     const QString output = QString::fromUtf8(process.readAll()).trimmed();
     const bool ok = process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
-    if (ok)
-        clearGameCache();
+    // A successful automatic reconnect to the same share does not change the
+    // library. Preserve the game cache; settings changes and the explicit
+    // Refresh Library action already invalidate it when required.
     emit authStateChanged();
     emit mountFinished(ok, ok
         ? QStringLiteral("RETRONAS READY")

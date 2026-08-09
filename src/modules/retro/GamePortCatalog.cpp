@@ -296,6 +296,7 @@ QList<GamePortDefinition> GamePortCatalog::load(const QString &appRoot,
                              .toString(QStringLiteral("copy")).trimmed().toLower();
         port.romFolders = jsonStringList(object.value(QStringLiteral("romFolders")));
         port.romExtensions = jsonStringList(object.value(QStringLiteral("romExtensions")));
+        port.romNameHints = jsonStringList(object.value(QStringLiteral("romNameHints")));
         port.validationArguments = jsonStringList(
             object.value(QStringLiteral("validationArguments")));
         port.launchArguments = jsonStringList(object.value(QStringLiteral("launchArguments")));
@@ -531,7 +532,21 @@ QStringList GamePortCatalog::findRomCandidates(const GamePortDefinition &port,
         }
     }
     result.removeDuplicates();
-    result.sort(Qt::CaseInsensitive);
+    std::sort(result.begin(), result.end(), [&port](const QString &left,
+                                                    const QString &right) {
+        const auto isHinted = [&port](const QString &path) {
+            const QString fileName = QFileInfo(path).fileName();
+            return std::any_of(port.romNameHints.cbegin(), port.romNameHints.cend(),
+                               [&fileName](const QString &hint) {
+                return fileName.contains(hint, Qt::CaseInsensitive);
+            });
+        };
+        const bool leftHinted = isHinted(left);
+        const bool rightHinted = isHinted(right);
+        if (leftHinted != rightHinted)
+            return leftHinted;
+        return QString::compare(left, right, Qt::CaseInsensitive) < 0;
+    });
     return result;
 }
 

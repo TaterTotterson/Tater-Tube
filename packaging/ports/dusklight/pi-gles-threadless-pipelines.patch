@@ -1,0 +1,98 @@
+diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
+index 274aedd..87bdd17 100644
+--- a/lib/gfx/pipeline_cache.cpp
++++ b/lib/gfx/pipeline_cache.cpp
+@@ -3,2 +3,3 @@
+ #include "clear.hpp"
++#include "render_worker.hpp"
+ #include "../fs_helper.hpp"
+@@ -463,2 +464,13 @@ static PipelineRef g_lastPipelineRef = std::numeric_limits<PipelineRef>::max();
+-
++
++static gl::Pipeline create_pipeline_on_render_worker(NewPipelineCallback cb) {
++  if (!render_worker::is_running() || render_worker::is_worker_thread()) {
++    return cb();
++  }
++
++  auto result = std::make_shared<std::optional<gl::Pipeline>>();
++  render_worker::enqueue_work([cb = std::move(cb), result]() mutable { result->emplace(cb()); });
++  render_worker::synchronize();
++  return std::move(result->value());
++}
++
+ template <typename PipelineConfig>
+@@ -481,2 +493,3 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+   bool queued = false;
++  std::optional<PendingPipeline> pipelineToCreate;
+   std::optional<PipelineCacheWrite> cacheWrite;
+@@ -501,9 +514,3 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+           }
+-          g_pipelines.try_emplace(hash, CachedPipeline{
+-                                            .pipeline = pending->create(),
+-                                            .firstFrameUsed = pending->firstFrameUsed,
+-                                        });
+-          pipelineReady = true;
+-          ++g_pipelinesPerFrame;
+-          createdPipeline = true;
++          pipelineToCreate.emplace(std::move(*pending));
+           queued = true;
+@@ -523,7 +530,7 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+     } else if (!g_hasPipelineThread && (blocking || g_pipelinesPerFrame < BuildPipelinesPerFrame)) {
+-      g_pipelines.try_emplace(hash, CachedPipeline{
+-                                        .pipeline = cb(),
+-                                        .firstFrameUsed = firstFrameUsed,
+-                                    });
+-      pipelineReady = true;
++      pipelineToCreate.emplace(PendingPipeline{
++          .hash = hash,
++          .firstFrameUsed = firstFrameUsed,
++          .create = std::move(cb),
++      });
+       if (persist) {
+@@ -531,4 +538,2 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+       }
+-      ++g_pipelinesPerFrame;
+-      createdPipeline = true;
+     } else {
+@@ -558,3 +563,17 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+   }
+-
++
++  if (pipelineToCreate) {
++    auto pipeline = create_pipeline_on_render_worker(std::move(pipelineToCreate->create));
++    {
++      std::scoped_lock guard{g_pipelineMutex};
++      g_pipelines.try_emplace(hash, CachedPipeline{
++                                        .pipeline = std::move(pipeline),
++                                        .firstFrameUsed = pipelineToCreate->firstFrameUsed,
++                                    });
++      ++g_pipelinesPerFrame;
++    }
++    pipelineReady = true;
++    createdPipeline = true;
++  }
++
+   if (cacheWrite) {
+@@ -1279,3 +1298,4 @@ void end_pipeline_frame() {
+   if (!g_hasPipelineThread) {
+-    pipeline_worker();
++    render_worker::enqueue_work(pipeline_worker);
++    render_worker::synchronize();
+   }
+diff --git a/lib/gl/context.cpp b/lib/gl/context.cpp
+index 7aff849..0c1d37a 100644
+--- a/lib/gl/context.cpp
++++ b/lib/gl/context.cpp
+@@ -5,3 +5,5 @@
+ #include <SDL3/SDL_video.h>
+-
++
++#include <cstdlib>
++
+ namespace aurora::gl {
+@@ -192,2 +194,5 @@ bool make_none_current() {
+ bool has_share_context() {
++  if (std::getenv("AURORA_GL_DISABLE_PIPELINE_THREAD") != nullptr) {
++    return false;
++  }
+   if (g_mode == ContextMode::Desktop) {

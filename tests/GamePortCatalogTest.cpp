@@ -179,6 +179,12 @@ void GamePortCatalogTest::streamsEngineValidatedDiscWithoutCopying()
     QVERIFY(disc.open(QIODevice::WriteOnly));
     QCOMPARE(disc.write("engine-validated-disc"), qint64(21));
     disc.close();
+    const QString unrelatedDiscPath = QDir(gamesRoot).filePath(
+        QStringLiteral("Nintendo/GameCube/iso/AAAA Unrelated Game.rvz"));
+    QFile unrelatedDisc(unrelatedDiscPath);
+    QVERIFY(unrelatedDisc.open(QIODevice::WriteOnly));
+    QCOMPARE(unrelatedDisc.write("unrelated-disc"), qint64(14));
+    unrelatedDisc.close();
 
     QJsonObject executableMap;
     executableMap.insert(GamePortCatalog::currentPlatformKey(),
@@ -192,6 +198,7 @@ void GamePortCatalogTest::streamsEngineValidatedDiscWithoutCopying()
         {QStringLiteral("romAccess"), QStringLiteral("direct")},
         {QStringLiteral("romFolders"), QJsonArray{QStringLiteral("GameCube")}},
         {QStringLiteral("romExtensions"), QJsonArray{QStringLiteral("rvz")}},
+        {QStringLiteral("romNameHints"), QJsonArray{QStringLiteral("twilight princess")}},
         {QStringLiteral("executables"), executableMap},
         {QStringLiteral("validationArguments"), QJsonArray{
              QStringLiteral("--validate"), QStringLiteral("{romPath}")}},
@@ -213,7 +220,7 @@ void GamePortCatalogTest::streamsEngineValidatedDiscWithoutCopying()
     QCOMPARE(port.romAccess, QStringLiteral("direct"));
 
     const QStringList candidates = GamePortCatalog::findRomCandidates(port, gamesRoot);
-    QCOMPARE(candidates, QStringList{discPath});
+    QCOMPARE(candidates, QStringList({discPath, unrelatedDiscPath}));
     QString matchedFolder;
     QString contentPath;
     QVERIFY(GamePortCatalog::splitLibraryPath(

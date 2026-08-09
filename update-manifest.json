@@ -1,14 +1,15 @@
 {
-  "version": "v1.9.1",
-  "app_version": "1.9.1",
+  "version": "v1.9.2",
+  "app_version": "1.9.2",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.1/Tater-Tube-v1.9.1-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.1.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.2/Tater-Tube-v1.9.2-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.2.tar.gz",
   "notes": [
-    "Reconnects Raspberry Pi Game Center to the newly selected RetroNAS host or share instead of retaining an older mounted share.",
-    "Automatically rebuilds the game list after RetroNAS connection or ROM-path changes without requiring a reboot.",
-    "Applies the complete Game Center setup before reconnecting, preventing premature scans and blank libraries while settings are being saved."
+    "Fixes Dusklight's audio-only black screen on Raspberry Pi 4 and Pi 5 by compiling OpenGL ES pipelines on the render worker that owns the graphics context.",
+    "Tunes Dusklight for Raspberry Pi with OpenGL ES, a 30 FPS target, and model-specific internal resolution defaults for Pi 4 and Pi 5.",
+    "Improves Twilight Princess and legacy NKit detection, including reliable engine validation and prioritizing likely ROM matches before unrelated GameCube images.",
+    "Preserves the Game Center library cache during unchanged RetroNAS reconnects so opening Game Center does not trigger another full scan."
   ]
 }

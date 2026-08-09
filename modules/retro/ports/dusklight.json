@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dusklight",
   "title": "Dusklight (Twilight Princess)",
-  "sourceUrl": "https://github.com/TwilitRealm/dusklight",
+  "sourceUrl": "https://github.com/bmdhacks/dusklight/tree/gles-backend",
   "distribution": "bundled-patched-engine",
   "engineEnvironment": "TATER_TUBE_DUSKLIGHT",
   "romValidation": "engine",
@@ -29,6 +29,9 @@
     "wia",
     "tgc"
   ],
+  "romNameHints": [
+    "twilight princess"
+  ],
   "executables": {
     "linux-x86_64": [
       "dusklight"
@@ -45,12 +48,15 @@
     "--dvd",
     "{romPath}",
     "--backend",
-    "vulkan",
+    "opengles",
     "--cvar",
-    "video.enableFullscreen=true"
+    "video.enableFullscreen=true",
+    "--cvar",
+    "video.enableVsync=false",
+    "--cvar",
+    "video.maxFrameRate=30",
+    "--cvar",
+    "video.decoupleSimFromRender=true"
   ],
-  "crtLaunchArguments": [
-    "--cvar",
-    "game.internalResolutionScale=1"
-  ]
+  "crtLaunchArguments": []
 }

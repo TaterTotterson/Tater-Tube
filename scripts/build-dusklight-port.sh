@@ -5,13 +5,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUTPUT_DIR="${1:?Usage: build-dusklight-port.sh OUTPUT_DIR}"
-UPSTREAM_URL="${DUSKLIGHT_URL:-https://github.com/TwilitRealm/dusklight.git}"
-UPSTREAM_REF="${DUSKLIGHT_REF:-f5642f307384bd4b7b7a09f690e391152445c815}"
+UPSTREAM_URL="${DUSKLIGHT_URL:-https://github.com/bmdhacks/dusklight.git}"
+UPSTREAM_REF="${DUSKLIGHT_REF:-eadb38b49de2c36601c6147be6faa4d79cc88f9b}"
 PATCH_FILE="${DUSKLIGHT_PATCH:-${REPO_ROOT}/packaging/ports/dusklight/tater-tube.patch}"
 NOD_PATCH_FILE="${DUSKLIGHT_NOD_PATCH:-${REPO_ROOT}/packaging/ports/dusklight/nod-rust-1.85.patch}"
+AURORA_PATCH_FILE="${DUSKLIGHT_AURORA_PATCH:-${REPO_ROOT}/packaging/ports/dusklight/pi-gles-threadless-pipelines.patch}"
 BUILD_ROOT="${DUSKLIGHT_BUILD_ROOT:-${TMPDIR:-/tmp}/tater-tube-dusklight-build}"
 BUILD_JOBS="${DUSKLIGHT_BUILD_JOBS:-3}"
-DAWN_PROVIDER="${DUSKLIGHT_DAWN_PROVIDER:-auto}"
 SOURCE_DIR="${BUILD_ROOT}/source"
 BUILD_DIR="${BUILD_ROOT}/build"
 INSTALL_DIR="${BUILD_ROOT}/install"
@@ -45,6 +45,10 @@ if [ ! -f "${NOD_PATCH_FILE}" ]; then
     echo "Dusklight nod compatibility patch not found: ${NOD_PATCH_FILE}" >&2
     exit 1
 fi
+if [ ! -f "${AURORA_PATCH_FILE}" ]; then
+    echo "Dusklight Aurora patch not found: ${AURORA_PATCH_FILE}" >&2
+    exit 1
+fi
 
 cmake -E remove_directory "${SOURCE_DIR}"
 cmake -E remove_directory "${BUILD_DIR}"
@@ -57,6 +61,8 @@ git clone --filter=blob:none --no-checkout "${UPSTREAM_URL}" "${SOURCE_DIR}"
 git -C "${SOURCE_DIR}" checkout --detach "${UPSTREAM_REF}"
 test "$(git -C "${SOURCE_DIR}" rev-parse HEAD)" = "${UPSTREAM_REF}"
 git -C "${SOURCE_DIR}" submodule update --init --recursive --depth 1
+git -C "${SOURCE_DIR}/extern/aurora" apply --check "${AURORA_PATCH_FILE}"
+git -C "${SOURCE_DIR}/extern/aurora" apply "${AURORA_PATCH_FILE}"
 git -C "${SOURCE_DIR}" apply --check "${PATCH_FILE}"
 git -C "${SOURCE_DIR}" apply "${PATCH_FILE}"
 
@@ -65,8 +71,8 @@ cmake -S "${SOURCE_DIR}" -B "${BUILD_DIR}" -G Ninja \
     -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
     -DCMAKE_DISABLE_FIND_PACKAGE_SQLite3=ON \
     -DCMAKE_DISABLE_FIND_PACKAGE_fmt=ON \
-    -DAURORA_DAWN_PROVIDER="${DAWN_PROVIDER}" \
     -DAURORA_SDL3_PROVIDER=vendor \
+    -DAURORA_SDL3_LINKAGE=static \
     -DBUILD_SHARED_LIBS=OFF \
     -DDUSK_ENABLE_DISCORD=OFF \
     -DDUSK_ENABLE_SENTRY_NATIVE=OFF \
@@ -105,9 +111,40 @@ engine_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 if [ -d "${engine_dir}/lib" ]; then
     export LD_LIBRARY_PATH="${engine_dir}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 fi
+tater_device_model="$(tr -d '\000' </proc/device-tree/model 2>/dev/null || true)"
+case "${tater_device_model}" in
+    *"Raspberry Pi"*)
+        # Mesa's Wayland/EGL stack on the Pi cannot move Aurora's shared SDL GL
+        # context to its compiler thread. Compile pipelines on the render worker
+        # instead so the game does not run with an audio-only black screen.
+        export AURORA_GL_DISABLE_PIPELINE_THREAD=1
+        ;;
+esac
 if [ "${1:-}" = "--tater-validate-disc" ]; then
     cd "${engine_dir}"
-    exec "${engine_dir}/dusklight-bin" "$@"
+    run_validation() {
+        # Dusklight currently aborts in static teardown on the Pi GLES build.
+        # Disable stdio buffering so its result marker reaches this wrapper
+        # before that unrelated shutdown assertion fires.
+        if command -v stdbuf >/dev/null 2>&1; then
+            exec stdbuf -o0 -e0 "${engine_dir}/dusklight-bin" "$@"
+        fi
+        exec "${engine_dir}/dusklight-bin" "$@"
+    }
+    if validation_output="$(run_validation "$@" 2>&1)"; then
+        validation_status=0
+    else
+        validation_status=$?
+    fi
+    printf '%s\n' "${validation_output}"
+    # The Pi GLES fork currently raises a shutdown-only CVar assertion after
+    # completing disc validation. Its explicit success marker is emitted only
+    # after the disc filesystem has opened, so normalize that known teardown
+    # failure without accepting a rejected or unreadable image.
+    case "${validation_output}" in
+        *TATER_DUSKLIGHT_DISC_FORMAT=*) exit 0 ;;
+        *) exit "${validation_status}" ;;
+    esac
 fi
 user_root="${TATER_TUBE_PORT_USER_ROOT:-}"
 if [ -z "${user_root}" ]; then
@@ -118,16 +155,35 @@ export XDG_DATA_HOME="${XDG_DATA_HOME:-${user_root}/data}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${user_root}/cache}"
 mkdir -p "${XDG_CONFIG_HOME}" "${XDG_DATA_HOME}" "${XDG_CACHE_HOME}"
 cd "${engine_dir}"
+
+# The current ARM64 renderer is tuned for the VideoCore GPUs in Raspberry Pi
+# 4 and 5. Keep the Pi 4 at half native resolution, while the Pi 5 has enough
+# headroom for a slightly sharper default. Users can still override the scale
+# in Dusklight's settings after launch.
+case "${tater_device_model}" in
+    *"Raspberry Pi 5"*) tater_resolution_scale="0.75" ;;
+    *"Raspberry Pi 4"*) tater_resolution_scale="0.5" ;;
+    *) tater_resolution_scale="" ;;
+esac
+case " $* " in
+    *"game.internalResolutionScale"*) ;;
+    *)
+        if [ -n "${tater_resolution_scale}" ]; then
+            set -- "$@" --cvar "game.internalResolutionScale=${tater_resolution_scale}"
+        fi
+        ;;
+esac
 exec "${engine_dir}/dusklight-bin" "$@"
 EOF
 chmod 0755 "${OUTPUT_DIR}/dusklight"
 
 cat > "${OUTPUT_DIR}/SOURCE.txt" <<EOF
-Dusklight 1.4.1 (${UPSTREAM_REF})
+Dusklight Pi OpenGL ES fork (${UPSTREAM_REF})
 Source: ${UPSTREAM_URL}
+Upstream: https://github.com/TwilitRealm/dusklight
 Tater Tube patch: tater-tube.patch
 nod compatibility patch: ${NOD_PATCH_NOTE}
-Build options: Release, Vulkan, updater/Discord/Sentry disabled
+Build options: Release, OpenGL ES, static SDL3, Pi threadless pipeline compilation, updater/Discord/Sentry disabled
 License: CC0-1.0 (Aurora is MIT)
 No Twilight Princess disc image, extracted game asset, BIOS, save, or credential is included.
 At runtime Dusklight reads a supported user-owned GameCube USA or EUR disc image directly,

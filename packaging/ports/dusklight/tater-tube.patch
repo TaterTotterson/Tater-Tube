@@ -68,7 +68,7 @@ diff --git a/src/m_Do/m_Do_main.cpp b/src/m_Do/m_Do_main.cpp
              ("console", "Show the Windows console window for logs", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
 +            ("tater-validate-disc", "Validate a Tater Tube disc candidate without opening a window", cxxopts::value<std::string>())
              ("dvd", "Path to DVD image file", cxxopts::value<std::string>())
-@@ -545,1 +582,26 @@ int game_main(int argc, char* argv[]) {
+@@ -545,1 +582,27 @@ int game_main(int argc, char* argv[]) {
 +    if (parsed_arg_options.count("tater-validate-disc")) {
 +        const auto path = parsed_arg_options["tater-validate-disc"].as<std::string>();
 +        dusk::iso::DiscInfo discInfo{};
@@ -91,6 +91,7 @@ diff --git a/src/m_Do/m_Do_main.cpp b/src/m_Do/m_Do_main.cpp
 +
 +        fprintf(stdout, "TATER_DUSKLIGHT_DISC_FORMAT=%s\n",
 +                tater_is_legacy_nkit_image(path.c_str()) ? "legacy-nkit" : "supported");
++        fflush(stdout);
 +        return 0;
 +    }
 +

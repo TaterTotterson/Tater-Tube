@@ -115,9 +115,11 @@ RUN STARSHIP_PATCH=/tmp/starship-tater-tube.patch \
 COPY scripts/build-dusklight-port.sh /tmp/build-dusklight-port.sh
 COPY packaging/ports/dusklight/tater-tube.patch /tmp/dusklight-tater-tube.patch
 COPY packaging/ports/dusklight/nod-rust-1.85.patch /tmp/dusklight-nod-rust.patch
+COPY packaging/ports/dusklight/pi-gles-threadless-pipelines.patch /tmp/dusklight-aurora-pi-gles.patch
 ARG DUSKLIGHT_BUILD_JOBS=3
 RUN DUSKLIGHT_PATCH=/tmp/dusklight-tater-tube.patch \
     DUSKLIGHT_NOD_PATCH=/tmp/dusklight-nod-rust.patch \
+    DUSKLIGHT_AURORA_PATCH=/tmp/dusklight-aurora-pi-gles.patch \
     DUSKLIGHT_BUILD_JOBS="${DUSKLIGHT_BUILD_JOBS}" \
     /tmp/build-dusklight-port.sh "${RUNTIME_ROOT}/ports/dusklight"
 
