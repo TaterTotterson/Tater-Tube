@@ -2901,8 +2901,16 @@ case "$action" in
         install -d -m 0755 "$mountpoint_path"
 
         if mountpoint -q "$mountpoint_path"; then
-            echo "mounted=1"
-            exit 0
+            current_source="$(findmnt -n -o SOURCE --target "$mountpoint_path" | head -n 1)"
+            desired_source="//$host/$share"
+            if [ "${current_source,,}" = "${desired_source,,}" ]; then
+                echo "mounted=1"
+                exit 0
+            fi
+
+            # The user changed the configured host or share. Replace the old
+            # mount so a successful reconnect cannot keep serving its files.
+            umount "$mountpoint_path"
         fi
 
         uid="${SUDO_UID:-1000}"

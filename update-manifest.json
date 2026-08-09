@@ -1,15 +1,14 @@
 {
-  "version": "v1.9.0",
-  "app_version": "1.9.0",
+  "version": "v1.9.1",
+  "app_version": "1.9.1",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.0/Tater-Tube-v1.9.0-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.0.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.1/Tater-Tube-v1.9.1-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.1.tar.gz",
   "notes": [
-    "Adds Nintendo 64 libraries to Game Center with ParaLLEl N64 on Raspberry Pi and Mupen64Plus-Next on Linux and SteamOS.",
-    "Uses the standard RetroNAS retronas/roms layout by default and supports manufacturer folders such as roms/nintendo/gamecube and roms/nintendo/n64 across every game system and port.",
-    "Keeps existing MiSTer-style RetroNAS folder layouts supported while improving nested ROM discovery and desktop fallback caching.",
-    "Launches Dusklight through a managed Wayland display on headless Raspberry Pi systems, fixing the window and surface creation crash."
+    "Reconnects Raspberry Pi Game Center to the newly selected RetroNAS host or share instead of retaining an older mounted share.",
+    "Automatically rebuilds the game list after RetroNAS connection or ROM-path changes without requiring a reboot.",
+    "Applies the complete Game Center setup before reconnecting, preventing premature scans and blank libraries while settings are being saved."
   ]
 }

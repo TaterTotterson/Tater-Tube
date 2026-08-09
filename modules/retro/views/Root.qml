@@ -30,6 +30,7 @@ FocusScope {
     property bool scanningLibrary: false
     property int loadingFrame: 0
     property int scanMessageIndex: 0
+    property bool savingSetup: false
     readonly property var scanMessages: [
         "CHECKING RETRONAS...",
         "READING GAME FOLDERS...",
@@ -217,23 +218,23 @@ FocusScope {
             statusText = "NO GAME RUNTIME IS AVAILABLE"
             return
         }
+        if (!automaticMountAttempted
+                && (status.localPath || "") === ""
+                && (status.host || "") !== "") {
+            automaticMountAttempted = true
+            mounting = true
+            scanningLibrary = false
+            statusText = "CONNECTING TO RETRONAS..."
+            mode = "loading"
+            retroBackend.mount_retronas(
+                status.host || "",
+                status.share || "retronas",
+                status.remotePath || "roms",
+                status.username || "",
+                settingValue("retronas_password", ""))
+            return
+        }
         if (!status.gamesRootExists) {
-            if (!automaticMountAttempted
-                    && (status.localPath || "") === ""
-                    && (status.host || "") !== "") {
-                automaticMountAttempted = true
-                mounting = true
-                scanningLibrary = false
-                statusText = "CONNECTING TO RETRONAS..."
-                mode = "loading"
-                retroBackend.mount_retronas(
-                    status.host || "",
-                    status.share || "retronas",
-                    status.remotePath || "roms",
-                    status.username || "",
-                    settingValue("retronas_password", ""))
-                return
-            }
             if (!status.portsReady) {
                 showSetup("ENTER RETRONAS INFO")
                 return
@@ -259,12 +260,17 @@ FocusScope {
         if (share === "") share = "retronas"
         if (remotePath === "") remotePath = "roms"
 
+        // Saving emits one notification per field. Suppress intermediate
+        // refreshes so Connect uses the complete new configuration once.
+        savingSetup = true
         appCore.save_setting(moduleId, "retronas_host", host)
         appCore.save_setting(moduleId, "retronas_share", share)
         appCore.save_setting(moduleId, "retronas_path", remotePath)
         appCore.save_setting(moduleId, "retronas_username", username)
         appCore.save_setting(moduleId, "retronas_password", password)
+        savingSetup = false
 
+        automaticMountAttempted = true
         mounting = true
         scanningLibrary = false
         statusText = "MOUNTING RETRONAS..."
@@ -434,6 +440,13 @@ FocusScope {
     }
 
     Timer {
+        id: settingsRefreshTimer
+        interval: 1
+        repeat: false
+        onTriggered: refresh()
+    }
+
+    Timer {
         interval: 90
         repeat: true
         running: mode === "loading"
@@ -520,8 +533,11 @@ FocusScope {
                     && key !== "retronas_password" && key !== "local_path"
                     && key !== "ports_path")
                 return
+            if (savingSetup)
+                return
+            automaticMountAttempted = false
             if (mode === "setup" || mode === "message")
-                refresh()
+                settingsRefreshTimer.restart()
         }
     }
 
