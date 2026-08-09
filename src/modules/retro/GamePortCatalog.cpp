@@ -14,6 +14,7 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QSysInfo>
+#include <algorithm>
 
 namespace {
 constexpr qint64 kMaximumManifestBytes = 256 * 1024;
@@ -51,13 +52,44 @@ QString normalizedRelativePath(QString path)
     return QDir::cleanPath(path);
 }
 
-bool folderMatches(const GamePortDefinition &port, const QString &folder)
+QString normalizedLibraryFolder(QString path)
 {
-    for (const QString &candidate : port.romFolders) {
-        if (folder.compare(candidate, Qt::CaseInsensitive) == 0)
-            return true;
+    path = normalizedRelativePath(path.trimmed());
+    if (path.isEmpty() || path == QLatin1String(".")
+        || path == QLatin1String("..")
+        || path.startsWith(QStringLiteral("../"))
+        || path.contains(QStringLiteral("/../"))) {
+        return {};
     }
-    return false;
+    return path;
+}
+
+QString resolveLibraryDirectory(const QString &rootPath,
+                                const QString &relativePath)
+{
+    QString current = QFileInfo(rootPath).absoluteFilePath();
+    const QStringList segments = relativePath.split(
+        QLatin1Char('/'), Qt::SkipEmptyParts);
+    if (segments.isEmpty())
+        return {};
+
+    for (const QString &segment : segments) {
+        const QDir directory(current);
+        const QFileInfoList children = directory.entryInfoList(
+            QDir::Dirs | QDir::Readable | QDir::NoDotAndDotDot,
+            QDir::Name | QDir::IgnoreCase);
+        QString next;
+        for (const QFileInfo &child : children) {
+            if (child.fileName().compare(segment, Qt::CaseInsensitive) == 0) {
+                next = child.absoluteFilePath();
+                break;
+            }
+        }
+        if (next.isEmpty())
+            return {};
+        current = next;
+    }
+    return current;
 }
 
 bool extensionMatches(const GamePortDefinition &port, const QString &path)
@@ -385,23 +417,111 @@ QString GamePortCatalog::findEngine(const GamePortDefinition &port,
     return {};
 }
 
+QStringList GamePortCatalog::findLibraryFolders(const QStringList &folderNames,
+                                                const QString &gamesRoot)
+{
+    const QDir root(gamesRoot);
+    if (!root.exists())
+        return {};
+
+    QStringList folders;
+    bool hasExplicitPath = false;
+    for (const QString &folderName : folderNames) {
+        const QString folder = normalizedLibraryFolder(folderName);
+        if (folder.isEmpty())
+            continue;
+        if (folder.contains(QLatin1Char('/')))
+            hasExplicitPath = true;
+        if (!folders.contains(folder, Qt::CaseInsensitive))
+            folders.append(folder);
+    }
+
+    QStringList result;
+    for (const QString &folder : folders) {
+        const QString resolved = resolveLibraryDirectory(
+            root.absolutePath(), folder);
+        if (!resolved.isEmpty() && !result.contains(resolved))
+            result.append(resolved);
+    }
+    if (!result.isEmpty() || hasExplicitPath)
+        return result;
+
+    // RetroNAS libraries commonly group systems by manufacturer, such as
+    // roms/nintendo/gamecube. Preserve the flat MiSTer layout first, then look
+    // exactly one collection level deeper without walking or hashing files.
+    const QFileInfoList collections = root.entryInfoList(
+        QDir::Dirs | QDir::Readable | QDir::NoDotAndDotDot,
+        QDir::Name | QDir::IgnoreCase);
+    for (const QString &folder : folders) {
+        for (const QFileInfo &collection : collections) {
+            const QString resolved = resolveLibraryDirectory(
+                collection.absoluteFilePath(), folder);
+            if (!resolved.isEmpty() && !result.contains(resolved))
+                result.append(resolved);
+        }
+    }
+    return result;
+}
+
+bool GamePortCatalog::splitLibraryPath(const QStringList &folderNames,
+                                       const QString &relativePath,
+                                       QString *libraryFolderPath,
+                                       QString *contentPath)
+{
+    const QString normalized = normalizedLibraryFolder(relativePath);
+    const QStringList pathSegments = normalized.split(
+        QLatin1Char('/'), Qt::SkipEmptyParts);
+    if (pathSegments.size() < 2)
+        return false;
+
+    const qsizetype directorySegmentCount = pathSegments.size() - 1;
+    for (const QString &folderName : folderNames) {
+        const QString folder = normalizedLibraryFolder(folderName);
+        const QStringList folderSegments = folder.split(
+            QLatin1Char('/'), Qt::SkipEmptyParts);
+        if (folderSegments.isEmpty()
+            || folderSegments.size() > directorySegmentCount) {
+            continue;
+        }
+
+        const qsizetype maximumStart = folder.contains(QLatin1Char('/'))
+            ? 0
+            : std::min<qsizetype>(1, directorySegmentCount - folderSegments.size());
+        for (qsizetype start = 0; start <= maximumStart; ++start) {
+            bool matches = true;
+            for (qsizetype index = 0; index < folderSegments.size(); ++index) {
+                if (pathSegments.at(start + index).compare(
+                        folderSegments.at(index), Qt::CaseInsensitive) != 0) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (!matches)
+                continue;
+
+            const qsizetype contentStart = start + folderSegments.size();
+            const QString content = pathSegments.mid(contentStart).join(
+                QLatin1Char('/'));
+            if (content.isEmpty())
+                continue;
+            if (libraryFolderPath) {
+                *libraryFolderPath = pathSegments.mid(0, contentStart).join(
+                    QLatin1Char('/'));
+            }
+            if (contentPath)
+                *contentPath = content;
+            return true;
+        }
+    }
+    return false;
+}
+
 QStringList GamePortCatalog::findRomCandidates(const GamePortDefinition &port,
                                                const QString &gamesRoot)
 {
     QStringList result;
-    QDir root(gamesRoot);
-    if (!root.exists())
-        return result;
-
-    QStringList matchingRoots;
-    const QFileInfoList directories = root.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot,
-                                                         QDir::Name);
-    for (const QFileInfo &directory : directories) {
-        if (folderMatches(port, directory.fileName()))
-            matchingRoots.append(directory.absoluteFilePath());
-    }
-
-    for (const QString &matchingRoot : matchingRoots) {
+    for (const QString &matchingRoot : findLibraryFolders(
+             port.romFolders, gamesRoot)) {
         QDirIterator iterator(matchingRoot, QDir::Files | QDir::NoSymLinks,
                               QDirIterator::Subdirectories);
         while (iterator.hasNext()) {
@@ -419,10 +539,8 @@ bool GamePortCatalog::remotePathCanProvideRom(const GamePortDefinition &port,
                                               const QString &relativePath)
 {
     const QString normalized = normalizedRelativePath(relativePath);
-    if (normalized.isEmpty() || normalized == QLatin1String("."))
-        return false;
-    const QString topFolder = normalized.section(QLatin1Char('/'), 0, 0);
-    return folderMatches(port, topFolder) && extensionMatches(port, normalized);
+    return splitLibraryPath(port.romFolders, normalized)
+        && extensionMatches(port, normalized);
 }
 
 bool GamePortCatalog::romMatches(const GamePortDefinition &port,

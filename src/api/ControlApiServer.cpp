@@ -1254,8 +1254,8 @@ void ControlApiServer::handleSetupRetroConnectRequest(QTcpSocket *socket,
     }
     const QJsonObject values = body.value(QStringLiteral("values")).toObject();
     const QString host = values.value(QStringLiteral("retronas_host")).toString().trimmed();
-    const QString share = values.value(QStringLiteral("retronas_share")).toString(QStringLiteral("mister")).trimmed();
-    const QString path = values.value(QStringLiteral("retronas_path")).toString(QStringLiteral("games")).trimmed();
+    const QString share = values.value(QStringLiteral("retronas_share")).toString(QStringLiteral("retronas")).trimmed();
+    const QString path = values.value(QStringLiteral("retronas_path")).toString(QStringLiteral("roms")).trimmed();
     const QString username = values.value(QStringLiteral("retronas_username")).toString().trimmed();
     const QString password = values.value(QStringLiteral("retronas_password")).toString();
     if (host.isEmpty()) {
@@ -1264,8 +1264,8 @@ void ControlApiServer::handleSetupRetroConnectRequest(QTcpSocket *socket,
     }
 
     m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_host"), host);
-    m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_share"), share.isEmpty() ? QStringLiteral("mister") : share);
-    m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_path"), path.isEmpty() ? QStringLiteral("games") : path);
+    m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_share"), share.isEmpty() ? QStringLiteral("retronas") : share);
+    m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_path"), path.isEmpty() ? QStringLiteral("roms") : path);
     m_appCore->save_setting(QStringLiteral("com.240mp.retro"), QStringLiteral("retronas_username"), username);
     QString mountPassword = password;
     if (password.trimmed().isEmpty() || password == QStringLiteral("******")) {

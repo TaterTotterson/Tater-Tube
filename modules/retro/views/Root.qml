@@ -192,8 +192,8 @@ FocusScope {
     function showSetup(message) {
         var status = retroBackend.get_setup_status()
         hostField.text = status.host || "retronas.local"
-        shareField.text = status.share || "mister"
-        pathField.text = status.remotePath || "games"
+        shareField.text = status.share || "retronas"
+        pathField.text = status.remotePath || "roms"
         userField.text = status.username || ""
         passwordField.text = settingValue("retronas_password", "")
         statusText = message || "ENTER RETRONAS INFO"
@@ -228,8 +228,8 @@ FocusScope {
                 mode = "loading"
                 retroBackend.mount_retronas(
                     status.host || "",
-                    status.share || "mister",
-                    status.remotePath || "games",
+                    status.share || "retronas",
+                    status.remotePath || "roms",
                     status.username || "",
                     settingValue("retronas_password", ""))
                 return
@@ -256,8 +256,8 @@ FocusScope {
             focusSetupRow()
             return
         }
-        if (share === "") share = "mister"
-        if (remotePath === "") remotePath = "games"
+        if (share === "") share = "retronas"
+        if (remotePath === "") remotePath = "roms"
 
         appCore.save_setting(moduleId, "retronas_host", host)
         appCore.save_setting(moduleId, "retronas_share", share)
@@ -541,7 +541,7 @@ FocusScope {
         iconSource: moduleIcon
         iconHeight: root.sh * 0.075
         title: moduleName
-        subtitle: mode === "games" ? selectedSystemTitle : "MISTER"
+        subtitle: mode === "games" ? selectedSystemTitle : "RETRONAS"
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: root.sh * 0.125
@@ -697,7 +697,7 @@ FocusScope {
         }
         SetupField {
             id: pathField
-            label: "MISTER ROM PATH"
+            label: "RETRONAS ROM PATH"
             selected: setupRow === 2
         }
         SetupField {

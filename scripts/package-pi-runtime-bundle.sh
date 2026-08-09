@@ -36,6 +36,7 @@ done
 
 if find "${INPUT_DIR}" -type f \
         \( -iname '*.z64' -o -iname '*.n64' -o -iname '*.v64' \
+           -o -iname '*.ndd' -o -iname '*.u1' \
            -o -iname '*.iso' -o -iname '*.chd' -o -iname '*.cue' \
            -o -iname 'mm.o2r' -o -iname 'oot.o2r' -o -iname 'oot.otr' \) \
         -print -quit | grep -q .; then

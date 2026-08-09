@@ -161,7 +161,7 @@ Saved playlists load automatically on later launches. The Pi image installs `yt-
 1. Set up RetroNAS with the MiSTer share enabled.
 2. Put ROMs in the MiSTer `games` folder layout, for example `games/NES`, `games/Genesis`, or `games/PSX`.
 3. Open the Game Center module.
-4. Enter the RetroNAS host, share, and path. Defaults are `retronas.local`, `mister`, and `games`.
+4. Enter the RetroNAS host, share, and path. Defaults are `retronas.local`, `retronas`, and `roms`. Flat MiSTer folders and manufacturer-grouped layouts such as `nintendo/gamecube/iso` are both supported.
 5. Enter a username and password if the share is not guest-accessible.
 
 The Pi image installs RetroArch and tries to install the supported libretro cores automatically. The module only shows systems that have both a ROM folder and an installed core. Games launch directly into RetroArch; press Home on the remote to stop the game and return to the Tater Tube menu.

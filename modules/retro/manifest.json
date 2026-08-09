@@ -21,13 +21,13 @@
       "key": "retronas_share",
       "label": "RETRONAS SHARE",
       "type": "text",
-      "default": "mister"
+      "default": "retronas"
     },
     {
       "key": "retronas_path",
-      "label": "MISTER ROM PATH",
+      "label": "RETRONAS ROM PATH",
       "type": "text",
-      "default": "games"
+      "default": "roms"
     },
     {
       "key": "keep_directory_structure",

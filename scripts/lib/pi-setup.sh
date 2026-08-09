@@ -2,6 +2,8 @@
 # Shared Raspberry Pi install helpers for the release installer and pi-gen image.
 
 PI240_RUNTIME_PACKAGES=(
+    cage
+    seatd
     libqt6quick6
     libqt6qml6
     libqt6concurrent6
@@ -118,6 +120,7 @@ PI240_RETRO_CORE_DOWNLOADS=(
     vecx_libretro.so
     fceumm_libretro.so
     nestopia_libretro.so
+    parallel_n64_libretro.so
     gearsystem_libretro.so
     genesis_plus_gx_libretro.so
     picodrive_libretro.so

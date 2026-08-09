@@ -170,10 +170,11 @@ void GamePortCatalogTest::streamsEngineValidatedDiscWithoutCopying()
     const QString dataRoot = temporary.filePath(QStringLiteral("data"));
     const QString gamesRoot = temporary.filePath(QStringLiteral("games"));
     QVERIFY(QDir().mkpath(QDir(appRoot).filePath(QStringLiteral("modules/retro/ports"))));
-    QVERIFY(QDir().mkpath(QDir(gamesRoot).filePath(QStringLiteral("GameCube"))));
+    QVERIFY(QDir().mkpath(QDir(gamesRoot).filePath(
+        QStringLiteral("Nintendo/GameCube/iso"))));
 
     const QString discPath = QDir(gamesRoot).filePath(
-        QStringLiteral("GameCube/Twilight Princess.rvz"));
+        QStringLiteral("Nintendo/GameCube/iso/Twilight Princess.rvz"));
     QFile disc(discPath);
     QVERIFY(disc.open(QIODevice::WriteOnly));
     QCOMPARE(disc.write("engine-validated-disc"), qint64(21));
@@ -213,6 +214,16 @@ void GamePortCatalogTest::streamsEngineValidatedDiscWithoutCopying()
 
     const QStringList candidates = GamePortCatalog::findRomCandidates(port, gamesRoot);
     QCOMPARE(candidates, QStringList{discPath});
+    QString matchedFolder;
+    QString contentPath;
+    QVERIFY(GamePortCatalog::splitLibraryPath(
+        port.romFolders,
+        QStringLiteral("nintendo/gamecube/iso/Twilight Princess.rvz"),
+        &matchedFolder, &contentPath));
+    QCOMPARE(matchedFolder, QStringLiteral("nintendo/gamecube"));
+    QCOMPARE(contentPath, QStringLiteral("iso/Twilight Princess.rvz"));
+    QVERIFY(GamePortCatalog::remotePathCanProvideRom(
+        port, QStringLiteral("nintendo/gamecube/iso/Twilight Princess.rvz")));
     const QString validatorPath = temporary.filePath(QStringLiteral("dusklight"));
     QFile validator(validatorPath);
     QVERIFY(validator.open(QIODevice::WriteOnly | QIODevice::Text));
@@ -261,6 +272,8 @@ void GamePortCatalogTest::recognizesMultiPartRomExtensions()
 
     QVERIFY(GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("GameCube/Twilight Princess.NKIT.ISO")));
+    QVERIFY(GamePortCatalog::remotePathCanProvideRom(
+        port, QStringLiteral("nintendo/gamecube/iso/Twilight Princess.NKIT.ISO")));
     QVERIFY(!GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("GameCube/Twilight Princess.iso")));
     QVERIFY(!GamePortCatalog::remotePathCanProvideRom(

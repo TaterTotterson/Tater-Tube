@@ -7,6 +7,12 @@ and cryptographic hash and copy it into the port's private writable directory.
 Disc-aware ports may explicitly delegate revision validation to their engine and
 stream the image directly from the configured game library.
 
+Game Center supports both the flat MiSTer layout and the main RetroNAS ROM
+layout. New connections default to the `retronas` share with `roms` as the
+library root. System folders may be directly below that root or grouped one
+level below a manufacturer, such as `nintendo/gamecube/iso` and
+`nintendo/n64`.
+
 The sm64coopdx integration is built from pinned v1.5.1 source and applies the
 small patch under
 `packaging/ports/sm64coopdx` to add **Exit to Tater Tube** at the bottom of the

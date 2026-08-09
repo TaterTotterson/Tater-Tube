@@ -2,9 +2,11 @@ build-essential
 bsdextrautils
 bluez
 bluetooth
+cage
 ca-certificates
 cifs-utils
 cmake
+seatd
 curl
 cargo
 libdrm-dev

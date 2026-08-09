@@ -44,6 +44,12 @@ public:
                               const QString &appRoot,
                               const QString &dataRoot,
                               const QString &configuredPath = QString());
+    static QStringList findLibraryFolders(const QStringList &folderNames,
+                                          const QString &gamesRoot);
+    static bool splitLibraryPath(const QStringList &folderNames,
+                                 const QString &relativePath,
+                                 QString *libraryFolderPath = nullptr,
+                                 QString *contentPath = nullptr);
     static QStringList findRomCandidates(const GamePortDefinition &port,
                                          const QString &gamesRoot);
     static bool remotePathCanProvideRom(const GamePortDefinition &port,
