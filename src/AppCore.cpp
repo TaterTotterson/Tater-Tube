@@ -1,5 +1,7 @@
 #include "AppCore.h"
 #include <algorithm>
+#include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -16,8 +18,10 @@
 #include <QVariantMap>
 #include <QDebug>
 #include <QRegularExpression>
+#include <QSet>
 #include <QTime>
 #include <QTimer>
+#include <QUuid>
 #include <QQmlContext>
 #include <QtConcurrent/QtConcurrent>
 
@@ -124,6 +128,31 @@ QString taterAssistantNameFromObject(const QJsonObject &object)
             return name;
     }
     return {};
+}
+
+QString cleanTaterActivitySlug(const QString &value, const QString &fallback)
+{
+    QString slug = value.trimmed().toLower();
+    slug.replace(QRegularExpression(QStringLiteral("[^a-z0-9_-]+")),
+                 QStringLiteral("_"));
+    slug.remove(QRegularExpression(QStringLiteral("^_+|_+$")));
+    return slug.left(64).isEmpty() ? fallback : slug.left(64);
+}
+
+QString taterSourceForModule(const QString &moduleId)
+{
+    static const QMap<QString, QString> sources{
+        {QStringLiteral("com.240mp.usenet"), QStringLiteral("the_tube")},
+        {QStringLiteral("com.240mp.ota"), QStringLiteral("over_the_air")},
+        {QStringLiteral("com.240mp.emby_jellyfin"), QStringLiteral("video_on_demand")},
+        {QStringLiteral("com.240mp.youtube_playlist"), QStringLiteral("public_access")},
+        {QStringLiteral("com.240mp.audio_tapes"), QStringLiteral("tape_deck")},
+        {QStringLiteral("com.240mp.retro"), QStringLiteral("game_center")},
+        {QStringLiteral("com.240mp.local_files"), QStringLiteral("local_files")},
+        {QStringLiteral("com.240mp.moonlight"), QStringLiteral("pc_link")},
+        {QStringLiteral("com.tater.picks"), QStringLiteral("tater_picks")},
+    };
+    return sources.value(moduleId, QStringLiteral("tater_tube"));
 }
 
 QVariantMap parseSshControlOutput(const QString &output)
@@ -555,6 +584,7 @@ AppCore::AppCore(const QString &appRoot, const QString &dataRoot, QObject *paren
     m_taterNarrationPollTimer->setInterval(250);
     connect(m_taterNarrationPollTimer, &QTimer::timeout,
             this, &AppCore::pollTaterNarrationRequest);
+    QTimer::singleShot(3500, this, &AppCore::sendTaterStartupActivity);
 
     QDir modulesDir(appRoot + "/modules");
     const QStringList dirs = modulesDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
@@ -802,7 +832,130 @@ void AppCore::refreshTaterRecommendations() {
             m_taterRecommendationBatch = batch;
             emit taterRecommendationsChanged();
         }
+        maybeRequestTaterBootGreeting();
     });
+}
+
+void AppCore::recordTaterActivity(const QString &source,
+                                  const QString &mediaType,
+                                  const QString &mediaId,
+                                  const QString &title,
+                                  const QVariantMap &metadata) {
+    const QString token = taterServerToken();
+    const QString endpoint = taterServerApiUrl(QStringLiteral("tater/viewing/events"));
+    const QString cleanTitle = title.simplified().left(240);
+    if (token.isEmpty() || endpoint.isEmpty() || cleanTitle.isEmpty())
+        return;
+
+    const QString cleanSource = cleanTaterActivitySlug(source, QStringLiteral("tater_tube"));
+    const QString cleanMediaType = cleanTaterActivitySlug(mediaType, QStringLiteral("activity"));
+    QString cleanMediaId = mediaId.trimmed().left(240);
+    if (cleanMediaId.isEmpty() || cleanMediaId.contains('/') || cleanMediaId.contains('\\')) {
+        const QByteArray identity = cleanSource.toUtf8() + '\0' +
+            cleanMediaType.toUtf8() + '\0' + cleanTitle.toUtf8();
+        cleanMediaId = QString::fromLatin1(
+            QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex());
+    }
+
+    // Only these deliberately non-secret fields may leave the player. In
+    // particular, never send URLs, filesystem paths, usernames, or credentials.
+    static const QSet<QString> allowedMetadata{
+        QStringLiteral("action"), QStringLiteral("module_id"),
+        QStringLiteral("system_id"), QStringLiteral("system_name"),
+        QStringLiteral("port_id"), QStringLiteral("provider"),
+        QStringLiteral("artist"), QStringLiteral("album"),
+        QStringLiteral("genres"), QStringLiteral("app_version"),
+        QStringLiteral("modules"),
+    };
+    QVariantMap safeMetadata;
+    for (auto it = metadata.constBegin(); it != metadata.constEnd(); ++it) {
+        if (allowedMetadata.contains(it.key()))
+            safeMetadata.insert(it.key(), jsonFriendlyVariant(it.value()));
+    }
+
+    const QJsonObject event{
+        {QStringLiteral("event_id"),
+         QUuid::createUuid().toString(QUuid::WithoutBraces)},
+        {QStringLiteral("profile_id"), QStringLiteral("household")},
+        {QStringLiteral("source"), cleanSource},
+        {QStringLiteral("media_id"), cleanMediaId},
+        {QStringLiteral("media_type"), cleanMediaType},
+        {QStringLiteral("title"), cleanTitle},
+        {QStringLiteral("position_ms"), 0},
+        {QStringLiteral("duration_ms"), 0},
+        {QStringLiteral("state"), QStringLiteral("started")},
+        {QStringLiteral("occurred_at"),
+         QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+        {QStringLiteral("metadata"), QJsonObject::fromVariantMap(safeMetadata)},
+    };
+    QNetworkRequest request{QUrl(endpoint)};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("Accept", "application/json");
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
+    QNetworkReply *reply = m_updateNetwork->post(
+        request, QJsonDocument(event).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [reply]() {
+        if (reply->error() != QNetworkReply::NoError)
+            qWarning("[AppCore] Tater activity report failed: %s",
+                     qPrintable(reply->errorString()));
+        reply->deleteLater();
+    });
+}
+
+void AppCore::recordTaterModuleOpened(const QString &moduleId,
+                                      const QString &moduleName) {
+    recordTaterActivity(
+        taterSourceForModule(moduleId), QStringLiteral("module"), moduleId,
+        moduleName,
+        QVariantMap{{QStringLiteral("action"), QStringLiteral("opened")},
+                    {QStringLiteral("module_id"), moduleId}});
+}
+
+void AppCore::sendTaterStartupActivity() {
+    const QJsonObject config = loadConfig();
+    const QJsonObject modulesConfig = config.value(QStringLiteral("modules")).toObject();
+    QVariantList modules;
+    for (const ModuleEntry &module : m_modules) {
+        const QJsonObject moduleConfig = modulesConfig.value(module.id).toObject();
+        bool enabled = true;
+        for (const QVariant &settingValue : module.settings) {
+            const QVariantMap setting = settingValue.toMap();
+            if (setting.value(QStringLiteral("key")).toString() == QStringLiteral("enabled")) {
+                const QString defaultValue =
+                    setting.value(QStringLiteral("default"), QStringLiteral("ON"))
+                        .toString().trimmed().toLower();
+                enabled = defaultValue != QStringLiteral("off") &&
+                          defaultValue != QStringLiteral("false") &&
+                          defaultValue != QStringLiteral("0");
+                break;
+            }
+        }
+        if (moduleConfig.contains(QStringLiteral("enabled"))) {
+            const QJsonValue value = moduleConfig.value(QStringLiteral("enabled"));
+            enabled = value.isBool()
+                ? value.toBool()
+                : !QStringList{QStringLiteral("off"), QStringLiteral("false"),
+                               QStringLiteral("0"), QStringLiteral("no")}
+                       .contains(value.toVariant().toString().trimmed().toLower());
+        }
+        if (!enabled)
+            continue;
+        const QString authState = get_module_auth_state(module.id).trimmed().toLower();
+        modules.append(QVariantMap{
+            {QStringLiteral("id"), module.id},
+            {QStringLiteral("name"), module.name},
+            {QStringLiteral("configured"),
+             authState == QStringLiteral("authed") ||
+                 authState == QStringLiteral("ready") ||
+                 authState == QStringLiteral("connected")},
+        });
+    }
+    recordTaterActivity(
+        QStringLiteral("tater_tube"), QStringLiteral("session"),
+        QStringLiteral("tater-tube-session"), QStringLiteral("Tater Tube"),
+        QVariantMap{{QStringLiteral("action"), QStringLiteral("booted")},
+                    {QStringLiteral("app_version"), appVersion()},
+                    {QStringLiteral("modules"), modules}});
 }
 
 void AppCore::sendTaterRecommendationFeedback(const QString &recommendationId,
@@ -849,6 +1002,54 @@ bool AppCore::taterPicksNarrationEnabled() const {
            normalized != QStringLiteral("no");
 }
 
+bool AppCore::taterBootGreetingEnabled() const {
+    const QJsonObject module = loadConfig()
+        .value(QStringLiteral("modules")).toObject()
+        .value(QStringLiteral("com.240mp.usenet")).toObject();
+    const QJsonValue value = module.value(QStringLiteral("tater_boot_greeting"));
+    if (value.isUndefined() || value.isNull())
+        return true;
+    if (value.isBool())
+        return value.toBool();
+    const QString normalized = value.toVariant().toString().trimmed().toLower();
+    return normalized != QStringLiteral("off") &&
+           normalized != QStringLiteral("false") &&
+           normalized != QStringLiteral("0") &&
+           normalized != QStringLiteral("no");
+}
+
+void AppCore::setHomeScreenActive(bool active) {
+    m_homeScreenActive = active;
+    if (!active) {
+        // Leaving the first home screen cancels a pending welcome and consumes
+        // it for this process, so returning Home can never replay the greeting.
+        if (!m_taterBootGreetingAttempted)
+            m_taterBootGreetingAttempted = true;
+        if (m_taterBootNarrationActive)
+            stopTaterNarration();
+        return;
+    }
+    maybeRequestTaterBootGreeting();
+}
+
+void AppCore::maybeRequestTaterBootGreeting() {
+    if (m_taterBootGreetingAttempted || !m_homeScreenActive ||
+        !taterBootGreetingEnabled()) {
+        return;
+    }
+    const QString batchId =
+        m_taterRecommendationBatch.value(QStringLiteral("id")).toString().trimmed();
+    if (batchId.isEmpty())
+        return;
+
+    m_taterBootGreetingAttempted = true;
+    requestTaterNarration(QJsonObject{
+        {QStringLiteral("batch_id"), batchId},
+        {QStringLiteral("briefing_kind"), QStringLiteral("boot")},
+        {QStringLiteral("local_hour"), QTime::currentTime().hour()},
+    });
+}
+
 void AppCore::setTaterNarrating(bool narrating) {
     if (m_taterNarrating == narrating)
         return;
@@ -892,6 +1093,7 @@ void AppCore::stopTaterNarration() {
         cancelTaterNarrationRequest(requestId);
 
     emit taterNarrationStopRequested();
+    m_taterBootNarrationActive = false;
     setTaterNarrating(false);
 }
 
@@ -903,6 +1105,7 @@ void AppCore::finishTaterNarrationPlayback(quint64 generation) {
     m_taterNarrationRequestId.clear();
     if (!requestId.isEmpty())
         cancelTaterNarrationRequest(requestId);
+    m_taterBootNarrationActive = false;
     setTaterNarrating(false);
 }
 
@@ -927,13 +1130,22 @@ void AppCore::speakTaterBriefing(const QString &batchId) {
 
 void AppCore::requestTaterNarration(const QJsonObject &identity) {
     stopTaterNarration();
-    if (!taterPicksNarrationEnabled())
+    const bool isBootGreeting =
+        identity.value(QStringLiteral("briefing_kind")).toString() ==
+        QStringLiteral("boot");
+    if ((isBootGreeting && !taterBootGreetingEnabled()) ||
+        (!isBootGreeting && !taterPicksNarrationEnabled())) {
         return;
+    }
 
     const QString token = taterServerToken();
     const QString endpoint = taterServerApiUrl(QStringLiteral("tater/tts/requests"));
     if (identity.isEmpty() || token.isEmpty() || endpoint.isEmpty())
         return;
+
+    m_taterBootNarrationActive =
+        identity.value(QStringLiteral("briefing_kind")).toString() ==
+        QStringLiteral("boot");
 
     const quint64 generation = ++m_taterNarrationGeneration;
     QNetworkRequest request{QUrl(endpoint)};
@@ -959,6 +1171,7 @@ void AppCore::requestTaterNarration(const QJsonObject &identity) {
         }
         if (!ok || requestId.isEmpty()) {
             qWarning("[AppCore] Tater narration request failed");
+            m_taterBootNarrationActive = false;
             setTaterNarrating(false);
             return;
         }
@@ -1020,6 +1233,7 @@ void AppCore::pollTaterNarrationRequest() {
             if (!error.isEmpty())
                 qWarning("[AppCore] Tater narration failed: %s", qPrintable(error));
             m_taterNarrationRequestId.clear();
+            m_taterBootNarrationActive = false;
             setTaterNarrating(false);
             return;
         }
@@ -1116,6 +1330,7 @@ void AppCore::save_setting(const QString &moduleId, const QString &key, const QV
             if (m_taterRecommendationsRetryTimer)
                 m_taterRecommendationsRetryTimer->stop();
             QTimer::singleShot(0, this, &AppCore::refreshTaterRecommendations);
+            QTimer::singleShot(250, this, &AppCore::sendTaterStartupActivity);
         }
     }
 }

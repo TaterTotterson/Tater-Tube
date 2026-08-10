@@ -672,10 +672,22 @@ FocusScope {
         streamRequestActive = false
         noSignalVisible = false
         var oscMode = channelTunePending ? "ota-tune" : "ota-quiet"
+        var channel = selectedChannel()
         mpvController.setViewingContext(
             isInterstitialKind(item ? item.kind : "")
                 ? ({ suppress_viewing_event: true })
-                : ({}))
+                : ({
+                    source: "video_on_demand",
+                    media_id: item.ratingKey || item.key || item.partKey || "",
+                    media_type: item.type || item.kind || "video",
+                    title: item.title || label || statusText || "VIDEO ON DEMAND",
+                    series_title: item.grandparentTitle || "",
+                    season: item.parentIndex || 0,
+                    episode: item.index || 0,
+                    module_id: vodModuleId,
+                    channel_number: channel ? (channel.number || "") : "",
+                    channel_name: channel ? (channel.title || "") : ""
+                }))
         mpvController.loadAndPlay(url, offset || 0.0, 0, -1, [], false, -1, 0.0,
                                   httpHeaderFields || "", false, oscMode, false, label || statusText,
                                   false, !!allowYtdl, format || "")

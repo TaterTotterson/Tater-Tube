@@ -1767,10 +1767,23 @@ FocusScope {
         var oscMode = showChannelLabelAfterTransition
             ? "ota-tune"
             : (transitionBlankVisible ? "ota-quiet" : "ota")
+        var channel = selectedChannel()
         mpvController.setViewingContext(
             isInterstitialItem(item)
                 ? ({ suppress_viewing_event: true })
-                : ({}))
+                : ({
+                    source: "the_tube",
+                    media_id: item.playStateId || item.ratingKey || item.key ||
+                              item.guid || "",
+                    media_type: item.mediaType || item.type || item.kind || "video",
+                    title: item.title || label || statusText || "THE TUBE",
+                    series_title: item.seriesTitle || "",
+                    season: item.season || 0,
+                    episode: item.episode || 0,
+                    module_id: tubeModuleId,
+                    channel_number: channel ? (channel.number || "") : "",
+                    channel_name: channel ? (channel.title || "") : ""
+                }))
         mpvController.loadAndPlay(playbackUrl, offset || 0.0, 0, -1, [], false, -1, 0.0,
                                   "", false, oscMode, false, label || statusText)
 

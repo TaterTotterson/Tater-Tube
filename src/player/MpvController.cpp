@@ -963,7 +963,7 @@ void MpvController::beginViewingSession(const QString &url, const QString &displ
 
     QString mediaId =
         m_currentViewingContext.value(QStringLiteral("media_id")).toString().trimmed();
-    if (mediaId.isEmpty()) {
+    if (mediaId.isEmpty() || mediaId.contains('/') || mediaId.contains('\\')) {
         QUrl safeUrl(url);
         safeUrl.setQuery(QString());
         safeUrl.setFragment(QString());
@@ -1008,6 +1008,16 @@ void MpvController::sendViewingEvent(const QString &state, int positionMs, int d
         metadata[QStringLiteral("channel_number")] = channelNumber;
     if (!channelName.isEmpty())
         metadata[QStringLiteral("channel_name")] = channelName;
+    const QStringList descriptiveMetadataKeys{
+        QStringLiteral("artist"),
+        QStringLiteral("album"),
+        QStringLiteral("provider"),
+    };
+    for (const QString &key : descriptiveMetadataKeys) {
+        const QString value = m_currentViewingContext.value(key).toString().simplified();
+        if (!value.isEmpty())
+            metadata[key] = value.left(240);
+    }
 
     QJsonObject event{
         {QStringLiteral("event_id"), m_viewingEventId},

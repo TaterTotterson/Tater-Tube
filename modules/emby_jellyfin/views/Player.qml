@@ -226,6 +226,17 @@ FocusScope {
         startTimer.restart()
     }
 
+    function setViewingActivity() {
+        mpvController.setViewingContext({
+            source: "video_on_demand",
+            media_id: ratingKey,
+            media_type: mediaType || "video",
+            title: itemTitle || overlayTitle || "VIDEO",
+            series_title: mediaType === "episode" ? overlayTitle : "",
+            module_id: "com.240mp.emby_jellyfin"
+        })
+    }
+
     function playTaterBumper(continuation) {
         var bumper = TaterBumpers.next(
                     appCore, continuation === "movie" ? "vod-movie" : "vod-series")
@@ -266,6 +277,7 @@ FocusScope {
 
     function doStartPlayback(offsetMs) {
         noSignalVisible = false
+        setViewingActivity()
         if (isTranscoding) {
             // Transcode covers the full timeline (requested at offset 0), so seek mpv
             // to the resume point. This keeps everything before offsetMs seekable, so
@@ -325,6 +337,7 @@ FocusScope {
                 // Fallback transcode was requested at offset 0 (full timeline), so seek
                 // mpv to the resume point — keeps everything before it seekable.
                 var sub = buildSubArgs()
+                setViewingActivity()
                 mpvController.loadAndPlay(url, viewOffset / 1000.0, audioIdx + 1, sub.track, sub.urls, false, -1, 0.0,
                                           httpHeaderFields, false, "", false, overlayTitle)
                 return

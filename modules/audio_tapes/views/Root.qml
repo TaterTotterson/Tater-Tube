@@ -67,6 +67,20 @@ FocusScope {
         return currentProvider === "server"
     }
 
+    function setTrackViewingActivity(track) {
+        mpvController.setViewingContext({
+            source: "tape_deck",
+            media_id: track.ratingKey || track.key || "",
+            media_type: "music",
+            title: track.title || "TAPE",
+            series_title: track.artist || currentAlbumArtist || "",
+            artist: track.artist || currentAlbumArtist || "",
+            album: track.album || currentAlbumTitle || "",
+            provider: currentProvider,
+            module_id: moduleId
+        })
+    }
+
     function providerLabel(provider) {
         return provider === "server" ? "TATER TUBE SERVER" : "VIDEO ON DEMAND"
     }
@@ -240,6 +254,7 @@ FocusScope {
             playing = true
             paused = false
             ignoringPreviousTrackExit = false
+            setTrackViewingActivity(track)
             mpvController.loadAudioAndPlay(track.streamUrl, 0.0, "", track.title || "TAPE")
         } else {
             vodRequestStage = "stream"
@@ -515,6 +530,7 @@ FocusScope {
             playing = true
             paused = false
             ignoringPreviousTrackExit = false
+            setTrackViewingActivity(track)
             mpvController.loadAudioAndPlay(url, 0.0, httpHeaderFields || "", track.title || "TAPE")
         }
 

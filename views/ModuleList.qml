@@ -66,9 +66,15 @@ FocusScope {
     }
 
     Component.onCompleted: {
+        appCore.setHomeScreenActive(true)
         loadMascotSetting()
         appCore.refreshTaterRecommendations()
         appCore.scan_for_modules()
+    }
+
+    Component.onDestruction: {
+        if (appCore)
+            appCore.setHomeScreenActive(false)
     }
 
     Connections {
@@ -229,7 +235,9 @@ FocusScope {
         }
 
         Keys.onReturnPressed: {
-            var selectedModulePath = menuList.model[menuList.currentIndex].entry_point
+            var selected = menuList.model[menuList.currentIndex] || ({})
+            var selectedModulePath = selected.entry_point
+            appCore.recordTaterModuleOpened(selected.id || "", selected.name || "MODULE")
             console.log("Routing to: " + selectedModulePath)
             appRoot.navigateTo(selectedModulePath, {}, { currentIndex: menuList.currentIndex })
         }

@@ -113,6 +113,11 @@ int main(int argc, char *argv[]) {
                      &mpvController, &MpvController::sendKey);
     QObject::connect(&mpvController, &MpvController::runningChanged,
                      &menuSoundPlayer, &MenuSoundPlayer::setPlaybackActive);
+    QObject::connect(&mpvController, &MpvController::runningChanged,
+                     &appCore, [&appCore](bool running) {
+        if (running)
+            appCore.stopTaterNarration();
+    });
     QObject::connect(&appCore, &AppCore::taterNarrationAudioReady,
                      &menuSoundPlayer, &MenuSoundPlayer::playNarration);
     QObject::connect(&appCore, &AppCore::taterNarrationStopRequested,
@@ -124,12 +129,16 @@ int main(int argc, char *argv[]) {
     QObject::connect(&mpvController, &MpvController::mutedChanged,
                      &menuSoundPlayer, &MenuSoundPlayer::setNarrationMuted);
     QObject::connect(&retroBackend, &RetroBackend::runningChanged,
-                     &menuSoundPlayer, [&menuSoundPlayer](bool running) {
+                     &menuSoundPlayer, [&menuSoundPlayer, &appCore](bool running) {
         menuSoundPlayer.setContextActive(QStringLiteral("retroarch"), running);
+        if (running)
+            appCore.stopTaterNarration();
     });
     QObject::connect(&moonlightBackend, &MoonlightBackend::runningChanged,
-                     &menuSoundPlayer, [&menuSoundPlayer](bool running) {
+                     &menuSoundPlayer, [&menuSoundPlayer, &appCore](bool running) {
         menuSoundPlayer.setContextActive(QStringLiteral("moonlight"), running);
+        if (running)
+            appCore.stopTaterNarration();
     });
 
     // Each module backend is wired in one call: stored for action routing, exposed to QML

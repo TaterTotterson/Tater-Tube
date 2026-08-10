@@ -23,6 +23,7 @@ FocusScope {
     property int pairWaitStage: 0
     property string messageReturnMode: ""
     property bool streamSessionActive: false
+    property var pendingAppActivity: ({})
 
     focus: true
 
@@ -161,6 +162,10 @@ FocusScope {
         mode = "loading"
         statusText = "TUNING " + (item.title || name)
         streamSessionActive = true
+        pendingAppActivity = {
+            media_id: name,
+            title: item.title || name
+        }
         moonlightBackend.launch_app(name)
     }
 
@@ -343,6 +348,11 @@ FocusScope {
         function onStreamStarted(title) {
             statusText = "PLAYING " + (title || "PC")
             mode = "playing"
+            appCore.recordTaterActivity(
+                        "pc_link", "pc_app", pendingAppActivity.media_id || "",
+                        pendingAppActivity.title || title || "PC LINK",
+                        { action: "launched", module_id: moduleId })
+            pendingAppActivity = ({})
         }
 
         function onStreamFinished() {
@@ -353,6 +363,7 @@ FocusScope {
         }
 
         function onErrorOccurred(message) {
+            pendingAppActivity = ({})
             streamSessionActive = false
             var wasLoadingApps = loadingApps
             loadingApps = false

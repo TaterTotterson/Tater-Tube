@@ -82,6 +82,14 @@ public:
                                                      const QString &feedback);
     Q_INVOKABLE void speakTaterRecommendation(const QString &recommendationId);
     Q_INVOKABLE void speakTaterBriefing(const QString &batchId);
+    Q_INVOKABLE void recordTaterActivity(const QString &source,
+                                         const QString &mediaType,
+                                         const QString &mediaId,
+                                         const QString &title,
+                                         const QVariantMap &metadata = {});
+    Q_INVOKABLE void recordTaterModuleOpened(const QString &moduleId,
+                                             const QString &moduleName);
+    Q_INVOKABLE void setHomeScreenActive(bool active);
     Q_INVOKABLE void stopTaterNarration();
     void finishTaterNarrationPlayback(quint64 generation);
 
@@ -125,6 +133,9 @@ private:
     QString taterServerToken() const;
     void scheduleTaterRecommendationsRetry();
     bool taterPicksNarrationEnabled() const;
+    bool taterBootGreetingEnabled() const;
+    void sendTaterStartupActivity();
+    void maybeRequestTaterBootGreeting();
     void requestTaterNarration(const QJsonObject &identity);
     void pollTaterNarrationRequest();
     void playTaterNarrationAudio(const QString &requestId, quint64 generation);
@@ -148,4 +159,7 @@ private:
     int m_taterRecommendationsRetryAttempts = 0;
     bool m_taterRecommendationsRequestInFlight = false;
     bool m_taterNarrating = false;
+    bool m_homeScreenActive = false;
+    bool m_taterBootGreetingAttempted = false;
+    bool m_taterBootNarrationActive = false;
 };

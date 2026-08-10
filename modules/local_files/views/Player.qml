@@ -33,6 +33,15 @@ FocusScope {
     property int    resumedFromPlaylistPos: -1
     property bool   needsSeekToZero:        false
 
+    function setViewingActivity() {
+        mpvController.setViewingContext({
+            source: "local_files",
+            media_type: isPlaylist(filePath) ? "playlist" : "video",
+            title: itemTitle || "LOCAL FILE",
+            module_id: "com.240mp.local_files"
+        })
+    }
+
     function finishPlayback(finalPositionMs, finalDurationMs) {
         if (finishingPlayback)
             return
@@ -83,6 +92,7 @@ FocusScope {
                 if (choiceIndex === 0 && startPlPos >= 0)
                     resumedFromPlaylistPos = startPlPos
                 overlayVisible = false
+                setViewingActivity()
                 mpvController.loadAndPlay(filePath, startMs / 1000.0, 0, -1, [], loopOn, startPlPos,
                                           0.0, "", false, "", false, itemTitle)
                 event.accepted = true
@@ -170,11 +180,13 @@ FocusScope {
         // Shuffle wins: a shuffled playlist starts fresh & random; resume position
         // (a sequential item index) is meaningless once order is randomized.
         if (shuffleOn && isPlaylist(filePath)) {
+            setViewingActivity()
             mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1, 0.0, "", false, "", true, itemTitle)
             return
         }
 
         if (resumeSetting === "no") {
+            setViewingActivity()
             mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1, 0.0, "", false, "", false, itemTitle)
             return
         }
@@ -186,6 +198,7 @@ FocusScope {
         if (resumeSetting === "yes") {
             if (savedPos > 0 && savedPl >= 0)
                 resumedFromPlaylistPos = savedPl
+            setViewingActivity()
             mpvController.loadAndPlay(filePath, savedPos > 0 ? savedPos / 1000.0 : 0.0,
                                       0, -1, [], loopOn, savedPos > 0 ? savedPl : -1,
                                       0.0, "", false, "", false, itemTitle)
@@ -195,6 +208,7 @@ FocusScope {
                 savedPlaylistPos = savedPl
                 overlayVisible   = true
             } else {
+                setViewingActivity()
                 mpvController.loadAndPlay(filePath, 0.0, 0, -1, [], loopOn, -1,
                                           0.0, "", false, "", false, itemTitle)
             }

@@ -587,10 +587,20 @@ FocusScope {
         tvStreamStarted = true
         tvStoppingForTune = false
         var oscMode = tvChannelTunePending ? "ota-tune" : "ota-quiet"
+        var channel = tvChannels[tvCurrentChannelIndex] || ({})
         mpvController.setViewingContext(
             isTvInterstitialItem(item)
                 ? ({ suppress_viewing_event: true })
-                : ({}))
+                : ({
+                    source: "public_access",
+                    media_id: item.id || item.videoId || "",
+                    media_type: "video",
+                    title: item.title || label || "PUBLIC ACCESS",
+                    series_title: channel.title || "",
+                    module_id: moduleId,
+                    channel_number: channel.number || "",
+                    channel_name: channel.title || ""
+                }))
         mpvController.loadAndPlay(url || "", offset || 0.0, 0, -1, [],
                                   false, -1, 0.0, "", false, oscMode, false,
                                   label, false, !!allowYtdl, format || "")
@@ -897,7 +907,14 @@ FocusScope {
         mode = "playing"
         stoppingPlayback = false
         var format = youtubePlaylistBackend.ytdl_format_for_quality(playbackQuality())
-        mpvController.setViewingContext({})
+        mpvController.setViewingContext({
+            source: "public_access",
+            media_id: item.id || item.videoId || "",
+            media_type: "video",
+            title: title,
+            series_title: currentPlaylist.title || playlistTitle || "",
+            module_id: moduleId
+        })
         mpvController.loadAndPlay(item.url || "", 0.0, 0, -1, [], false, -1, 0.0,
                                   "", false, "", false, title, false, true, format)
     }

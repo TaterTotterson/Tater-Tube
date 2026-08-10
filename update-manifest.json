@@ -1,16 +1,14 @@
 {
-  "version": "v1.9.4",
-  "app_version": "1.9.4",
+  "version": "v1.9.5",
+  "app_version": "1.9.5",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.4/Tater-Tube-v1.9.4-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.4.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.5/Tater-Tube-v1.9.5-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.5.tar.gz",
   "notes": [
-    "Tape Deck now discovers Video on Demand and Tater Tube Server music automatically, combines both library lists when available, and removes the manual provider setting.",
-    "Game Center now indexes the main RetroNAS manufacturer/system layout once per refresh and preserves its completed catalog across boots, reconnects, and app updates.",
-    "Adds working Nintendo 64 support on Raspberry Pi 4 and Pi 5 with the pinned Mupen64Plus-Next ARM64 core.",
-    "Adds complete left- and right-stick RetroPad mappings, including right-stick N64 C-button control and safe migration of legacy controller maps.",
-    "Standardizes bundled game-port discovery on the RetroNAS ROM layout and improves the cached-library loading screen."
+    "Adds a one-time personalized morning, afternoon, or evening welcome when Tater Tube starts, including a watch-or-play suggestion based on recent activity.",
+    "Shares privacy-safe activity context across video, live TV, music, Game Center, PC Link, local files, and module use without sending paths, stream URLs, usernames, or credentials.",
+    "Adds independent controls for the boot greeting and Tater Picks narration, and stops narration automatically when media, a game, or a PC stream begins."
   ]
 }

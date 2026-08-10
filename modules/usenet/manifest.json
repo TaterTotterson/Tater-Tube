@@ -30,6 +30,12 @@
       "default": "ON"
     },
     {
+      "key": "tater_boot_greeting",
+      "label": "TATER BOOT GREETING",
+      "type": "toggle",
+      "default": "ON"
+    },
+    {
       "key": "tube_transcode_mode",
       "label": "TRANSCODING",
       "type": "list_single",
