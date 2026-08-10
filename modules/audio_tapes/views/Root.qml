@@ -20,7 +20,6 @@ FocusScope {
     property string currentLibraryTitle: "TAPE DECK"
     property string currentAlbumTitle: "TAPE"
     property string currentAlbumArtist: "UNKNOWN ARTIST"
-    property bool skippedLibraryPicker: false
     property string pendingItemId: ""
     property bool playing: false
     property bool paused: false
@@ -28,7 +27,13 @@ FocusScope {
     property bool ignoringPreviousTrackExit: false
     property int fastForwardTargetIndex: -1
     property int visualTick: 0
-    property string musicProvider: "Video on Demand"
+    property string currentProvider: ""
+    property var vodLibraries: []
+    property var serverLibraries: []
+    property bool vodLibraryPending: false
+    property bool serverLibraryPending: false
+    property string vodRequestStage: ""
+    property string serverRequestStage: ""
     property string messageReturnMode: ""
 
     focus: true
@@ -58,13 +63,56 @@ FocusScope {
         return track.album || currentAlbumTitle || "TAPE"
     }
 
-    function refreshProvider() {
-        var provider = appCore.get_setting(moduleId, "music_provider") || "Video on Demand"
-        musicProvider = provider
+    function usesTaterServer() {
+        return currentProvider === "server"
     }
 
-    function usesTaterServer() {
-        return String(musicProvider).toLowerCase() === "tater tube server"
+    function providerLabel(provider) {
+        return provider === "server" ? "TATER TUBE SERVER" : "VIDEO ON DEMAND"
+    }
+
+    function taggedLibraries(items, provider) {
+        var tagged = []
+        var rows = items || []
+        for (var i = 0; i < rows.length; i++) {
+            var library = Object.assign({}, rows[i] || ({}))
+            library.tapeProvider = provider
+            library.providerLabel = providerLabel(provider)
+            tagged.push(library)
+        }
+        return tagged
+    }
+
+    function finishLibrarySource(provider, items) {
+        if (provider === "server") {
+            if (!serverLibraryPending) return
+            serverLibraries = taggedLibraries(items, provider)
+            serverLibraryPending = false
+            serverRequestStage = ""
+        } else {
+            if (!vodLibraryPending) return
+            vodLibraries = taggedLibraries(items, provider)
+            vodLibraryPending = false
+            vodRequestStage = ""
+        }
+
+        if (!vodLibraryPending && !serverLibraryPending)
+            showAvailableLibraries()
+    }
+
+    function showAvailableLibraries() {
+        // Keep the order stable even though the two network requests can
+        // complete in either order.
+        libraries = vodLibraries.concat(serverLibraries)
+        if (libraries.length === 0) {
+            mode = "message"
+            statusText = "NO MUSIC LIBRARIES FOUND"
+            return
+        }
+
+        mode = "libraries"
+        currentLibraryIndex = Math.max(0, Math.min(currentLibraryIndex, libraries.length - 1))
+        libraryList.currentIndex = currentLibraryIndex
     }
 
     function formatTime(ms) {
@@ -100,31 +148,33 @@ FocusScope {
     }
 
     function loadLibraries() {
-        refreshProvider()
-        if (usesTaterServer()) {
-            if (usenetBackend.get_auth_state() !== "authed") {
-                mode = "message"
-                statusText = "PAIR TATER TUBE SERVER"
-                return
-            }
+        libraries = []
+        vodLibraries = []
+        serverLibraries = []
+        albums = []
+        tracks = []
+        currentProvider = ""
+        vodRequestStage = ""
+        serverRequestStage = ""
+        vodLibraryPending = embyBackend.get_auth_state() === "authed"
+        serverLibraryPending = usenetBackend.get_auth_state() === "authed"
 
-            mode = "loading"
-            statusText = "LOADING SERVER TAPES..."
-            skippedLibraryPicker = false
-            usenetBackend.load_music_libraries()
-            return
-        }
-
-        if (embyBackend.get_auth_state() !== "authed") {
+        if (!vodLibraryPending && !serverLibraryPending) {
             mode = "message"
-            statusText = "SIGN IN FROM VIDEO ON DEMAND"
+            statusText = "SET UP VIDEO ON DEMAND OR PAIR TATER TUBE SERVER"
             return
         }
 
         mode = "loading"
         statusText = "LOADING TAPES..."
-        skippedLibraryPicker = false
-        embyBackend.load_music_libraries()
+        if (vodLibraryPending) {
+            vodRequestStage = "libraries"
+            embyBackend.load_music_libraries()
+        }
+        if (serverLibraryPending) {
+            serverRequestStage = "libraries"
+            usenetBackend.load_music_libraries()
+        }
     }
 
     function selectLibrary(index) {
@@ -132,16 +182,20 @@ FocusScope {
         messageReturnMode = mode === "libraries" ? "libraries" : ""
         currentLibraryIndex = index
         var library = libraries[index] || ({})
-        currentLibraryTitle = library.title || "TAPE DECK"
+        currentProvider = library.tapeProvider || "vod"
+        currentLibraryTitle = providerLabel(currentProvider) + " / " + (library.title || "TAPE DECK")
         currentAlbumIndex = 0
         albums = []
         tracks = []
         mode = "loading"
         statusText = "SCANNING TAPES..."
-        if (usesTaterServer())
+        if (usesTaterServer()) {
+            serverRequestStage = "albums"
             usenetBackend.load_music_albums(library.sectionId || library.key || library.ratingKey || "")
-        else
+        } else {
+            vodRequestStage = "albums"
             embyBackend.load_music_albums(library.sectionId || library.key || "")
+        }
     }
 
     function selectAlbum(index) {
@@ -155,10 +209,13 @@ FocusScope {
         tracks = []
         mode = "loading"
         statusText = "LOADING " + currentAlbumTitle
-        if (usesTaterServer())
+        if (usesTaterServer()) {
+            serverRequestStage = "tracks"
             usenetBackend.load_music_tracks(album.ratingKey || album.key || "")
-        else
+        } else {
+            vodRequestStage = "tracks"
             embyBackend.load_music_tracks(album.ratingKey || album.key || "")
+        }
     }
 
     function playTrack(index) {
@@ -185,6 +242,7 @@ FocusScope {
             ignoringPreviousTrackExit = false
             mpvController.loadAudioAndPlay(track.streamUrl, 0.0, "", track.title || "TAPE")
         } else {
+            vodRequestStage = "stream"
             embyBackend.build_audio_stream_url(pendingItemId, track.partKey || "")
         }
     }
@@ -229,7 +287,7 @@ FocusScope {
             albumList.currentIndex = Math.max(0, Math.min(currentAlbumIndex, albums.length - 1))
             return
         }
-        if (!skippedLibraryPicker && libraries.length > 0) {
+        if (libraries.length > 0) {
             mode = "libraries"
             libraryList.currentIndex = Math.max(0, Math.min(currentLibraryIndex, libraries.length - 1))
             return
@@ -321,10 +379,7 @@ FocusScope {
                 mode = "albums"
                 albumList.currentIndex = currentAlbumIndex
             } else if (mode === "albums") {
-                if (skippedLibraryPicker)
-                    goBack()
-                else
-                    mode = "libraries"
+                mode = "libraries"
             } else if (mode === "message") {
                 returnFromMessage()
             } else {
@@ -421,22 +476,12 @@ FocusScope {
         target: embyBackend
 
         function onMusicLibrariesLoaded(items) {
-            libraries = items || []
-            if (libraries.length === 0) {
-                mode = "message"
-                statusText = "NO MUSIC LIBRARIES FOUND"
-                return
-            }
-            if (libraries.length === 1) {
-                skippedLibraryPicker = true
-                selectLibrary(0)
-                return
-            }
-            mode = "libraries"
-            libraryList.currentIndex = Math.min(currentLibraryIndex, libraries.length - 1)
+            finishLibrarySource("vod", items)
         }
 
         function onMusicAlbumsLoaded(items) {
+            if (currentProvider !== "vod" || vodRequestStage !== "albums") return
+            vodRequestStage = ""
             albums = items || []
             if (albums.length === 0) {
                 mode = "message"
@@ -449,6 +494,8 @@ FocusScope {
         }
 
         function onMusicTracksLoaded(items) {
+            if (currentProvider !== "vod" || vodRequestStage !== "tracks") return
+            vodRequestStage = ""
             tracks = items || []
             if (tracks.length === 0) {
                 mode = "message"
@@ -461,7 +508,8 @@ FocusScope {
         }
 
         function onAudioStreamUrlReady(itemId, url, httpHeaderFields) {
-            if (itemId !== pendingItemId) return
+            if (currentProvider !== "vod" || vodRequestStage !== "stream" || itemId !== pendingItemId) return
+            vodRequestStage = ""
             var track = currentTrack()
             mode = "deck"
             playing = true
@@ -471,6 +519,12 @@ FocusScope {
         }
 
         function onErrorOccurred(message) {
+            if (vodLibraryPending && vodRequestStage === "libraries") {
+                finishLibrarySource("vod", [])
+                return
+            }
+            if (currentProvider !== "vod" || vodRequestStage === "") return
+            vodRequestStage = ""
             ignoringPreviousTrackExit = false
             if (mode === "loading" || mode === "deck") {
                 playing = false
@@ -484,24 +538,12 @@ FocusScope {
         target: usenetBackend
 
         function onMusicLibrariesLoaded(items) {
-            if (!usesTaterServer()) return
-            libraries = items || []
-            if (libraries.length === 0) {
-                mode = "message"
-                statusText = "NO SERVER MUSIC FOUND"
-                return
-            }
-            if (libraries.length === 1) {
-                skippedLibraryPicker = true
-                selectLibrary(0)
-                return
-            }
-            mode = "libraries"
-            libraryList.currentIndex = Math.min(currentLibraryIndex, libraries.length - 1)
+            finishLibrarySource("server", items)
         }
 
         function onMusicAlbumsLoaded(items) {
-            if (!usesTaterServer()) return
+            if (currentProvider !== "server" || serverRequestStage !== "albums") return
+            serverRequestStage = ""
             albums = items || []
             if (albums.length === 0) {
                 mode = "message"
@@ -514,7 +556,8 @@ FocusScope {
         }
 
         function onMusicTracksLoaded(items) {
-            if (!usesTaterServer()) return
+            if (currentProvider !== "server" || serverRequestStage !== "tracks") return
+            serverRequestStage = ""
             tracks = items || []
             if (tracks.length === 0) {
                 mode = "message"
@@ -527,23 +570,18 @@ FocusScope {
         }
 
         function onErrorOccurred(message) {
-            if (!usesTaterServer()) return
+            if (serverLibraryPending && serverRequestStage === "libraries") {
+                finishLibrarySource("server", [])
+                return
+            }
+            if (currentProvider !== "server" || serverRequestStage === "") return
+            serverRequestStage = ""
             ignoringPreviousTrackExit = false
             if (mode === "loading" || mode === "deck") {
                 playing = false
                 mode = "message"
                 statusText = message || "TATER SERVER ERROR"
             }
-        }
-    }
-
-    Connections {
-        target: appCore
-
-        function onModuleSettingChanged(mid, key, value) {
-            if (mid !== tapeRoot.moduleId || key !== "music_provider")
-                return
-            loadLibraries()
         }
     }
 
@@ -664,7 +702,7 @@ FocusScope {
 
             Text {
                 id: tapeText
-                text: "LIBRARY " + (index + 1) + "  " + modelData.title
+                text: "LIBRARY " + (index + 1) + "  " + modelData.providerLabel + " / " + modelData.title
                 color: libraryList.currentIndex === index ? root.surfaceColor : root.primaryColor
                 font.family: root.globalFont
                 font.capitalization: Font.AllUppercase

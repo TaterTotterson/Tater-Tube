@@ -26,6 +26,14 @@ FocusScope {
         { id: "r2",     title: "RIGHT TRIGGER",  symbol: "R2",     note: "PULL FOR PAGE DOWN" },
         { id: "l3",     title: "LEFT STICK",     symbol: "L3",     note: "CLICK LEFT STICK" },
         { id: "r3",     title: "RIGHT STICK",    symbol: "R3",     note: "CLICK RIGHT STICK" },
+        { id: "l_x_minus", title: "LEFT STICK LEFT",   symbol: "L←", note: "MOVE LEFT STICK LEFT" },
+        { id: "l_x_plus",  title: "LEFT STICK RIGHT",  symbol: "L→", note: "MOVE LEFT STICK RIGHT" },
+        { id: "l_y_minus", title: "LEFT STICK UP",     symbol: "L↑", note: "MOVE LEFT STICK UP" },
+        { id: "l_y_plus",  title: "LEFT STICK DOWN",   symbol: "L↓", note: "MOVE LEFT STICK DOWN" },
+        { id: "r_x_minus", title: "RIGHT STICK LEFT",  symbol: "R←", note: "MOVE RIGHT STICK LEFT" },
+        { id: "r_x_plus",  title: "RIGHT STICK RIGHT", symbol: "R→", note: "MOVE RIGHT STICK RIGHT" },
+        { id: "r_y_minus", title: "RIGHT STICK UP",    symbol: "R↑", note: "MOVE RIGHT STICK UP" },
+        { id: "r_y_plus",  title: "RIGHT STICK DOWN",  symbol: "R↓", note: "MOVE RIGHT STICK DOWN" },
         { id: "menu",   title: "MENU",           symbol: "MENU",   note: "ON SCREEN DISPLAY" },
         { id: "home",   title: "HOME",           symbol: "HOME",   note: "RETURN TO TATER TUBE" }
     ]

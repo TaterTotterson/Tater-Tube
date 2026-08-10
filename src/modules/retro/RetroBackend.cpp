@@ -669,7 +669,7 @@ QList<RetroBackend::SystemDef> RetroBackend::systemDefinitions() const
          {"mame2003_plus_libretro.so", "mame2003_libretro.so", "mame2000_libretro.so"},
          "mame2003-plus"},
         {"psx", "PlayStation",
-         {"PSX", "PS1", "PlayStation", "Playstation"},
+         {"PSX", "PS1", "PlayStation", "Playstation", "PlayStation1"},
          {"cue", "chd", "pbp", "m3u"},
          {"pcsx_rearmed_libretro.so", "mednafen_psx_hw_libretro.so",
           "mednafen_psx_libretro.so", "beetle_psx_hw_libretro.so",
@@ -701,6 +701,7 @@ const RetroBackend::SystemDef *RetroBackend::systemById(const QString &systemId)
 QString RetroBackend::corePath(const SystemDef &def) const
 {
     const QStringList roots{
+        QDir(m_appRoot).absoluteFilePath(QStringLiteral("vendor/retroarch/cores")),
         "/usr/lib/aarch64-linux-gnu/libretro",
         "/usr/lib/arm-linux-gnueabihf/libretro",
         "/usr/lib/x86_64-linux-gnu/libretro",
@@ -998,10 +999,11 @@ bool RetroBackend::savePortRomHashCache(
 
 bool RetroBackend::gameCacheIsCurrent(const QVariantMap &cache) const
 {
+    // Port manifests are intentionally not an automatic invalidation trigger.
+    // App updates therefore keep the completed catalog; first use, library
+    // setup changes, core installation, or an explicit refresh rebuild it.
     return cache.value(QStringLiteral("version")).toInt() == kGameCacheVersion
-        && cache.value(QStringLiteral("gamesRoot")).toString() == gameCacheRootKey()
-        && cache.value(QStringLiteral("portManifestKey")).toString()
-            == gamePortManifestKey();
+        && cache.value(QStringLiteral("gamesRoot")).toString() == gameCacheRootKey();
 }
 
 QVariantMap RetroBackend::loadGameCache() const
@@ -1040,6 +1042,8 @@ bool RetroBackend::saveGameCache(const QVariantMap &cache) const
 
 QVariantMap RetroBackend::buildGameCache() const
 {
+    GamePortCatalog::refreshLibraryFolderIndex(gamesRoot());
+
     QVariantMap cache;
     cache[QStringLiteral("version")] = kGameCacheVersion;
     cache[QStringLiteral("createdAt")] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
@@ -1152,6 +1156,7 @@ QVariantMap RetroBackend::get_setup_status()
     status["gamesRootExists"] = QDir(gamesRoot()).exists();
     status["retroarchAvailable"] = !retroarchPath().isEmpty();
     const QVariantMap existingCache = loadGameCache();
+    status["gameCacheAvailable"] = !existingCache.isEmpty();
     const QVariantList portGames = existingCache.value(QStringLiteral("games"))
         .toMap().value(QString::fromUtf8(kPortsSystemId)).toList();
     bool portsAvailable = !portGames.isEmpty();
@@ -1282,7 +1287,9 @@ void RetroBackend::load_games(const QString &systemId)
 
 void RetroBackend::refresh_game_cache()
 {
-    clearGameCache();
+    // Keep the last complete catalog available until its replacement is
+    // written atomically. An interrupted refresh or reboot must not force the
+    // next launch to start another full network scan.
     startGameCacheBuild();
 }
 
@@ -1390,6 +1397,14 @@ QString RetroBackend::writeRetroarchConfig()
             writeMapped(QStringLiteral("r2"), QStringLiteral("r2"));
             writeMapped(QStringLiteral("l3"), QStringLiteral("l3"));
             writeMapped(QStringLiteral("r3"), QStringLiteral("r3"));
+            writeMapped(QStringLiteral("l_x_minus"), QStringLiteral("l_x_minus"));
+            writeMapped(QStringLiteral("l_x_plus"), QStringLiteral("l_x_plus"));
+            writeMapped(QStringLiteral("l_y_minus"), QStringLiteral("l_y_minus"));
+            writeMapped(QStringLiteral("l_y_plus"), QStringLiteral("l_y_plus"));
+            writeMapped(QStringLiteral("r_x_minus"), QStringLiteral("r_x_minus"));
+            writeMapped(QStringLiteral("r_x_plus"), QStringLiteral("r_x_plus"));
+            writeMapped(QStringLiteral("r_y_minus"), QStringLiteral("r_y_minus"));
+            writeMapped(QStringLiteral("r_y_plus"), QStringLiteral("r_y_plus"));
         }
     }
 

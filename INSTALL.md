@@ -9,7 +9,7 @@ The release images are built for:
 - Emby/Jellyfin or Plex media libraries
 - HDHomeRun OTA tuners
 - YouTube playlists
-- RetroNAS/MiSTer ROM shares
+- RetroNAS ROM shares
 - Sunshine/Moonlight PC Link hosts
 - Bluetooth controllers
 - Argon IR remote support
@@ -158,10 +158,10 @@ Saved playlists load automatically on later launches. The Pi image installs `yt-
 
 ## Game Center Setup
 
-1. Set up RetroNAS with the MiSTer share enabled.
-2. Put ROMs in the MiSTer `games` folder layout, for example `games/NES`, `games/Genesis`, or `games/PSX`.
+1. Set up the main RetroNAS share.
+2. Put ROMs in the RetroNAS manufacturer/system layout, for example `roms/nintendo/nes`, `roms/sega/genesis`, or `roms/sony/playstation1`.
 3. Open the Game Center module.
-4. Enter the RetroNAS host, share, and path. Defaults are `retronas.local`, `retronas`, and `roms`. Flat MiSTer folders and manufacturer-grouped layouts such as `nintendo/gamecube/iso` are both supported.
+4. Enter the RetroNAS host, share, and path. Defaults are `retronas.local`, `retronas`, and `roms`. Game Center indexes the manufacturer-grouped folders below that root, such as `nintendo/gamecube/iso`.
 5. Enter a username and password if the share is not guest-accessible.
 
 The Pi image installs RetroArch and tries to install the supported libretro cores automatically. The module only shows systems that have both a ROM folder and an installed core. Games launch directly into RetroArch; press Home on the remote to stop the game and return to the Tater Tube menu.

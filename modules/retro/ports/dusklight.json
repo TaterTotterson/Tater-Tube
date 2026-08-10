@@ -8,14 +8,7 @@
   "romValidation": "engine",
   "romAccess": "direct",
   "romFolders": [
-    "nintendo/gamecube",
-    "nintendo/game cube",
-    "nintendo/nintendo gamecube",
-    "GameCube",
-    "Game Cube",
-    "Nintendo GameCube",
-    "Nintendo - GameCube",
-    "GC"
+    "nintendo/gamecube"
   ],
   "romExtensions": [
     "nkit.iso",

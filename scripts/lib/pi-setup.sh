@@ -120,7 +120,6 @@ PI240_RETRO_CORE_DOWNLOADS=(
     vecx_libretro.so
     fceumm_libretro.so
     nestopia_libretro.so
-    parallel_n64_libretro.so
     gearsystem_libretro.so
     genesis_plus_gx_libretro.so
     picodrive_libretro.so
@@ -377,6 +376,7 @@ pi240_install_missing_retro_core_dependencies() {
 
 pi240_retro_core_dirs() {
     printf '%s\n' \
+        /opt/240mp/share/240mp/vendor/retroarch/cores \
         /usr/lib/aarch64-linux-gnu/libretro \
         /usr/lib/arm-linux-gnueabihf/libretro \
         /usr/lib/x86_64-linux-gnu/libretro \

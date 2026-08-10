@@ -11,6 +11,9 @@ for required_path in \
     moonlight-sdl/bin/moonlight \
     moonlight-sdl/LICENSE \
     moonlight-sdl/SOURCE.txt \
+    retroarch/cores/mupen64plus_next_libretro.so \
+    notices/retroarch-cores/mupen64plus-next/LICENSE \
+    notices/retroarch-cores/mupen64plus-next/SOURCE.txt \
     ports/sm64coopdx/sm64coopdx \
     ports/sm64coopdx/SOURCE.txt \
     ports/2ship2harkinian/2s2h.elf \

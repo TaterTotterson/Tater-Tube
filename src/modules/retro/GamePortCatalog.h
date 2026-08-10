@@ -45,6 +45,7 @@ public:
                               const QString &appRoot,
                               const QString &dataRoot,
                               const QString &configuredPath = QString());
+    static void refreshLibraryFolderIndex(const QString &gamesRoot);
     static QStringList findLibraryFolders(const QStringList &folderNames,
                                           const QString &gamesRoot);
     static bool splitLibraryPath(const QStringList &folderNames,

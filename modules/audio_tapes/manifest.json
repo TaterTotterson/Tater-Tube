@@ -10,13 +10,6 @@
       "label": "ENABLED",
       "type": "toggle",
       "default": "ON"
-    },
-    {
-      "key": "music_provider",
-      "label": "MUSIC PROVIDER",
-      "type": "list_single",
-      "options": ["Video on Demand", "Tater Tube Server"],
-      "default": "Video on Demand"
     }
   ]
 }

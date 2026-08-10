@@ -17,6 +17,7 @@ private slots:
     void reusesHashesAcrossRequirementsAndPorts();
     void streamsEngineValidatedDiscWithoutCopying();
     void recognizesMultiPartRomExtensions();
+    void indexesManufacturerFoldersOncePerRefresh();
     void detectsCompositeDisplayModes();
 };
 
@@ -30,13 +31,15 @@ void GamePortCatalogTest::discoversValidatesAndStagesPort()
     const QString gamesRoot = temporary.filePath(QStringLiteral("games"));
     const QString engineRoot = temporary.filePath(QStringLiteral("engines"));
     QVERIFY(QDir().mkpath(QDir(appRoot).filePath(QStringLiteral("modules/retro/ports"))));
-    QVERIFY(QDir().mkpath(QDir(gamesRoot).filePath(QStringLiteral("N64"))));
+    QVERIFY(QDir().mkpath(QDir(gamesRoot).filePath(
+        QStringLiteral("Nintendo/N64"))));
     QVERIFY(QDir().mkpath(engineRoot));
 
     const QByteArray romContents("game-port-test-rom");
     const QByteArray romMd5 = QCryptographicHash::hash(
         romContents, QCryptographicHash::Md5).toHex();
-    const QString romPath = QDir(gamesRoot).filePath(QStringLiteral("N64/Test.z64"));
+    const QString romPath = QDir(gamesRoot).filePath(
+        QStringLiteral("Nintendo/N64/Test.z64"));
     QFile rom(romPath);
     QVERIFY(rom.open(QIODevice::WriteOnly));
     QCOMPARE(rom.write(romContents), romContents.size());
@@ -95,9 +98,9 @@ void GamePortCatalogTest::discoversValidatesAndStagesPort()
     const QStringList candidates = GamePortCatalog::findRomCandidates(port, gamesRoot);
     QCOMPARE(candidates, QStringList{romPath});
     QVERIFY(GamePortCatalog::remotePathCanProvideRom(
-        port, QStringLiteral("N64/folder/Test.z64")));
+        port, QStringLiteral("Nintendo/N64/folder/Test.z64")));
     QVERIFY(!GamePortCatalog::remotePathCanProvideRom(
-        port, QStringLiteral("SNES/Test.z64")));
+        port, QStringLiteral("N64/Test.z64")));
     QVERIFY(GamePortCatalog::romMatches(port, romPath));
 
     QString stagedPath;
@@ -277,7 +280,7 @@ void GamePortCatalogTest::recognizesMultiPartRomExtensions()
     port.romFolders = {QStringLiteral("GameCube")};
     port.romExtensions = {QStringLiteral("nkit.iso")};
 
-    QVERIFY(GamePortCatalog::remotePathCanProvideRom(
+    QVERIFY(!GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("GameCube/Twilight Princess.NKIT.ISO")));
     QVERIFY(GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("nintendo/gamecube/iso/Twilight Princess.NKIT.ISO")));
@@ -285,6 +288,41 @@ void GamePortCatalogTest::recognizesMultiPartRomExtensions()
         port, QStringLiteral("GameCube/Twilight Princess.iso")));
     QVERIFY(!GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("Wii/Twilight Princess.nkit.iso")));
+}
+
+void GamePortCatalogTest::indexesManufacturerFoldersOncePerRefresh()
+{
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+
+    const QString gamesRoot = temporary.filePath(QStringLiteral("roms"));
+    const QString n64Path = QDir(gamesRoot).filePath(
+        QStringLiteral("Nintendo/Nintendo64"));
+    const QString genesisPath = QDir(gamesRoot).filePath(
+        QStringLiteral("Sega/Genesis"));
+    const QString legacyFlatN64Path = QDir(gamesRoot).filePath(
+        QStringLiteral("N64"));
+    QVERIFY(QDir().mkpath(n64Path));
+    QVERIFY(QDir().mkpath(genesisPath));
+    QVERIFY(QDir().mkpath(legacyFlatN64Path));
+
+    GamePortCatalog::refreshLibraryFolderIndex(gamesRoot);
+    QCOMPARE(GamePortCatalog::findLibraryFolders(
+                 {QStringLiteral("N64"), QStringLiteral("Nintendo64")},
+                 gamesRoot),
+             QStringList{n64Path});
+    QCOMPARE(GamePortCatalog::findLibraryFolders(
+                 {QStringLiteral("Genesis"), QStringLiteral("MegaDrive")},
+                 gamesRoot),
+             QStringList{genesisPath});
+
+    const QString psxPath = QDir(gamesRoot).filePath(
+        QStringLiteral("Sony/PlayStation1"));
+    QVERIFY(QDir().mkpath(psxPath));
+    GamePortCatalog::refreshLibraryFolderIndex(gamesRoot);
+    QCOMPARE(GamePortCatalog::findLibraryFolders(
+                 {QStringLiteral("PlayStation1")}, gamesRoot),
+             QStringList{psxPath});
 }
 
 void GamePortCatalogTest::detectsCompositeDisplayModes()

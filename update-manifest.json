@@ -1,15 +1,16 @@
 {
-  "version": "v1.9.2",
-  "app_version": "1.9.2",
+  "version": "v1.9.4",
+  "app_version": "1.9.4",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.2/Tater-Tube-v1.9.2-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.2.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.4/Tater-Tube-v1.9.4-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.4.tar.gz",
   "notes": [
-    "Fixes Dusklight's audio-only black screen on Raspberry Pi 4 and Pi 5 by compiling OpenGL ES pipelines on the render worker that owns the graphics context.",
-    "Tunes Dusklight for Raspberry Pi with OpenGL ES, a 30 FPS target, and model-specific internal resolution defaults for Pi 4 and Pi 5.",
-    "Improves Twilight Princess and legacy NKit detection, including reliable engine validation and prioritizing likely ROM matches before unrelated GameCube images.",
-    "Preserves the Game Center library cache during unchanged RetroNAS reconnects so opening Game Center does not trigger another full scan."
+    "Tape Deck now discovers Video on Demand and Tater Tube Server music automatically, combines both library lists when available, and removes the manual provider setting.",
+    "Game Center now indexes the main RetroNAS manufacturer/system layout once per refresh and preserves its completed catalog across boots, reconnects, and app updates.",
+    "Adds working Nintendo 64 support on Raspberry Pi 4 and Pi 5 with the pinned Mupen64Plus-Next ARM64 core.",
+    "Adds complete left- and right-stick RetroPad mappings, including right-stick N64 C-button control and safe migration of legacy controller maps.",
+    "Standardizes bundled game-port discovery on the RetroNAS ROM layout and improves the cached-library loading screen."
   ]
 }

@@ -204,10 +204,12 @@ FocusScope {
     }
 
     function loadSystems() {
+        var status = retroBackend.get_setup_status()
+        var cached = status.gameCacheAvailable === true
         mode = "loading"
-        scanningLibrary = true
+        scanningLibrary = !cached
         scanMessageIndex = 0
-        statusText = "SCANNING GAME LIBRARY"
+        statusText = cached ? "LOADING GAME LIBRARY" : "SCANNING GAME LIBRARY"
         retroBackend.load_systems()
     }
 

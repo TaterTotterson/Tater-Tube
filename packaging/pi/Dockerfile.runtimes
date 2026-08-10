@@ -123,6 +123,32 @@ RUN DUSKLIGHT_PATCH=/tmp/dusklight-tater-tube.patch \
     DUSKLIGHT_BUILD_JOBS="${DUSKLIGHT_BUILD_JOBS}" \
     /tmp/build-dusklight-port.sh "${RUNTIME_ROOT}/ports/dusklight"
 
+# Mupen64Plus-Next is built for the Pi 4's ARMv8/GLES3 baseline so the same
+# core works on both Pi 4 and Pi 5. The Libretro ARM64 buildbot does not ship
+# this core, and its ParaLLEl N64 substitute crashes with the Pi GLES frontend.
+ARG MUPEN64PLUS_NEXT_REF=f275caf4b2bfa1e6d1c51636746ea793f3d80320
+RUN mkdir -p /build/mupen64plus-next \
+        "${RUNTIME_ROOT}/retroarch/cores" \
+        "${RUNTIME_ROOT}/notices/retroarch-cores/mupen64plus-next" \
+    && curl -fL --retry 3 \
+        "https://github.com/libretro/mupen64plus-libretro-nx/archive/${MUPEN64PLUS_NEXT_REF}.tar.gz" \
+        | tar -xz -C /build/mupen64plus-next --strip-components=1 \
+    && make -C /build/mupen64plus-next -f Makefile -j"${BUILD_JOBS}" \
+        platform=rpi4_64 GIT_VERSION="${MUPEN64PLUS_NEXT_REF}" \
+    && install -m 0644 \
+        /build/mupen64plus-next/mupen64plus_next_libretro.so \
+        "${RUNTIME_ROOT}/retroarch/cores/mupen64plus_next_libretro.so" \
+    && strip --strip-unneeded \
+        "${RUNTIME_ROOT}/retroarch/cores/mupen64plus_next_libretro.so" \
+    && cp /build/mupen64plus-next/LICENSE \
+        "${RUNTIME_ROOT}/notices/retroarch-cores/mupen64plus-next/LICENSE" \
+    && printf '%s\n' \
+        "Mupen64Plus-Next ${MUPEN64PLUS_NEXT_REF}" \
+        'Source: https://github.com/libretro/mupen64plus-libretro-nx' \
+        'License: GPL-2.0' \
+        > "${RUNTIME_ROOT}/notices/retroarch-cores/mupen64plus-next/SOURCE.txt" \
+    && rm -rf /build/mupen64plus-next
+
 RUN curl -fsSL --retry 3 \
         https://raw.githubusercontent.com/moonlight-stream/moonlight-embedded/f32e415aea6797d261d6b470dcf8bf18727341c2/LICENSE \
         -o "${RUNTIME_ROOT}/moonlight-sdl/LICENSE" \

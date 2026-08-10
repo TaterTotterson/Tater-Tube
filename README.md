@@ -66,7 +66,7 @@ Run Tater Tube Server on a NAS, desktop, or home server, usually through Docker.
 
 ### Game Center
 
-- Browses RetroNAS/MiSTer-style ROM folders
+- Browses RetroNAS ROM folders organized by manufacturer and system
 - Launches directly into RetroArch
 - Supports common Pi-friendly systems through Nintendo 64 and PlayStation when matching cores are available
 - Uses one global RetroPad controller map across cores

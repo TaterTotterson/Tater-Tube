@@ -8,16 +8,89 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QSharedPointer>
 #include <QStandardPaths>
 #include <QSysInfo>
 #include <algorithm>
 
 namespace {
 constexpr qint64 kMaximumManifestBytes = 256 * 1024;
+
+struct LibraryFolderIndex {
+    QHash<QString, QString> nestedFolders;
+    QHash<QString, QStringList> nestedFoldersByName;
+};
+
+QMutex libraryFolderIndexMutex;
+QHash<QString, QSharedPointer<LibraryFolderIndex>> libraryFolderIndexes;
+
+QString libraryFolderIndexKey(const QString &gamesRoot)
+{
+    const QFileInfo rootInfo(gamesRoot);
+    const QString canonical = rootInfo.canonicalFilePath();
+    return canonical.isEmpty() ? rootInfo.absoluteFilePath() : canonical;
+}
+
+QSharedPointer<LibraryFolderIndex> buildLibraryFolderIndex(
+    const QString &gamesRoot)
+{
+    auto index = QSharedPointer<LibraryFolderIndex>::create();
+    const QDir root(gamesRoot);
+    if (!root.exists())
+        return index;
+
+    const QFileInfoList collections = root.entryInfoList(
+        QDir::Dirs | QDir::Readable | QDir::NoDotAndDotDot,
+        QDir::Name | QDir::IgnoreCase);
+    for (const QFileInfo &collection : collections) {
+        const QString collectionName = collection.fileName().toLower();
+        // RetroNAS groups systems one level below their manufacturer. Build
+        // that directory map once so a library scan does not reopen every
+        // manufacturer directory for every system alias.
+        const QFileInfoList systems = QDir(collection.absoluteFilePath())
+            .entryInfoList(QDir::Dirs | QDir::Readable | QDir::NoDotAndDotDot,
+                           QDir::Name | QDir::IgnoreCase);
+        for (const QFileInfo &system : systems) {
+            const QString systemName = system.fileName().toLower();
+            const QString nestedName = collectionName + QLatin1Char('/')
+                + systemName;
+            if (!index->nestedFolders.contains(nestedName)) {
+                index->nestedFolders.insert(nestedName,
+                                            system.absoluteFilePath());
+            }
+            QStringList &matches = index->nestedFoldersByName[systemName];
+            if (!matches.contains(system.absoluteFilePath()))
+                matches.append(system.absoluteFilePath());
+        }
+    }
+    return index;
+}
+
+QSharedPointer<LibraryFolderIndex> libraryFolderIndex(
+    const QString &gamesRoot)
+{
+    const QString key = libraryFolderIndexKey(gamesRoot);
+    {
+        QMutexLocker locker(&libraryFolderIndexMutex);
+        const auto existing = libraryFolderIndexes.constFind(key);
+        if (existing != libraryFolderIndexes.constEnd())
+            return existing.value();
+    }
+
+    const auto built = buildLibraryFolderIndex(gamesRoot);
+    QMutexLocker locker(&libraryFolderIndexMutex);
+    const auto existing = libraryFolderIndexes.constFind(key);
+    if (existing != libraryFolderIndexes.constEnd())
+        return existing.value();
+    libraryFolderIndexes.insert(key, built);
+    return built;
+}
 
 QStringList jsonStringList(const QJsonValue &value)
 {
@@ -418,6 +491,14 @@ QString GamePortCatalog::findEngine(const GamePortDefinition &port,
     return {};
 }
 
+void GamePortCatalog::refreshLibraryFolderIndex(const QString &gamesRoot)
+{
+    const QString key = libraryFolderIndexKey(gamesRoot);
+    const auto refreshed = buildLibraryFolderIndex(gamesRoot);
+    QMutexLocker locker(&libraryFolderIndexMutex);
+    libraryFolderIndexes.insert(key, refreshed);
+}
+
 QStringList GamePortCatalog::findLibraryFolders(const QStringList &folderNames,
                                                 const QString &gamesRoot)
 {
@@ -426,37 +507,42 @@ QStringList GamePortCatalog::findLibraryFolders(const QStringList &folderNames,
         return {};
 
     QStringList folders;
-    bool hasExplicitPath = false;
     for (const QString &folderName : folderNames) {
         const QString folder = normalizedLibraryFolder(folderName);
         if (folder.isEmpty())
             continue;
-        if (folder.contains(QLatin1Char('/')))
-            hasExplicitPath = true;
         if (!folders.contains(folder, Qt::CaseInsensitive))
             folders.append(folder);
     }
 
+    const auto index = libraryFolderIndex(gamesRoot);
     QStringList result;
     for (const QString &folder : folders) {
-        const QString resolved = resolveLibraryDirectory(
-            root.absolutePath(), folder);
+        if (!folder.contains(QLatin1Char('/')))
+            continue;
+        QString resolved;
+        const QString lookup = folder.toLower();
+        resolved = index->nestedFolders.value(lookup);
+        // Keep support for RetroNAS layouts deeper than the standard
+        // manufacturer/system hierarchy.
+        if (resolved.isEmpty() && folder.count(QLatin1Char('/')) > 1) {
+            resolved = resolveLibraryDirectory(root.absolutePath(), folder);
+        }
         if (!resolved.isEmpty() && !result.contains(resolved))
             result.append(resolved);
     }
-    if (!result.isEmpty() || hasExplicitPath)
+    if (!result.isEmpty())
         return result;
 
     // RetroNAS libraries commonly group systems by manufacturer, such as
-    // roms/nintendo/gamecube. Preserve the flat MiSTer layout first, then look
-    // exactly one collection level deeper without walking or hashing files.
-    const QFileInfoList collections = root.entryInfoList(
-        QDir::Dirs | QDir::Readable | QDir::NoDotAndDotDot,
-        QDir::Name | QDir::IgnoreCase);
+    // roms/nintendo/gamecube. Resolve unqualified system aliases only within
+    // that indexed manufacturer/system hierarchy.
     for (const QString &folder : folders) {
-        for (const QFileInfo &collection : collections) {
-            const QString resolved = resolveLibraryDirectory(
-                collection.absoluteFilePath(), folder);
+        if (folder.contains(QLatin1Char('/')))
+            continue;
+        const QStringList matches = index->nestedFoldersByName.value(
+            folder.toLower());
+        for (const QString &resolved : matches) {
             if (!resolved.isEmpty() && !result.contains(resolved))
                 result.append(resolved);
         }
@@ -485,10 +571,10 @@ bool GamePortCatalog::splitLibraryPath(const QStringList &folderNames,
             continue;
         }
 
-        const qsizetype maximumStart = folder.contains(QLatin1Char('/'))
-            ? 0
-            : std::min<qsizetype>(1, directorySegmentCount - folderSegments.size());
-        for (qsizetype start = 0; start <= maximumStart; ++start) {
+        const qsizetype start = folder.contains(QLatin1Char('/')) ? 0 : 1;
+        if (start + folderSegments.size() > directorySegmentCount)
+            continue;
+        {
             bool matches = true;
             for (qsizetype index = 0; index < folderSegments.size(); ++index) {
                 if (pathSegments.at(start + index).compare(

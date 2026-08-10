@@ -1168,7 +1168,7 @@ bool InputManager::controllerMappingNeedsDefault() const
 void InputManager::ensureDefaultControllerMapping(SDL_JoystickID which,
                                                   SDL_GameController *controller)
 {
-    if (!controller || !controllerMappingNeedsDefault())
+    if (!controller)
         return;
 
     const auto withStep = [](QVariantMap input, const QString &step, const QString &title) {
@@ -1179,42 +1179,111 @@ void InputManager::ensureDefaultControllerMapping(SDL_JoystickID which,
         return input;
     };
 
-    QVariantMap bindings;
+    QVariantMap mapping = getControllerMapping();
+    QVariantMap bindings = mapping.value(QStringLiteral("bindings")).toMap();
+    const bool seedFullMapping = bindings.isEmpty();
+    bool changed = false;
     const auto addButton = [&](const QString &step, const QString &title, SDL_GameControllerButton button) {
+        if (bindings.contains(step))
+            return;
         QVariantMap input = mappingInputForButton(controller, static_cast<Uint8>(button));
-        if (!input.isEmpty())
+        if (!input.isEmpty()) {
             bindings[step] = withStep(input, step, title);
+            changed = true;
+        }
     };
     const auto addAxis = [&](const QString &step, const QString &title, SDL_GameControllerAxis axis, int direction) {
+        if (bindings.contains(step))
+            return;
         QVariantMap input = mappingInputForAxis(controller, static_cast<Uint8>(axis), direction);
-        if (!input.isEmpty())
+        if (!input.isEmpty()) {
             bindings[step] = withStep(input, step, title);
+            changed = true;
+        }
     };
 
-    addButton(QStringLiteral("up"),     QStringLiteral("UP"),             SDL_CONTROLLER_BUTTON_DPAD_UP);
-    addButton(QStringLiteral("down"),   QStringLiteral("DOWN"),           SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-    addButton(QStringLiteral("left"),   QStringLiteral("LEFT"),           SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-    addButton(QStringLiteral("right"),  QStringLiteral("RIGHT"),          SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-    addButton(QStringLiteral("b"),      QStringLiteral("A BUTTON"),       SDL_CONTROLLER_BUTTON_A);
-    addButton(QStringLiteral("a"),      QStringLiteral("B BUTTON"),       SDL_CONTROLLER_BUTTON_B);
-    addButton(QStringLiteral("y"),      QStringLiteral("X BUTTON"),       SDL_CONTROLLER_BUTTON_X);
-    addButton(QStringLiteral("x"),      QStringLiteral("Y BUTTON"),       SDL_CONTROLLER_BUTTON_Y);
-    addButton(QStringLiteral("select"), QStringLiteral("SELECT"),         SDL_CONTROLLER_BUTTON_BACK);
-    addButton(QStringLiteral("start"),  QStringLiteral("START"),          SDL_CONTROLLER_BUTTON_START);
-    addButton(QStringLiteral("l"),      QStringLiteral("LEFT BUMPER"),    SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-    addButton(QStringLiteral("r"),      QStringLiteral("RIGHT BUMPER"),   SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
-    addAxis(QStringLiteral("l2"),       QStringLiteral("LEFT TRIGGER"),   SDL_CONTROLLER_AXIS_TRIGGERLEFT, +1);
-    addAxis(QStringLiteral("r2"),       QStringLiteral("RIGHT TRIGGER"),  SDL_CONTROLLER_AXIS_TRIGGERRIGHT, +1);
-    addButton(QStringLiteral("l3"),     QStringLiteral("LEFT STICK"),     SDL_CONTROLLER_BUTTON_LEFTSTICK);
-    addButton(QStringLiteral("r3"),     QStringLiteral("RIGHT STICK"),    SDL_CONTROLLER_BUTTON_RIGHTSTICK);
-    addButton(QStringLiteral("home"),   QStringLiteral("HOME"),           SDL_CONTROLLER_BUTTON_GUIDE);
+    if (seedFullMapping) {
+        addButton(QStringLiteral("up"),     QStringLiteral("UP"),             SDL_CONTROLLER_BUTTON_DPAD_UP);
+        addButton(QStringLiteral("down"),   QStringLiteral("DOWN"),           SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        addButton(QStringLiteral("left"),   QStringLiteral("LEFT"),           SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+        addButton(QStringLiteral("right"),  QStringLiteral("RIGHT"),          SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+        addButton(QStringLiteral("b"),      QStringLiteral("A BUTTON"),       SDL_CONTROLLER_BUTTON_A);
+        addButton(QStringLiteral("a"),      QStringLiteral("B BUTTON"),       SDL_CONTROLLER_BUTTON_B);
+        addButton(QStringLiteral("y"),      QStringLiteral("X BUTTON"),       SDL_CONTROLLER_BUTTON_X);
+        addButton(QStringLiteral("x"),      QStringLiteral("Y BUTTON"),       SDL_CONTROLLER_BUTTON_Y);
+        addButton(QStringLiteral("select"), QStringLiteral("SELECT"),         SDL_CONTROLLER_BUTTON_BACK);
+        addButton(QStringLiteral("start"),  QStringLiteral("START"),          SDL_CONTROLLER_BUTTON_START);
+        addButton(QStringLiteral("l"),      QStringLiteral("LEFT BUMPER"),    SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+        addButton(QStringLiteral("r"),      QStringLiteral("RIGHT BUMPER"),   SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+        addAxis(QStringLiteral("l2"),       QStringLiteral("LEFT TRIGGER"),   SDL_CONTROLLER_AXIS_TRIGGERLEFT, +1);
+        addAxis(QStringLiteral("r2"),       QStringLiteral("RIGHT TRIGGER"),  SDL_CONTROLLER_AXIS_TRIGGERRIGHT, +1);
+        addButton(QStringLiteral("l3"),     QStringLiteral("LEFT STICK"),     SDL_CONTROLLER_BUTTON_LEFTSTICK);
+        addButton(QStringLiteral("r3"),     QStringLiteral("RIGHT STICK"),    SDL_CONTROLLER_BUTTON_RIGHTSTICK);
+        addButton(QStringLiteral("home"),   QStringLiteral("HOME"),           SDL_CONTROLLER_BUTTON_GUIDE);
+    }
 
-    if (bindings.isEmpty())
+    // RetroArch autodetection is disabled because Tater Tube owns the global
+    // controller map. Seed every RetroPad analog direction from SDL so an
+    // existing button-only map is upgraded without asking the user to remap.
+    addAxis(QStringLiteral("l_x_minus"), QStringLiteral("LEFT STICK LEFT"),  SDL_CONTROLLER_AXIS_LEFTX, -1);
+    addAxis(QStringLiteral("l_x_plus"),  QStringLiteral("LEFT STICK RIGHT"), SDL_CONTROLLER_AXIS_LEFTX, +1);
+    addAxis(QStringLiteral("l_y_minus"), QStringLiteral("LEFT STICK UP"),    SDL_CONTROLLER_AXIS_LEFTY, -1);
+    addAxis(QStringLiteral("l_y_plus"),  QStringLiteral("LEFT STICK DOWN"),  SDL_CONTROLLER_AXIS_LEFTY, +1);
+    addAxis(QStringLiteral("r_x_minus"), QStringLiteral("RIGHT STICK LEFT"),  SDL_CONTROLLER_AXIS_RIGHTX, -1);
+    addAxis(QStringLiteral("r_x_plus"),  QStringLiteral("RIGHT STICK RIGHT"), SDL_CONTROLLER_AXIS_RIGHTX, +1);
+    addAxis(QStringLiteral("r_y_minus"), QStringLiteral("RIGHT STICK UP"),    SDL_CONTROLLER_AXIS_RIGHTY, -1);
+    addAxis(QStringLiteral("r_y_plus"),  QStringLiteral("RIGHT STICK DOWN"),  SDL_CONTROLLER_AXIS_RIGHTY, +1);
+
+    // Some existing Steam Deck maps were saved against the physical Deck
+    // controller before Steam Input began exposing its virtual Xbox pad. The
+    // old physical L2 axis (4) then collides with the virtual pad's right-Y
+    // axis. Repair only that impossible trigger/stick overlap, preserving all
+    // deliberate button choices and otherwise-valid custom controller maps.
+    const auto unsignedAxis = [](const QVariantMap &binding) {
+        if (binding.value(QStringLiteral("retroType")).toString() != QStringLiteral("axis"))
+            return QString();
+        QString value = binding.value(QStringLiteral("retroValue")).toString();
+        if (value.startsWith(QLatin1Char('+')) || value.startsWith(QLatin1Char('-')))
+            value.remove(0, 1);
+        return value;
+    };
+    QSet<QString> stickAxes;
+    for (const QString &step : {
+             QStringLiteral("l_x_minus"), QStringLiteral("l_y_minus"),
+             QStringLiteral("r_x_minus"), QStringLiteral("r_y_minus")}) {
+        const QString axis = unsignedAxis(bindings.value(step).toMap());
+        if (!axis.isEmpty())
+            stickAxes.insert(axis);
+    }
+    const auto repairTriggerCollision = [&](const QString &step,
+                                            const QString &title,
+                                            SDL_GameControllerAxis axis) {
+        const QVariantMap existing = bindings.value(step).toMap();
+        const QVariantMap desired = withStep(
+            mappingInputForAxis(controller, static_cast<Uint8>(axis), +1),
+            step, title);
+        const QString existingAxis = unsignedAxis(existing);
+        const QString desiredAxis = unsignedAxis(desired);
+        if (!existingAxis.isEmpty() && stickAxes.contains(existingAxis)
+            && !desiredAxis.isEmpty() && desiredAxis != existingAxis) {
+            bindings[step] = desired;
+            changed = true;
+            qInfo("[input] repaired stale %s axis mapping (%s -> %s)",
+                  qPrintable(step), qPrintable(existingAxis), qPrintable(desiredAxis));
+        }
+    };
+    repairTriggerCollision(QStringLiteral("l2"), QStringLiteral("LEFT TRIGGER"),
+                           SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+    repairTriggerCollision(QStringLiteral("r2"), QStringLiteral("RIGHT TRIGGER"),
+                           SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+
+    if (!changed)
         return;
 
+    mapping[QStringLiteral("bindings")] = bindings;
     noteActiveController(which);
-    if (saveControllerMapping({{QStringLiteral("bindings"), bindings}}))
-        qInfo("[input] seeded default controller mapping from SDL controller");
+    if (saveControllerMapping(mapping))
+        qInfo("[input] completed controller mapping from SDL controller");
 }
 
 void InputManager::ensureDefaultJoystickMapping(SDL_JoystickID which)
@@ -1262,6 +1331,14 @@ void InputManager::ensureDefaultJoystickMapping(SDL_JoystickID which)
     addButton(QStringLiteral("l3"),     QStringLiteral("LEFT STICK"),     11);
     addButton(QStringLiteral("r3"),     QStringLiteral("RIGHT STICK"),    12);
     addButton(QStringLiteral("home"),   QStringLiteral("HOME"),           10);
+    addAxis(QStringLiteral("l_x_minus"), QStringLiteral("LEFT STICK LEFT"),  0, -1);
+    addAxis(QStringLiteral("l_x_plus"),  QStringLiteral("LEFT STICK RIGHT"), 0, +1);
+    addAxis(QStringLiteral("l_y_minus"), QStringLiteral("LEFT STICK UP"),    1, -1);
+    addAxis(QStringLiteral("l_y_plus"),  QStringLiteral("LEFT STICK DOWN"),  1, +1);
+    addAxis(QStringLiteral("r_x_minus"), QStringLiteral("RIGHT STICK LEFT"),  3, -1);
+    addAxis(QStringLiteral("r_x_plus"),  QStringLiteral("RIGHT STICK RIGHT"), 3, +1);
+    addAxis(QStringLiteral("r_y_minus"), QStringLiteral("RIGHT STICK UP"),    4, -1);
+    addAxis(QStringLiteral("r_y_plus"),  QStringLiteral("RIGHT STICK DOWN"),  4, +1);
 
     noteActiveController(which);
     if (saveControllerMapping({{QStringLiteral("bindings"), bindings}}))
