@@ -23,6 +23,7 @@ namespace {
 constexpr qint64 kMaximumManifestBytes = 256 * 1024;
 
 struct LibraryFolderIndex {
+    QHash<QString, QString> rootFolders;
     QHash<QString, QString> nestedFolders;
     QHash<QString, QStringList> nestedFoldersByName;
 };
@@ -50,9 +51,13 @@ QSharedPointer<LibraryFolderIndex> buildLibraryFolderIndex(
         QDir::Name | QDir::IgnoreCase);
     for (const QFileInfo &collection : collections) {
         const QString collectionName = collection.fileName().toLower();
+        if (!index->rootFolders.contains(collectionName)) {
+            index->rootFolders.insert(collectionName,
+                                      collection.absoluteFilePath());
+        }
         // RetroNAS groups systems one level below their manufacturer. Build
-        // that directory map once so a library scan does not reopen every
-        // manufacturer directory for every system alias.
+        // both the root-level SMB map and manufacturer/system map once so a
+        // library scan does not reopen the share for every system alias.
         const QFileInfoList systems = QDir(collection.absoluteFilePath())
             .entryInfoList(QDir::Dirs | QDir::Readable | QDir::NoDotAndDotDot,
                            QDir::Name | QDir::IgnoreCase);
@@ -518,15 +523,16 @@ QStringList GamePortCatalog::findLibraryFolders(const QStringList &folderNames,
     const auto index = libraryFolderIndex(gamesRoot);
     QStringList result;
     for (const QString &folder : folders) {
-        if (!folder.contains(QLatin1Char('/')))
-            continue;
         QString resolved;
-        const QString lookup = folder.toLower();
-        resolved = index->nestedFolders.value(lookup);
-        // Keep support for RetroNAS layouts deeper than the standard
-        // manufacturer/system hierarchy.
-        if (resolved.isEmpty() && folder.count(QLatin1Char('/')) > 1) {
-            resolved = resolveLibraryDirectory(root.absolutePath(), folder);
+        if (folder.contains(QLatin1Char('/'))) {
+            resolved = index->nestedFolders.value(folder.toLower());
+            // Keep support for layouts deeper than the standard
+            // manufacturer/system hierarchy.
+            if (resolved.isEmpty() && folder.count(QLatin1Char('/')) > 1) {
+                resolved = resolveLibraryDirectory(root.absolutePath(), folder);
+            }
+        } else {
+            resolved = index->rootFolders.value(folder.toLower());
         }
         if (!resolved.isEmpty() && !result.contains(resolved))
             result.append(resolved);
@@ -534,9 +540,8 @@ QStringList GamePortCatalog::findLibraryFolders(const QStringList &folderNames,
     if (!result.isEmpty())
         return result;
 
-    // RetroNAS libraries commonly group systems by manufacturer, such as
-    // roms/nintendo/gamecube. Resolve unqualified system aliases only within
-    // that indexed manufacturer/system hierarchy.
+    // If no direct SMB-style folder or explicit path matched, resolve system
+    // aliases in the indexed RetroNAS manufacturer/system hierarchy.
     for (const QString &folder : folders) {
         if (folder.contains(QLatin1Char('/')))
             continue;
@@ -571,10 +576,11 @@ bool GamePortCatalog::splitLibraryPath(const QStringList &folderNames,
             continue;
         }
 
-        const qsizetype start = folder.contains(QLatin1Char('/')) ? 0 : 1;
-        if (start + folderSegments.size() > directorySegmentCount)
-            continue;
-        {
+        const qsizetype maximumStart = folder.contains(QLatin1Char('/'))
+            ? 0
+            : std::min<qsizetype>(
+                  1, directorySegmentCount - folderSegments.size());
+        for (qsizetype start = 0; start <= maximumStart; ++start) {
             bool matches = true;
             for (qsizetype index = 0; index < folderSegments.size(); ++index) {
                 if (pathSegments.at(start + index).compare(

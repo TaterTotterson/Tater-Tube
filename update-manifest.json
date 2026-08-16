@@ -1,14 +1,14 @@
 {
-  "version": "v1.9.5",
-  "app_version": "1.9.5",
+  "version": "v1.9.6",
+  "app_version": "1.9.6",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.5/Tater-Tube-v1.9.5-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.5.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.6/Tater-Tube-v1.9.6-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.6.tar.gz",
   "notes": [
-    "Adds a one-time personalized morning, afternoon, or evening welcome when Tater Tube starts, including a watch-or-play suggestion based on recent activity.",
-    "Shares privacy-safe activity context across video, live TV, music, Game Center, PC Link, local files, and module use without sending paths, stream URLs, usernames, or credentials.",
-    "Adds independent controls for the boot greeting and Tater Picks narration, and stops narration automatically when media, a game, or a PC stream begins."
+    "Restores Game Center discovery for flat SMB and NAS libraries such as roms/N64 while retaining the indexed RetroNAS manufacturer/system layout.",
+    "Accepts flat and nested remote ROM paths without adding a second full library walk.",
+    "Refreshes the game-library cache once after updating so titles hidden by the previous scanner return automatically."
   ]
 }

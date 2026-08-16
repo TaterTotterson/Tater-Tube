@@ -17,7 +17,7 @@ private slots:
     void reusesHashesAcrossRequirementsAndPorts();
     void streamsEngineValidatedDiscWithoutCopying();
     void recognizesMultiPartRomExtensions();
-    void indexesManufacturerFoldersOncePerRefresh();
+    void indexesFlatAndManufacturerFoldersOncePerRefresh();
     void detectsCompositeDisplayModes();
 };
 
@@ -99,7 +99,7 @@ void GamePortCatalogTest::discoversValidatesAndStagesPort()
     QCOMPARE(candidates, QStringList{romPath});
     QVERIFY(GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("Nintendo/N64/folder/Test.z64")));
-    QVERIFY(!GamePortCatalog::remotePathCanProvideRom(
+    QVERIFY(GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("N64/Test.z64")));
     QVERIFY(GamePortCatalog::romMatches(port, romPath));
 
@@ -280,7 +280,7 @@ void GamePortCatalogTest::recognizesMultiPartRomExtensions()
     port.romFolders = {QStringLiteral("GameCube")};
     port.romExtensions = {QStringLiteral("nkit.iso")};
 
-    QVERIFY(!GamePortCatalog::remotePathCanProvideRom(
+    QVERIFY(GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("GameCube/Twilight Princess.NKIT.ISO")));
     QVERIFY(GamePortCatalog::remotePathCanProvideRom(
         port, QStringLiteral("nintendo/gamecube/iso/Twilight Princess.NKIT.ISO")));
@@ -290,7 +290,7 @@ void GamePortCatalogTest::recognizesMultiPartRomExtensions()
         port, QStringLiteral("Wii/Twilight Princess.nkit.iso")));
 }
 
-void GamePortCatalogTest::indexesManufacturerFoldersOncePerRefresh()
+void GamePortCatalogTest::indexesFlatAndManufacturerFoldersOncePerRefresh()
 {
     QTemporaryDir temporary;
     QVERIFY(temporary.isValid());
@@ -310,11 +310,18 @@ void GamePortCatalogTest::indexesManufacturerFoldersOncePerRefresh()
     QCOMPARE(GamePortCatalog::findLibraryFolders(
                  {QStringLiteral("N64"), QStringLiteral("Nintendo64")},
                  gamesRoot),
-             QStringList{n64Path});
+             QStringList{legacyFlatN64Path});
     QCOMPARE(GamePortCatalog::findLibraryFolders(
                  {QStringLiteral("Genesis"), QStringLiteral("MegaDrive")},
                  gamesRoot),
              QStringList{genesisPath});
+
+    QVERIFY(QDir().rmdir(legacyFlatN64Path));
+    GamePortCatalog::refreshLibraryFolderIndex(gamesRoot);
+    QCOMPARE(GamePortCatalog::findLibraryFolders(
+                 {QStringLiteral("N64"), QStringLiteral("Nintendo64")},
+                 gamesRoot),
+             QStringList{n64Path});
 
     const QString psxPath = QDir(gamesRoot).filePath(
         QStringLiteral("Sony/PlayStation1"));
