@@ -1,14 +1,14 @@
 {
-  "version": "v1.9.6",
-  "app_version": "1.9.6",
+  "version": "v1.9.7",
+  "app_version": "1.9.7",
   "channel": "main",
   "repo": "https://github.com/TaterTotterson/Tater-Tube",
   "manifest_url": "https://raw.githubusercontent.com/TaterTotterson/Tater-Tube/main/update-manifest.json",
-  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.6/Tater-Tube-v1.9.6-linux-arm64.tar.gz",
-  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.6.tar.gz",
+  "binary_archive": "https://github.com/TaterTotterson/Tater-Tube/releases/download/v1.9.7/Tater-Tube-v1.9.7-linux-arm64.tar.gz",
+  "source_archive": "https://github.com/TaterTotterson/Tater-Tube/archive/refs/tags/v1.9.7.tar.gz",
   "notes": [
-    "Restores Game Center discovery for flat SMB and NAS libraries such as roms/N64 while retaining the indexed RetroNAS manufacturer/system layout.",
-    "Accepts flat and nested remote ROM paths without adding a second full library walk.",
-    "Refreshes the game-library cache once after updating so titles hidden by the previous scanner return automatically."
+    "Extends flat SMB and NAS library support to all six bundled Game Center ports while retaining the grouped RetroNAS layout.",
+    "Recognizes common N64, Nintendo 64, Nintendo64, GameCube, Game Cube, and Nintendo GameCube folder names for local and remote libraries.",
+    "Refreshes the game-library cache once after updating so ports are rediscovered automatically."
   ]
 }

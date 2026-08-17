@@ -6,7 +6,10 @@
   "distribution": "bundled-patched-engine",
   "engineEnvironment": "TATER_TUBE_SPAGHETTIKART",
   "romFolders": [
-    "nintendo/nintendo64"
+    "nintendo/nintendo64",
+    "N64",
+    "Nintendo64",
+    "Nintendo 64"
   ],
   "romExtensions": [
     "z64"

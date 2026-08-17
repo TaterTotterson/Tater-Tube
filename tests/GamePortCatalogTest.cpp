@@ -18,6 +18,7 @@ private slots:
     void streamsEngineValidatedDiscWithoutCopying();
     void recognizesMultiPartRomExtensions();
     void indexesFlatAndManufacturerFoldersOncePerRefresh();
+    void bundledPortsSupportFlatAndGroupedLibraries();
     void detectsCompositeDisplayModes();
 };
 
@@ -330,6 +331,56 @@ void GamePortCatalogTest::indexesFlatAndManufacturerFoldersOncePerRefresh()
     QCOMPARE(GamePortCatalog::findLibraryFolders(
                  {QStringLiteral("PlayStation1")}, gamesRoot),
              QStringList{psxPath});
+}
+
+void GamePortCatalogTest::bundledPortsSupportFlatAndGroupedLibraries()
+{
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+
+    const QString flatRoot = temporary.filePath(QStringLiteral("flat"));
+    const QString groupedRoot = temporary.filePath(QStringLiteral("grouped"));
+    const QString flatN64 = QDir(flatRoot).filePath(
+        QStringLiteral("N64/Test.z64"));
+    const QString flatGameCube = QDir(flatRoot).filePath(
+        QStringLiteral("GameCube/Test.iso"));
+    const QString groupedN64 = QDir(groupedRoot).filePath(
+        QStringLiteral("Nintendo/Nintendo64/Test.z64"));
+    const QString groupedGameCube = QDir(groupedRoot).filePath(
+        QStringLiteral("Nintendo/GameCube/Test.iso"));
+
+    for (const QString &path : {flatN64, flatGameCube,
+                                groupedN64, groupedGameCube}) {
+        QVERIFY(QDir().mkpath(QFileInfo(path).absolutePath()));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("port-rom"), qint64(8));
+    }
+
+    QStringList errors;
+    const QList<GamePortDefinition> ports = GamePortCatalog::load(
+        QStringLiteral(TATER_TUBE_TEST_APP_ROOT), &errors);
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QStringLiteral("; "))));
+    QCOMPARE(ports.size(), 6);
+
+    for (const GamePortDefinition &port : ports) {
+        const bool gameCube = port.id == QLatin1String("dusklight");
+        const QString expectedFlat = gameCube ? flatGameCube : flatN64;
+        const QString expectedGrouped = gameCube ? groupedGameCube : groupedN64;
+
+        GamePortCatalog::refreshLibraryFolderIndex(flatRoot);
+        QCOMPARE(GamePortCatalog::findRomCandidates(port, flatRoot),
+                 QStringList{expectedFlat});
+        GamePortCatalog::refreshLibraryFolderIndex(groupedRoot);
+        QCOMPARE(GamePortCatalog::findRomCandidates(port, groupedRoot),
+                 QStringList{expectedGrouped});
+        QVERIFY(GamePortCatalog::remotePathCanProvideRom(
+            port, gameCube ? QStringLiteral("GameCube/Test.iso")
+                           : QStringLiteral("N64/Test.z64")));
+        QVERIFY(GamePortCatalog::remotePathCanProvideRom(
+            port, gameCube ? QStringLiteral("nintendo/gamecube/Test.iso")
+                           : QStringLiteral("nintendo/nintendo64/Test.z64")));
+    }
 }
 
 void GamePortCatalogTest::detectsCompositeDisplayModes()

@@ -7,17 +7,18 @@ and cryptographic hash and copy it into the port's private writable directory.
 Disc-aware ports may explicitly delegate revision validation to their engine and
 stream the image directly from the configured game library.
 
-Game Center uses the main RetroNAS ROM layout. New connections default to the
-`retronas` share with `roms` as the library root. System folders are grouped
-below a manufacturer, such as `nintendo/gamecube/iso` and
-`nintendo/nintendo64`.
+Game Center supports both conventional SMB/NAS libraries with system folders
+directly under the configured root and the main RetroNAS layout. New
+connections default to the `retronas` share with `roms` as the library root.
+Ports recognize flat folders such as `GameCube` and `N64`, as well as grouped
+folders such as `nintendo/gamecube/iso` and `nintendo/nintendo64`.
 
 The sm64coopdx integration is built from pinned v1.5.1 source and applies the
 small patch under
 `packaging/ports/sm64coopdx` to add **Exit to Tater Tube** at the bottom of the
 pause menu. No ROM or extracted Nintendo game data is included. Place a supported
-original ROM under `nintendo/nintendo64` in the configured game library, then
-refresh the Game Center list.
+original ROM under `nintendo/nintendo64` or a flat `N64` folder in the
+configured game library, then refresh the Game Center list.
 
 Developers can rebuild the engine with `scripts/build-sm64coopdx-port.sh`. The
 SteamOS release uses its Ubuntu 22.04 builder, while Raspberry Pi releases build
@@ -61,7 +62,8 @@ partition and filesystem. Because compressed disc images do not have stable
 whole-file hashes, the preflight checks the game, supported region, and actual
 disc filesystem instead. Game Center passes the read-only RetroNAS path
 directly to the engine instead of copying a multi-gigabyte image into local
-storage. Its normal quit menu is labelled **Exit to Tater Tube**. Developers
+storage. Flat `GameCube` folders and the grouped `nintendo/gamecube` layout are
+both supported. Its normal quit menu is labelled **Exit to Tater Tube**. Developers
 can rebuild it with `scripts/build-dusklight-port.sh`. Linux requires Vulkan;
 Raspberry Pi support therefore depends on a working Mesa V3DV driver and
 suitable performance.

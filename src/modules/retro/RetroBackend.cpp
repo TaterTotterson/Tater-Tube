@@ -46,7 +46,7 @@ constexpr const char *kRetroMountHelper = "/usr/local/sbin/240mp-retro-mount";
 constexpr const char *kRetroCoreHelper = "/usr/local/sbin/240mp-retro-core-control";
 constexpr const char *kGameCacheFile = "game-cache.json";
 constexpr const char *kPortRomHashCacheFile = "port-rom-hashes.json";
-constexpr int kGameCacheVersion = 7;
+constexpr int kGameCacheVersion = 8;
 constexpr const char *kPortsSystemId = "ports";
 constexpr qsizetype kMaximumGamePortOutputBytes = 64 * 1024;
 

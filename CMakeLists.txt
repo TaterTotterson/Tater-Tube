@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(TaterTube VERSION 1.9.6 LANGUAGES CXX)
+project(TaterTube VERSION 1.9.7 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,6 +26,9 @@ if(BUILD_TESTING)
             src/modules/retro/GamePortCatalog.cpp
         )
         target_include_directories(game-port-catalog-test PRIVATE src)
+        target_compile_definitions(game-port-catalog-test PRIVATE
+            TATER_TUBE_TEST_APP_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+        )
         target_link_libraries(game-port-catalog-test PRIVATE Qt6::Core Qt6::Test)
         add_test(NAME game-port-catalog COMMAND game-port-catalog-test)
     endif()
